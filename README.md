@@ -63,3 +63,53 @@ CTRL + C
 - Jangan mengedit isi folder `venv`.
 - Jika ada dependency baru, jalankan `pip freeze > requirements.txt` agar daftar package tetap terbaru.
 - File database lokal seperti `db.sqlite3` tidak perlu dibagikan ke anggota kelompok.
+
+## Aturan Kerja Git
+
+Branch `main` digunakan sebagai versi utama project. Jangan push langsung ke `main` agar pekerjaan anggota kelompok lain tidak tertimpa.
+
+Setiap anggota kelompok sebaiknya membuat branch baru untuk fitur atau tugas masing-masing.
+
+### 1. Ambil update terbaru dari main
+
+```powershell
+git checkout main
+git pull origin main
+```
+
+### 2. Buat branch baru
+
+Gunakan nama branch yang jelas sesuai tugas.
+
+```powershell
+git checkout -b fitur-nama-fitur
+```
+
+Contoh:
+
+```powershell
+git checkout -b fitur-menu-makanan
+```
+
+### 3. Simpan perubahan ke commit
+
+```powershell
+git add .
+git commit -m "Tambah fitur menu makanan"
+```
+
+### 4. Push branch ke repository
+
+```powershell
+git push origin fitur-menu-makanan
+```
+
+### 5. Buat Pull Request
+
+Setelah branch di-push, buat Pull Request dari branch tersebut ke `main`.
+
+Sebelum Pull Request digabungkan:
+
+- Pastikan project masih bisa dijalankan.
+- Minta minimal satu anggota kelompok untuk mengecek perubahan.
+- Jangan merge jika masih ada error yang belum diselesaikan.
