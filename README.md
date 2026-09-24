@@ -66,9 +66,9 @@ CTRL + C
 
 ## Aturan Kerja Git
 
-Branch `main` digunakan sebagai versi utama project. Jangan push langsung ke `main` agar pekerjaan anggota kelompok lain tidak tertimpa.
+Branch `main` digunakan sebagai versi utama project. Jangan push langsung ke `main` agar pekerjaan yang lain tidak tertimpa.
 
-Setiap anggota kelompok sebaiknya membuat branch baru untuk fitur atau tugas masing-masing.
+Setiap orang sebaiknya membuat branch baru untuk fitur atau tugas masing-masing.
 
 ### 1. Ambil update terbaru dari main
 
