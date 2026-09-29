@@ -22,5 +22,8 @@ class Product(models.Model):
     image = models.ImageField(upload_to="menu/", blank=True)
     is_available = models.BooleanField(default=True)
 
+    def dapatkan_status(self):
+        return "Tersedia" if self.is_available else "Sedang Kosong"
+
     def __str__(self):
         return self.name
