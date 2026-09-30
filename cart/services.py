@@ -76,7 +76,7 @@ class CartService:
             try:
                 item = MenuItem.objects.select_related("category").get(pk=line["menu_item_id"])
             except MenuItem.DoesNotExist:
-                rendered.append({**line, "valid": False, "error": "Menu item no longer exists."})
+                rendered.append({**line, "name": "Menu tidak tersedia", "valid": False, "error": "Menu item no longer exists.", "unit_price": "0.00", "line_total": "0.00", "variants": [], "addons": []})
                 continue
             options = list(VariantOption.objects.select_related("group").filter(pk__in=line["variant_ids"]))
             addons = list(AddOn.objects.filter(pk__in=line["addon_ids"]))

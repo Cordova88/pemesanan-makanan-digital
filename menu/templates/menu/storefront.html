@@ -1,0 +1,416 @@
+{% load static %}
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RasaKita — Pesan Makanan</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --brand: #00aa5b;
+        --ink: #1f2937;
+        --soft: #f5f7f6;
+      }
+      body {
+        background: var(--soft);
+        color: var(--ink);
+        font-family: Inter, system-ui, sans-serif;
+      }
+      .navbar-brand,
+      .brand {
+        color: var(--brand) !important;
+        font-weight: 800;
+        letter-spacing: -0.6px;
+      }
+      .hero {
+        background: linear-gradient(125deg, #006b3f, #00aa5b 55%, #42cc7a);
+        color: white;
+        border-radius: 0 0 32px 32px;
+      }
+      .search-wrap {
+        max-width: 650px;
+      }
+      .category-chip {
+        white-space: nowrap;
+        border: 0;
+        background: white;
+        color: #4b5563;
+        font-weight: 600;
+      }
+      .category-chip.active,
+      .category-chip:hover {
+        background: #d8f7e7;
+        color: #06743d;
+      }
+      .menu-card {
+        border: 0;
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+        transition:
+          transform 0.18s,
+          box-shadow 0.18s;
+      }
+      .menu-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+      }
+      .food-cover {
+        height: 126px;
+        background: linear-gradient(135deg, #e8f9ef, #bcf0d0);
+        display: grid;
+        place-items: center;
+        font-size: 3.5rem;
+      }
+      .price {
+        color: #087a43;
+        font-size: 1.05rem;
+        font-weight: 800;
+      }
+      .btn-brand {
+        background: var(--brand);
+        border-color: var(--brand);
+        color: white;
+        font-weight: 700;
+      }
+      .btn-brand:hover {
+        background: #008f4c;
+        border-color: #008f4c;
+        color: white;
+      }
+      #floatingCart {
+        display: none;
+        position: fixed;
+        z-index: 1030;
+        bottom: 22px;
+        left: 50%;
+        transform: translateX(-50%);
+        min-width: min(390px, calc(100vw - 32px));
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0, 80, 40, 0.3);
+      }
+      .cart-line + .cart-line {
+        border-top: 1px solid #e5e7eb;
+      }
+      .quantity-btn {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        padding: 0;
+      }
+      .offcanvas {
+        border-radius: 22px 0 0 22px;
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar bg-white sticky-top border-bottom">
+      <div class="container py-1"></div>
+    </nav>
+    <header class="hero py-4 py-md-5 mb-4">
+      <div class="container">
+        <p class="mb-1 text-white-50 fw-semibold">MAKANAN FAVORIT HARI INI</p>
+        <h1 class="fw-bold mb-3">Lapar? Pesan yang kamu suka.</h1>
+        <div class="input-group search-wrap bg-white rounded-3 overflow-hidden">
+          <span class="input-group-text bg-white border-0">🔎</span
+          ><input
+            id="search"
+            class="form-control border-0 shadow-none py-3"
+            placeholder="Cari nasi goreng, minuman, atau add-on…"
+          />
+        </div>
+      </div>
+    </header>
+    <main class="container pb-5">
+      <div id="categories" class="d-flex gap-2 overflow-auto pb-3 mb-2"></div>
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h4 fw-bold mb-0">Menu untukmu</h2>
+        <span id="menuCount" class="small text-secondary"></span>
+      </div>
+      <div id="menuGrid" class="row g-3">
+        <div class="text-center py-5 text-secondary">Memuat menu…</div>
+      </div>
+    </main>
+
+    <button
+      id="floatingCart"
+      class="btn btn-brand py-3 px-4"
+      data-bs-toggle="offcanvas"
+      data-bs-target="#cartDrawer"
+    >
+      <span>🛒 <strong id="cartCount">0 item</strong></span
+      ><span class="float-end ms-5" id="cartTotal">Rp0</span>
+    </button>
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="cartDrawer">
+      <div class="offcanvas-header border-bottom">
+        <h5 class="fw-bold mb-0">Keranjangmu</h5>
+        <button class="btn-close" data-bs-dismiss="offcanvas"></button>
+      </div>
+      <div id="cartLines" class="offcanvas-body"></div>
+      <div class="border-top p-3 bg-white">
+        <div class="d-flex justify-content-between fw-bold mb-3">
+          <span>Total</span><span id="drawerTotal">Rp0</span>
+        </div>
+        <button id="checkoutButton" class="btn btn-brand w-100 py-2" disabled>
+          Lanjut ke checkout
+        </button>
+      </div>
+    </div>
+
+    <div class="modal fade" id="itemModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content border-0 rounded-4">
+          <div class="modal-header">
+            <h5 id="modalTitle" class="modal-title fw-bold"></h5>
+            <button class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div id="modalBody" class="modal-body"></div>
+          <div class="modal-footer">
+            <span class="me-auto small text-secondary" id="modalPrice"></span
+            ><button id="confirmAdd" class="btn btn-brand">
+              Tambahkan ke keranjang
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal fade" id="checkoutModal" tabindex="-1">
+      <div class="modal-dialog">
+        <form id="checkoutForm" class="modal-content border-0 rounded-4">
+          <div class="modal-header">
+            <h5 class="modal-title fw-bold">Lengkapi pesanan</h5>
+            <button class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <label class="form-label">Nama</label
+            ><input
+              class="form-control mb-3"
+              name="customer_name"
+              required
+            /><label class="form-label"
+              >Nomor telepon
+              <small class="text-secondary">(opsional)</small></label
+            ><input class="form-control mb-3" name="phone" /><label
+              class="form-label"
+              >Tipe pesanan</label
+            ><select class="form-select mb-3" name="order_type" id="orderType">
+              <option value="TAKEAWAY">Takeaway</option>
+              <option value="DINE_IN">Makan di tempat</option>
+            </select>
+            <div id="tableField" class="d-none">
+              <label class="form-label">Nomor meja</label
+              ><input class="form-control mb-3" name="table_number" />
+            </div>
+            <label class="form-label"
+              >Catatan <small class="text-secondary">(opsional)</small></label
+            ><textarea class="form-control" name="note" rows="2"></textarea>
+            <div
+              id="checkoutError"
+              class="alert alert-danger d-none mt-3 mb-0"
+            ></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-brand" type="submit">Buat pesanan</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div
+      id="toastArea"
+      class="toast-container position-fixed top-0 end-0 p-3"
+    ></div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      const money = (v) =>
+        new Intl.NumberFormat("id-ID", {
+          style: "currency",
+          currency: "IDR",
+          maximumFractionDigits: 0,
+        }).format(v);
+      const emoji = (name) =>
+        /teh|es|kopi|jus/i.test(name) ? "🥤" : /ayam/i.test(name) ? "🍗" : "🍛";
+      const csrf = () =>
+        document.cookie
+          .split("; ")
+          .find((v) => v.startsWith("csrftoken="))
+          ?.split("=")[1] || "";
+      const api = async (url, options = {}) => {
+        const res = await fetch(url, {
+          ...options,
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrf(),
+            ...(options.headers || {}),
+          },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Terjadi kesalahan.");
+        return data;
+      };
+      let menu = [],
+        cart = { items: [], total: "0.00" },
+        chosen = null,
+        category = "Semua";
+      const toast = (text) => {
+        const el = document.createElement("div");
+        el.className = "toast align-items-center text-bg-dark border-0";
+        el.innerHTML = `<div class="d-flex"><div class="toast-body">${text}</div><button class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
+        document.querySelector("#toastArea").append(el);
+        new bootstrap.Toast(el).show();
+      };
+      function renderMenu() {
+        const query = document.querySelector("#search").value.toLowerCase();
+        const filtered = menu.filter(
+          (x) =>
+            (category === "Semua" || x.category === category) &&
+            x.name.toLowerCase().includes(query),
+        );
+        document.querySelector("#menuCount").textContent =
+          `${filtered.length} menu`;
+        document.querySelector("#menuGrid").innerHTML =
+          filtered
+            .map(
+              (x) =>
+                `<div class="col-6 col-md-4 col-lg-3"><article class="card menu-card h-100"><div class="food-cover">${emoji(x.name)}</div><div class="card-body d-flex flex-column p-3"><span class="small text-secondary mb-1">${x.category}</span><h3 class="h6 fw-bold">${x.name}</h3><p class="small text-secondary mb-3 flex-grow-1">${x.description || "Menu pilihan RasaKita"}</p><div class="d-flex align-items-center justify-content-between gap-2"><span class="price">${money(x.price)}</span><button class="btn btn-sm btn-brand" onclick="openItem(${x.id})">+ Tambah</button></div></div></article></div>`,
+            )
+            .join("") ||
+          '<div class="text-center py-5 text-secondary">Menu tidak ditemukan.</div>';
+      }
+      function renderCategories() {
+        const cats = ["Semua", ...new Set(menu.map((x) => x.category))];
+        document.querySelector("#categories").innerHTML = cats
+          .map(
+            (c) =>
+              `<button class="btn category-chip rounded-pill px-3 ${c === category ? "active" : ""}" onclick="setCategory('${c}')">${c}</button>`,
+          )
+          .join("");
+      }
+      function setCategory(value) {
+        category = value;
+        renderCategories();
+        renderMenu();
+      }
+      function openItem(id) {
+        chosen = menu.find((x) => x.id === id);
+        document.querySelector("#modalTitle").textContent = chosen.name;
+        document.querySelector("#modalPrice").textContent =
+          `Mulai ${money(chosen.price)}`;
+        const variants = chosen.variants
+          .map(
+            (g) =>
+              `<div class="mb-3"><label class="form-label fw-bold">${g.name}${g.required ? " *" : ""}</label>${g.options.map((o) => `<div class="form-check"><input class="form-check-input variant-choice" type="radio" name="group-${g.id}" value="${o.id}" ${g.required ? "required" : ""}><label class="form-check-label">${o.name} <span class="text-secondary">${Number(o.price_adjustment) ? "+" + money(o.price_adjustment) : ""}</span></label></div>`).join("")}</div>`,
+          )
+          .join("");
+        const addons = chosen.addons.length
+          ? `<div><label class="form-label fw-bold">Tambahan</label>${chosen.addons.map((a) => `<div class="form-check"><input class="form-check-input addon-choice" type="checkbox" value="${a.id}"><label class="form-check-label">${a.name} <span class="text-secondary">+${money(a.price)}</span></label></div>`).join("")}</div>`
+          : "";
+        document.querySelector("#modalBody").innerHTML =
+          `${variants}${addons}<label class="form-label fw-bold mt-2">Jumlah</label><input id="itemQty" class="form-control" type="number" min="1" value="1">`;
+        bootstrap.Modal.getOrCreateInstance("#itemModal").show();
+      }
+      async function refreshCart() {
+        cart = await api("/api/cart/");
+        const count = cart.items.reduce((n, x) => n + x.quantity, 0);
+        document.querySelector("#floatingCart").style.display = count
+          ? "block"
+          : "none";
+        document.querySelector("#cartCount").textContent = `${count} item`;
+        document.querySelector("#cartTotal").textContent = money(cart.total);
+        document.querySelector("#drawerTotal").textContent = money(cart.total);
+        document.querySelector("#checkoutButton").disabled = !count;
+        document.querySelector("#cartLines").innerHTML = cart.items.length
+          ? cart.items
+              .map(
+                (x) =>
+                  `<div class="cart-line py-3"><div class="d-flex justify-content-between gap-2"><div><div class="fw-bold">${x.name}</div><div class="small text-secondary">${[...x.variants.map((v) => v.name), ...x.addons.map((a) => a.name)].join(", ") || "Tanpa tambahan"}</div><span class="price small">${money(x.line_total)}</span></div><button class="btn btn-link text-danger p-0" onclick="removeLine('${x.id}')">Hapus</button></div><div class="mt-2 d-flex gap-2 align-items-center"><button class="btn btn-outline-secondary quantity-btn" onclick="changeQty('${x.id}',${x.quantity - 1})">−</button><b>${x.quantity}</b><button class="btn btn-outline-secondary quantity-btn" onclick="changeQty('${x.id}',${x.quantity + 1})">+</button></div></div>`,
+              )
+              .join("")
+          : '<p class="text-secondary text-center pt-5">Keranjangmu masih kosong.</p>';
+      }
+      async function changeQty(id, quantity) {
+        try {
+          await api("/api/cart/" + id + "/", {
+            method: "PATCH",
+            body: JSON.stringify({ quantity }),
+          });
+          refreshCart();
+        } catch (e) {
+          toast(e.message);
+        }
+      }
+      async function removeLine(id) {
+        try {
+          await api("/api/cart/" + id + "/", { method: "DELETE" });
+          refreshCart();
+        } catch (e) {
+          toast(e.message);
+        }
+      }
+      document.querySelector("#confirmAdd").onclick = async () => {
+        const form = document.querySelector("#modalBody");
+        const invalid = form.querySelector("input:invalid");
+        if (invalid && !invalid.reportValidity()) return;
+        try {
+          await api("/api/cart/add/", {
+            method: "POST",
+            body: JSON.stringify({
+              menu_item_id: chosen.id,
+              quantity: Number(document.querySelector("#itemQty").value),
+              variant_ids: [
+                ...document.querySelectorAll(".variant-choice:checked"),
+              ].map((x) => Number(x.value)),
+              addon_ids: [
+                ...document.querySelectorAll(".addon-choice:checked"),
+              ].map((x) => Number(x.value)),
+            }),
+          });
+          bootstrap.Modal.getInstance("#itemModal").hide();
+          await refreshCart();
+          toast("Ditambahkan ke keranjang");
+        } catch (e) {
+          toast(e.message);
+        }
+      };
+      document.querySelector("#search").oninput = renderMenu;
+      document.querySelector("#checkoutButton").onclick = () =>
+        bootstrap.Modal.getOrCreateInstance("#checkoutModal").show();
+      document.querySelector("#orderType").onchange = (e) =>
+        document
+          .querySelector("#tableField")
+          .classList.toggle("d-none", e.target.value !== "DINE_IN");
+      document.querySelector("#checkoutForm").onsubmit = async (e) => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(e.target));
+        const error = document.querySelector("#checkoutError");
+        try {
+          const order = await api("/api/orders/checkout/", {
+            method: "POST",
+            body: JSON.stringify(data),
+          });
+          bootstrap.Modal.getInstance("#checkoutModal").hide();
+          await refreshCart();
+          toast(
+            `Pesanan ${order.public_id} berhasil dibuat — total ${money(order.total)}`,
+          );
+        } catch (err) {
+          error.textContent = err.message;
+          error.classList.remove("d-none");
+        }
+      };
+      Promise.all([api("/api/menu/"), refreshCart()])
+        .then(([data]) => {
+          menu = data.items;
+          renderCategories();
+          renderMenu();
+        })
+        .catch((e) => {
+          document.querySelector("#menuGrid").innerHTML =
+            `<div class="alert alert-danger">${e.message}</div>`;
+        });
+    </script>
+  </body>
+</html>
