@@ -78,5 +78,8 @@ class AddOn(models.Model):
         indexes = [models.Index(fields=["is_active", "is_available"])]
         constraints = [models.CheckConstraint(condition=Q(price__gte=0), name="addon_price_nonnegative")]
 
+    def dapatkan_status(self):
+        return "Tersedia" if self.is_available else "Sedang Kosong"
+
     def __str__(self):
         return self.name
