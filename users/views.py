@@ -1,4 +1,5 @@
 from io import BytesIO
+from base64 import b64encode
 
 from django.contrib import messages
 from django.contrib.auth import login, logout
@@ -79,7 +80,7 @@ def table_qr(request, pk):
     table = get_object_or_404(Table, pk=pk)
     try: qr_data = _qr_png(_table_url(request, table))
     except RuntimeError as exc: messages.error(request, str(exc)); return redirect('staff:tables')
-    return render(request, 'users/table_qr.html', {'table': table, 'table_url': _table_url(request, table), 'qr_data': qr_data.hex()})
+    return render(request, 'users/table_qr.html', {'table': table, 'table_url': _table_url(request, table), 'qr_data': b64encode(qr_data).decode()})
 
 @cms_required
 def table_qr_download(request, pk):
