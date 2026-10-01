@@ -23,6 +23,7 @@ urlpatterns = [
     path('', storefront, name='storefront'),
     path('orders/<str:public_id>/', confirmation, name='order-confirmation'),
     path('admin/', admin.site.urls),
+    path('staff/', include('users.urls')),
     path('api/menu/', include('menu.urls')),
     path('api/cart/', include('cart.urls')),
     path('api/orders/', include('orders.urls')),
