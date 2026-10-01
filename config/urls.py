@@ -17,9 +17,11 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 from menu.views import storefront
+from orders.views import confirmation
 
 urlpatterns = [
     path('', storefront, name='storefront'),
+    path('orders/<str:public_id>/', confirmation, name='order-confirmation'),
     path('admin/', admin.site.urls),
     path('api/menu/', include('menu.urls')),
     path('api/cart/', include('cart.urls')),

@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Status Pesanan — RasaKita</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --brand: #10b981;
+        --paper: #f8fafc;
+      }
+      body {
+        background: var(--paper);
+        color: #0f172a;
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+      }
+      .brand {
+        color: var(--brand);
+        font-weight: 800;
+        letter-spacing: -0.5px;
+      }
+      .receipt {
+        max-width: 560px;
+        border: 0;
+        border-radius: 22px;
+        box-shadow: 0 12px 35px rgba(15, 23, 42, 0.08);
+      }
+      .status {
+        font-size: 0.78rem;
+        letter-spacing: 0.04em;
+      }
+      .qr-box {
+        width: 190px;
+        min-height: 190px;
+        display: grid;
+        place-items: center;
+        border: 1px solid #e2e8f0;
+        border-radius: 18px;
+        background: #fff;
+        margin: auto;
+      }
+      .expiry {
+        background: #ecfdf5;
+        border: 1px solid #bbf7d0;
+        color: #166534;
+        border-radius: 14px;
+      }
+      .copy-link {
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar bg-white border-bottom">
+      <div class="container py-2">
+        <a class="navbar-brand brand fs-4 m-0" href="/"
+          >rasa<span class="text-dark">kita</span></a
+        >
+        <a class="small text-decoration-none text-secondary" href="/"
+          >← Kembali ke menu</a
+        >
+      </div>
+    </nav>
+
+    <main class="container py-4 py-md-5">
+      <section class="card receipt mx-auto bg-white overflow-hidden">
+        <!-- Header Banner -->
+        <div class="text-center p-4 pb-3 border-bottom">
+          <div
+            class="rounded-circle bg-success-subtle text-success d-inline-flex align-items-center justify-content-center mb-3"
+            style="width: 54px; height: 54px"
+          >
+            ✓
+          </div>
+          <h1 class="h4 fw-bold mb-1">Pesanan Berhasil Dibuat</h1>
+          <p class="text-secondary mb-0 small">
+            Tunjukkan kode QR atau ID pesanan ini kepada kasir.
+          </p>
+        </div>
+
+        <!-- Card Body Content -->
+        <div class="card-body p-4">
+          <div id="loading" class="text-center text-secondary py-4">
+            Memuat detail pesanan…
+          </div>
+
+          <div id="content" class="d-none">
+            <!-- Order ID & Status Badge -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <div class="small text-secondary fw-semibold">ID PESANAN</div>
+                <strong id="orderId" class="fs-4 text-dark"></strong>
+              </div>
+              <span
+                id="status"
+                class="badge rounded-pill status px-3 py-2"
+              ></span>
+            </div>
+
+            <!-- Service Type & Table Context Banner -->
+            <div
+              id="serviceType"
+              class="small rounded-3 bg-light p-3 mb-3 border"
+            ></div>
+
+            <!-- Transaction QR Code -->
+            <div
+              class="qr-box p-2 mb-3"
+              id="qrCode"
+              aria-label="QR code pesanan"
+            ></div>
+
+            <button
+              id="copyButton"
+              class="btn btn-outline-secondary btn-sm w-100 copy-link mb-3 rounded-3 py-2"
+            >
+              Salin tautan pesanan
+            </button>
+
+            <!-- Expiration Countdown -->
+            <div
+              id="expiryBox"
+              class="expiry p-3 mb-3 d-flex justify-content-between align-items-center"
+            >
+              <div>
+                <strong class="d-block">Batas Pembayaran</strong>
+                <span id="expiryDescription" class="small"></span>
+              </div>
+              <strong id="countdown" class="fs-5"></strong>
+            </div>
+
+            <!-- Order Summary Details -->
+            <div class="border-top pt-3">
+              <h2 class="h6 fw-bold mb-3">Rincian Pesanan</h2>
+              <div id="items"></div>
+
+              <!-- Customer Note (If provided) -->
+              <div
+                id="orderNoteContainer"
+                class="d-none mt-3 p-2.5 bg-light rounded-3 border small"
+              >
+                <span class="text-muted fw-semibold">Catatan:</span>
+                <span id="orderNoteText" class="text-dark"></span>
+              </div>
+
+              <!-- Payment Total -->
+              <div
+                class="d-flex justify-content-between border-top mt-3 pt-3 align-items-center"
+              >
+                <span class="fw-bold text-dark">Total Pembayaran</span>
+                <strong id="total" class="text-success fs-5"></strong>
+              </div>
+            </div>
+          </div>
+
+          <div id="error" class="alert alert-danger d-none mb-0"></div>
+        </div>
+
+        <!-- Card Footer -->
+        <div class="card-footer bg-white border-top p-3 text-center">
+          <a
+            id="showOrderLink"
+            class="small text-secondary text-decoration-none"
+            href="#"
+          >
+            Halaman ini dapat dibuka kembali menggunakan tautan pesanan.
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script>
+      const publicId = "{{ public_id|escapejs }}";
+      const orderUrl = `${window.location.origin}/orders/${publicId}/`;
+      const money = (value) =>
+        new Intl.NumberFormat("id-ID", {
+          style: "currency",
+          currency: "IDR",
+          maximumFractionDigits: 0,
+        }).format(value);
+
+      let order, timer;
+
+      function statusStyle(status) {
+        return (
+          {
+            PENDING:
+              "bg-warning-subtle text-warning-emphasis border border-warning-subtle",
+            PAID: "bg-success-subtle text-success border border-success-subtle",
+            CANCELLED:
+              "bg-danger-subtle text-danger border border-danger-subtle",
+            EXPIRED:
+              "bg-secondary-subtle text-secondary border border-secondary-subtle",
+            REFUNDED:
+              "bg-info-subtle text-info-emphasis border border-info-subtle",
+          }[status] || "bg-light text-dark"
+        );
+      }
+
+      function safeText(value) {
+        if (!value) return "";
+        const node = document.createElement("span");
+        node.textContent = value;
+        return node.innerHTML;
+      }
+
+      function render() {
+        document.querySelector("#loading").classList.add("d-none");
+        document.querySelector("#content").classList.remove("d-none");
+
+        document.querySelector("#orderId").textContent = order.public_id;
+
+        const status = document.querySelector("#status");
+        status.textContent = order.status;
+        status.className = `badge rounded-pill status px-3 py-2 ${statusStyle(order.status)}`;
+
+        document.querySelector("#total").textContent = money(order.total);
+
+        // Safe Service Type & Table Display
+        const serviceTypeEl = document.querySelector("#serviceType");
+        if (order.order_type === "DINE_IN") {
+          const tableNum = order.table?.number || order.table_number || "—";
+          serviceTypeEl.innerHTML = `
+          <div class="d-flex align-items-center gap-2">
+            <span class="fs-6">🍽️</span>
+            <div>
+              <strong class="d-block text-dark">Makan di Tempat (Dine In)</strong>
+              <span class="text-muted">Nomor Meja: <strong class="text-dark">Meja ${safeText(tableNum)}</strong></span>
+            </div>
+          </div>`;
+        } else {
+          serviceTypeEl.innerHTML = `
+          <div class="d-flex align-items-center gap-2">
+            <span class="fs-6">🥡</span>
+            <div>
+              <strong class="d-block text-dark">Bawa Pulang (Takeaway)</strong>
+              <span class="text-muted">Tidak menggunakan meja</span>
+            </div>
+          </div>`;
+        }
+
+        // Render Line Items with Variants & Addons
+        document.querySelector("#items").innerHTML = order.items
+          .map((item) => {
+            const optionsList = [
+              ...(item.variants || []).map((v) => v.name),
+              ...(item.addons || []).map((a) => a.name),
+            ].filter(Boolean);
+
+            const optionsText = optionsList.length
+              ? `<div class="small text-muted mt-0.5">${safeText(optionsList.join(" · "))}</div>`
+              : "";
+
+            return `
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-2.5">
+            <div>
+              <span class="fw-semibold text-dark">${safeText(item.name)}</span>
+              <span class="text-secondary small">× ${item.quantity}</span>
+              ${optionsText}
+            </div>
+            <strong class="text-dark small">${money(item.line_total)}</strong>
+          </div>`;
+          })
+          .join("");
+
+        // Render Order Note if present
+        if (order.note && order.note.trim()) {
+          document.querySelector("#orderNoteText").textContent = order.note;
+          document
+            .querySelector("#orderNoteContainer")
+            .classList.remove("d-none");
+        } else {
+          document.querySelector("#orderNoteContainer").classList.add("d-none");
+        }
+
+        document.querySelector("#showOrderLink").href = orderUrl;
+
+        // Render Transaction QR Code
+        const qrContainer = document.querySelector("#qrCode");
+        qrContainer.innerHTML = "";
+        new QRCode(qrContainer, {
+          text: orderUrl,
+          width: 170,
+          height: 170,
+          colorDark: "#0f172a",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M,
+        });
+
+        updateCountdown();
+        clearInterval(timer);
+        timer = setInterval(updateCountdown, 1000);
+      }
+
+      function updateCountdown() {
+        const box = document.querySelector("#expiryBox");
+
+        if (order.status !== "PENDING") {
+          box.classList.add("d-none");
+          clearInterval(timer);
+          return;
+        }
+
+        const seconds = Math.max(
+          0,
+          Math.floor((new Date(order.expires_at) - Date.now()) / 1000),
+        );
+
+        if (!seconds) {
+          document.querySelector("#countdown").textContent = "Kadaluarsa";
+          document.querySelector("#expiryDescription").textContent =
+            "Pesanan sedang diperbarui…";
+          clearInterval(timer);
+          setTimeout(loadOrder, 800);
+          return;
+        }
+
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+
+        document.querySelector("#countdown").textContent =
+          `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+        document.querySelector("#expiryDescription").textContent =
+          "Selesaikan pembayaran sebelum waktu habis.";
+      }
+
+      async function loadOrder() {
+        try {
+          const response = await fetch(`/api/orders/${publicId}/`);
+          const data = await response.json();
+          if (!response.ok)
+            throw new Error(data.error || "Pesanan tidak ditemukan.");
+          order = data;
+          render();
+        } catch (error) {
+          document.querySelector("#loading").classList.add("d-none");
+          const alert = document.querySelector("#error");
+          alert.textContent = error.message;
+          alert.classList.remove("d-none");
+        }
+      }
+
+      document.querySelector("#copyButton").onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(orderUrl);
+          const btn = document.querySelector("#copyButton");
+          btn.textContent = "✓ Tautan tersalin";
+          setTimeout(() => (btn.textContent = "Salin tautan pesanan"), 1800);
+        } catch {
+          window.prompt("Salin tautan ini:", orderUrl);
+        }
+      };
+
+      loadOrder();
+    </script>
+  </body>
+</html>

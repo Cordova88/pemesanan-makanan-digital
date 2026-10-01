@@ -10,6 +10,17 @@ from django.utils import timezone
 from menu.models import AddOn, MenuItem, VariantOption
 
 def new_public_id(): return secrets.token_hex(4).upper()
+def new_table_token(): return secrets.token_urlsafe(18)
+
+class Table(models.Model):
+    """A physical restaurant table. Its token is encoded in a permanent table QR."""
+    number=models.CharField(max_length=30, unique=True)
+    token=models.CharField(max_length=64, unique=True, default=new_table_token, editable=False)
+    is_active=models.BooleanField(default=True, db_index=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+    updated_at=models.DateTimeField(auto_now=True)
+    class Meta: indexes=[models.Index(fields=["is_active","number"])]
+    def __str__(self): return f"Table {self.number}"
 
 class Order(models.Model):
     class Status(models.TextChoices):
@@ -18,7 +29,7 @@ class Order(models.Model):
     public_id=models.CharField(max_length=12, unique=True, default=new_public_id, editable=False)
     status=models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING, db_index=True)
     customer_name=models.CharField(max_length=150); phone=models.CharField(max_length=32, blank=True)
-    order_type=models.CharField(max_length=10, choices=OrderType.choices); table_number=models.CharField(max_length=30, blank=True); note=models.TextField(blank=True)
+    order_type=models.CharField(max_length=10, choices=OrderType.choices); table=models.ForeignKey(Table,null=True,blank=True,on_delete=models.PROTECT,related_name="orders"); note=models.TextField(blank=True)
     total=models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), validators=[MinValueValidator(0)])
     created_at=models.DateTimeField(auto_now_add=True, db_index=True); updated_at=models.DateTimeField(auto_now=True); expires_at=models.DateTimeField(db_index=True)
     paid_at=models.DateTimeField(null=True, blank=True); cancelled_at=models.DateTimeField(null=True, blank=True); refunded_at=models.DateTimeField(null=True, blank=True)
@@ -27,11 +38,11 @@ class Order(models.Model):
     refunded_by=models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="refunded_orders")
     class Meta:
         indexes=[models.Index(fields=["status","created_at"]),models.Index(fields=["status","expires_at"])]
-        constraints=[models.CheckConstraint(condition=Q(total__gte=0),name="order_total_nonnegative"),models.CheckConstraint(condition=Q(order_type="DINE_IN",table_number__gt="")|Q(order_type="TAKEAWAY",table_number=""),name="order_table_matches_type")]
+        constraints=[models.CheckConstraint(condition=Q(total__gte=0),name="order_total_nonnegative"),models.CheckConstraint(condition=Q(order_type="DINE_IN",table__isnull=False)|Q(order_type="TAKEAWAY",table__isnull=True),name="order_table_matches_type")]
     def clean(self):
         from django.core.exceptions import ValidationError
-        if self.order_type==self.OrderType.DINE_IN and not self.table_number.strip(): raise ValidationError({"table_number":"Required for dine-in."})
-        if self.order_type==self.OrderType.TAKEAWAY and self.table_number: raise ValidationError({"table_number":"Must be empty for takeaway."})
+        if self.order_type==self.OrderType.DINE_IN and not self.table_id: raise ValidationError({"table":"A valid table is required for dine-in."})
+        if self.order_type==self.OrderType.TAKEAWAY and self.table_id: raise ValidationError({"table":"Takeaway orders cannot have a table."})
     def save(self,*args,**kwargs):
         if not self.expires_at: self.expires_at=timezone.now()+timedelta(hours=1)
         while not self.pk and Order.objects.filter(public_id=self.public_id).exists(): self.public_id=new_public_id()

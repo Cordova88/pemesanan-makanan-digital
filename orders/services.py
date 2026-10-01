@@ -6,7 +6,7 @@ from django.db.models import Sum
 from datetime import timedelta
 from django.utils import timezone
 from menu.models import AddOn, MenuItem, VariantOption
-from .models import AuditLog, Order, OrderItem, OrderItemAddOn, OrderItemVariant, Payment
+from .models import AuditLog, Order, OrderItem, OrderItemAddOn, OrderItemVariant, Payment, Table
 
 def _role(user): return "ADMIN" if user and user.is_staff else "CASHIER" if user else "CUSTOMER"
 def _audit(order, action, actor=None, before=None, after=None, **metadata):
@@ -24,6 +24,12 @@ def _menu_item(item_id):
     except MenuItem.DoesNotExist: raise ValidationError("Menu item does not exist.")
     if not item.is_active or not item.is_available or not item.category.is_active: raise ValidationError(f"{item.name} is not available.")
     return item
+def resolve_table_token(token):
+    if not isinstance(token, str) or not token:
+        raise ValidationError({"table_token": "Scan the QR code attached to your table for dine-in ordering."})
+    try: table = Table.objects.get(token=token, is_active=True)
+    except Table.DoesNotExist: raise ValidationError({"table_token": "The table QR code is invalid or inactive."})
+    return table
 def add_item(order, item_id, quantity, variant_ids=(), addon_ids=(), actor=None):
     if quantity < 1: raise ValidationError("Quantity must be positive.")
     item=_menu_item(item_id); options=list(VariantOption.objects.select_related("group").filter(pk__in=variant_ids, is_active=True, group__menu_item=item, group__is_active=True))
@@ -41,7 +47,9 @@ def add_item(order, item_id, quantity, variant_ids=(), addon_ids=(), actor=None)
     return line
 @transaction.atomic
 def create_order(payload):
-    order=Order(customer_name=payload.get("customer_name","").strip(),phone=payload.get("phone","").strip(),order_type=payload.get("order_type",""),table_number=payload.get("table_number","").strip(),note=payload.get("note","").strip(),expires_at=timezone.now()+timedelta(hours=1))
+    order_type=payload.get("order_type", "")
+    table = resolve_table_token(payload.get("table_token")) if order_type == Order.OrderType.DINE_IN else None
+    order=Order(customer_name=payload.get("customer_name","").strip(),phone=payload.get("phone","").strip(),order_type=order_type,table=table,note=payload.get("note","").strip(),expires_at=timezone.now()+timedelta(hours=1))
     order.full_clean(); order.save()
     items=payload.get("items",[])
     if not items: raise ValidationError("Cart cannot be empty.")
@@ -59,11 +67,26 @@ def edit_item(public_id, line_id, quantity, actor):
 @transaction.atomic
 def update_customer(public_id, payload, actor):
     order=Order.objects.select_for_update().get(public_id=public_id); _pending(order)
-    before={field:getattr(order,field) for field in ("customer_name","phone","order_type","table_number","note")}
-    for field in before:
+    before={field:getattr(order,field) for field in ("customer_name","phone","order_type","note")}
+    before["table"] = order.table.number if order.table_id else None
+    for field in ("customer_name", "phone", "order_type", "note"):
         if field in payload: setattr(order,field,str(payload[field]).strip())
+    if order.order_type == Order.OrderType.TAKEAWAY:
+        order.table = None
+    elif "table_token" in payload:
+        order.table = resolve_table_token(payload["table_token"])
     order.full_clean(); order.save()
-    _audit(order,AuditLog.Action.CUSTOMER_CHANGED,actor,before=before,after={field:getattr(order,field) for field in before})
+    after={field:getattr(order,field) for field in ("customer_name","phone","order_type","note")}; after["table"] = order.table.number if order.table_id else None
+    _audit(order,AuditLog.Action.CUSTOMER_CHANGED,actor,before=before,after=after)
+    return order
+@transaction.atomic
+def change_table(public_id, table_token, actor):
+    order=Order.objects.select_for_update().select_related("table").get(public_id=public_id); _pending(order)
+    if order.order_type != Order.OrderType.DINE_IN: raise ValidationError("Takeaway orders cannot be assigned to a table.")
+    previous = order.table.number if order.table_id else None
+    table = resolve_table_token(table_token)
+    order.table = table; order.full_clean(); order.save(update_fields=["table", "updated_at"])
+    _audit(order,AuditLog.Action.MODIFIED,actor,before={"table":previous},after={"table":table.number},change="TABLE_CHANGED")
     return order
 @transaction.atomic
 def cashier_add_item(public_id, payload, actor):
@@ -89,3 +112,13 @@ def expire_pending_orders():
     with transaction.atomic():
         orders=Order.objects.select_for_update().filter(status=Order.Status.PENDING,expires_at__lte=timezone.now())
         for order in orders: order.status=Order.Status.EXPIRED; order.save(update_fields=["status","updated_at"]); _audit(order,AuditLog.Action.EXPIRED)
+
+@transaction.atomic
+def expire_order_if_due(public_id):
+    """Materialize expiry for an individual public lookup without waiting for the scheduler."""
+    order = Order.objects.select_for_update().get(public_id=public_id)
+    if order.status == Order.Status.PENDING and order.expires_at <= timezone.now():
+        order.status = Order.Status.EXPIRED
+        order.save(update_fields=["status", "updated_at"])
+        _audit(order, AuditLog.Action.EXPIRED)
+    return order

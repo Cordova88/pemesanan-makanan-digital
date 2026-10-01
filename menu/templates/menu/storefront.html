@@ -141,6 +141,37 @@
         -webkit-box-orient: vertical;
         overflow: hidden;
       }
+
+      /* Compact Camera Scanner Box Styles */
+      .qr-scanner-box {
+        position: relative;
+        width: 100%;
+        height: 190px;
+        border: 2px dashed #cbd5e1;
+        border-radius: 16px;
+        background-color: #f8fafc;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease-in-out;
+      }
+      .qr-scanner-box.scanning {
+        border-style: solid;
+        border-color: #0f172a;
+        background-color: #0f172a;
+      }
+      #tableQrReader {
+        width: 100%;
+        height: 100%;
+      }
+      #tableQrReader video {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+        border-radius: 14px;
+      }
     </style>
   </head>
   <body>
@@ -307,7 +338,7 @@
     <div class="modal fade" id="checkoutModal" tabindex="-1">
       <div class="modal-dialog modal-dialog-centered">
         <form id="checkoutForm" class="modal-content border-0 rounded-4 shadow">
-          <div class="modal-header border-bottom">
+          <div class="modal-header border-bottom py-3 px-3">
             <h5 class="modal-title fw-bold fs-6">Detail Pemesanan</h5>
             <button class="btn-close" data-bs-dismiss="modal"></button>
           </div>
@@ -339,14 +370,109 @@
                 <option value="DINE_IN">Makan di Tempat (Dine In)</option>
               </select>
             </div>
-            <div id="tableField" class="mb-3 d-none">
-              <label class="form-label small fw-semibold">Nomor Meja</label>
-              <input
-                class="form-control"
-                name="table_number"
-                placeholder="Contoh: Meja 05"
-              />
+
+            <!-- COMPACT QR TABLE SCANNER AREA -->
+            <div id="tableScanContainer" class="d-none mb-3">
+              <!-- State 1: Table Detected Banner -->
+              <div
+                id="tableDetectedBanner"
+                class="alert alert-success border-success-subtle rounded-3 p-3 mb-0 d-none"
+              >
+                <div class="d-flex align-items-center justify-content-between">
+                  <div class="d-flex align-items-center gap-2.5">
+                    <div
+                      class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center"
+                      style="width: 32px; height: 32px"
+                    >
+                      <svg
+                        width="18"
+                        height="18"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <span
+                        class="d-block text-success-emphasis small fw-medium"
+                        >Meja Terdeteksi</span
+                      >
+                      <strong id="detectedTableName" class="text-dark fs-6"
+                        >Meja --</strong
+                      >
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    id="btnRescan"
+                    class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 small"
+                  >
+                    Ganti Meja
+                  </button>
+                </div>
+              </div>
+
+              <!-- State 2 & 3: Compact Camera Box (Initial Prompt & Video Viewport) -->
+              <div id="scannerBox" class="qr-scanner-box">
+                <!-- Initial State inside Box -->
+                <div id="scannerInitialState" class="text-center p-3">
+                  <div class="mb-2 text-secondary opacity-75">
+                    <svg
+                      width="32"
+                      height="32"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        d="M3 7V5a2 2 0 012-2h2m10 0h2a2 2 0 012 2v2m0 10v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2M12 8v8m-4-4h8"
+                      />
+                    </svg>
+                  </div>
+                  <p class="small text-secondary mb-2 fw-medium">
+                    Pindai QR meja untuk melanjutkan
+                  </p>
+                  <button
+                    type="button"
+                    id="btnStartScan"
+                    class="btn btn-sm btn-warning px-3 py-1.5 fw-bold rounded-pill shadow-sm"
+                  >
+                    📷 Pindai QR Meja
+                  </button>
+                </div>
+
+                <!-- Live Camera Viewport -->
+                <div
+                  id="cameraViewport"
+                  class="w-100 h-100 d-none position-relative"
+                >
+                  <div id="tableQrReader"></div>
+                  <div
+                    class="position-absolute bottom-0 start-0 end-0 p-2 d-flex justify-content-between align-items-center bg-dark bg-opacity-75 text-white"
+                  >
+                    <span
+                      id="scanStatus"
+                      class="small ms-1"
+                      style="font-size: 0.75rem"
+                      >Arahkan ke QR Meja...</span
+                    >
+                    <button
+                      type="button"
+                      id="btnStopScan"
+                      class="btn btn-xs btn-outline-light rounded-pill px-2 py-0.5"
+                      style="font-size: 0.75rem"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
+
             <div class="mb-2">
               <label class="form-label small fw-semibold">
                 Catatan Pesanan
@@ -364,9 +490,12 @@
               class="alert alert-danger d-none mt-3 mb-0 py-2 small"
             ></div>
           </div>
-          <div class="modal-footer border-top bg-light rounded-bottom-4">
+          <div
+            class="modal-footer border-top bg-light rounded-bottom-4 py-2.5 px-3"
+          >
             <button
-              class="btn btn-primary-app w-100 py-2 fw-bold"
+              id="btnSubmitCheckout"
+              class="btn btn-primary-app w-100 py-2.5 fw-bold fs-6 rounded-3"
               type="submit"
             >
               Konfirmasi & Buat Pesanan
@@ -384,6 +513,10 @@
     ></div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script
+      src="https://unpkg.com/html5-qrcode"
+      type="text/javascript"
+    ></script>
     <script>
       const money = (v) =>
         new Intl.NumberFormat("id-ID", {
@@ -392,7 +525,6 @@
           maximumFractionDigits: 0,
         }).format(v);
 
-      // SVG Placeholder Icon (Replaces Emojis)
       const placeholderIcon = `
         <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24">
           <rect x="3" y="3" width="18" height="18" rx="4"/>
@@ -424,6 +556,10 @@
         cart = { items: [], total: "0.00" },
         chosen = null,
         category = "Semua";
+      const TABLE_CONTEXT_KEY = "restaurant_table_context";
+      const TABLE_CONTEXT_MAX_AGE = 2 * 60 * 60 * 1000;
+      let tableContext = null;
+      let html5QrCode = null;
 
       const toast = (text) => {
         const el = document.createElement("div");
@@ -432,6 +568,157 @@
         document.querySelector("#toastArea").append(el);
         new bootstrap.Toast(el).show();
       };
+
+      function storedTableContext() {
+        try {
+          const saved = JSON.parse(sessionStorage.getItem(TABLE_CONTEXT_KEY));
+          if (!saved || Date.now() - saved.savedAt > TABLE_CONTEXT_MAX_AGE) {
+            sessionStorage.removeItem(TABLE_CONTEXT_KEY);
+            return null;
+          }
+          return saved;
+        } catch {
+          return null;
+        }
+      }
+
+      async function establishTableContext() {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get("table");
+        if (token) {
+          try {
+            const table = await api(
+              `/api/orders/tables/${encodeURIComponent(token)}/`,
+            );
+            tableContext = { ...table, savedAt: Date.now() };
+            sessionStorage.setItem(
+              TABLE_CONTEXT_KEY,
+              JSON.stringify(tableContext),
+            );
+            params.delete("table");
+            const query = params.toString();
+            window.history.replaceState(
+              {},
+              "",
+              `${window.location.pathname}${query ? `?${query}` : ""}`,
+            );
+          } catch (e) {
+            console.warn("Invalid table QR token from URL");
+          }
+        } else {
+          tableContext = storedTableContext();
+        }
+      }
+
+      function renderOrderType() {
+        const orderType = document.querySelector("#orderType").value;
+        const scanContainer = document.querySelector("#tableScanContainer");
+        const detectedBanner = document.querySelector("#tableDetectedBanner");
+        const scannerBox = document.querySelector("#scannerBox");
+        const submitBtn = document.querySelector("#btnSubmitCheckout");
+
+        if (orderType === "TAKEAWAY") {
+          scanContainer.classList.add("d-none");
+          stopTableScanner();
+          submitBtn.disabled = false;
+          return;
+        }
+
+        scanContainer.classList.remove("d-none");
+
+        if (tableContext) {
+          detectedBanner.classList.remove("d-none");
+          scannerBox.classList.add("d-none");
+          document.querySelector("#detectedTableName").textContent =
+            tableContext.number
+              ? `Meja ${tableContext.number}`
+              : "Meja Terdeteksi";
+          submitBtn.disabled = false;
+        } else {
+          detectedBanner.classList.add("d-none");
+          scannerBox.classList.remove("d-none");
+          submitBtn.disabled = true; // Block checkout until table is scanned
+        }
+      }
+
+      function tokenFromQr(decodedText) {
+        try {
+          const url = new URL(decodedText);
+          return url.searchParams.get("table") || decodedText.trim();
+        } catch {
+          return decodedText.trim();
+        }
+      }
+
+      async function stopTableScanner() {
+        if (html5QrCode && html5QrCode.isScanning) {
+          try {
+            await html5QrCode.stop();
+            html5QrCode.clear();
+          } catch (e) {
+            console.error("Error stopping scanner", e);
+          }
+        }
+        document.querySelector("#cameraViewport").classList.add("d-none");
+        document
+          .querySelector("#scannerInitialState")
+          .classList.remove("d-none");
+        document.querySelector("#scannerBox").classList.remove("scanning");
+      }
+
+      async function startTableScanner() {
+        if (!window.Html5Qrcode) {
+          toast("Modul pemindai kamera tidak tersedia.");
+          return;
+        }
+
+        document.querySelector("#scannerInitialState").classList.add("d-none");
+        document.querySelector("#cameraViewport").classList.remove("d-none");
+        document.querySelector("#scannerBox").classList.add("scanning");
+        document.querySelector("#scanStatus").textContent = "Membuka kamera...";
+
+        html5QrCode = new Html5Qrcode("tableQrReader");
+
+        try {
+          await html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 160, height: 160 } },
+            async (decodedText) => {
+              document.querySelector("#scanStatus").textContent =
+                "Memvalidasi meja...";
+              try {
+                const token = tokenFromQr(decodedText);
+                const table = await api(
+                  `/api/orders/tables/${encodeURIComponent(token)}/`,
+                );
+                tableContext = { ...table, savedAt: Date.now() };
+                sessionStorage.setItem(
+                  TABLE_CONTEXT_KEY,
+                  JSON.stringify(tableContext),
+                );
+                await stopTableScanner();
+                renderOrderType();
+                toast(`Berhasil: Meja ${table.number}`);
+              } catch (err) {
+                document.querySelector("#scanStatus").textContent =
+                  "QR Meja tidak valid!";
+                setTimeout(() => {
+                  if (html5QrCode && html5QrCode.isScanning) {
+                    document.querySelector("#scanStatus").textContent =
+                      "Arahkan ke QR Meja...";
+                  }
+                }, 2000);
+              }
+            },
+            () => {},
+          );
+          document.querySelector("#scanStatus").textContent =
+            "Arahkan ke QR Meja...";
+        } catch (err) {
+          toast("Gagal mengakses kamera. Pastikan izin kamera diberikan.");
+          stopTableScanner();
+        }
+      }
 
       function renderMenu() {
         const query = document.querySelector("#search").value.toLowerCase();
@@ -523,7 +810,6 @@
         document.querySelector("#drawerTotal").textContent = money(cart.total);
         document.querySelector("#checkoutButton").disabled = !count;
 
-        // Render Cart Items / Empty State
         if (!cart.items.length) {
           document.querySelector("#cartLines").innerHTML = `
             <div class="text-center py-5">
@@ -557,7 +843,6 @@
 
             return `
               <div class="cart-item-card p-3 mb-2.5">
-                <!-- Top Row: Name & Delete Button -->
                 <div class="d-flex justify-content-between align-items-start gap-2 mb-1.5">
                   <div class="d-flex align-items-center gap-2">
                     <div class="bg-white rounded-3 d-flex align-items-center justify-content-center border flex-shrink-0" style="width: 32px; height: 32px; color: #94a3b8;">
@@ -585,7 +870,6 @@
                   </button>
                 </div>
 
-                <!-- Bottom Row: Price Hierarchy & Capsule Stepper -->
                 <div class="d-flex align-items-center justify-content-between mt-3 pt-2 border-top border-light-subtle">
                   <div>${priceDisplay}</div>
                   
@@ -666,48 +950,75 @@
       };
 
       document.querySelector("#search").oninput = renderMenu;
+
       document.querySelector("#checkoutButton").onclick = () => {
         const cartDrawerEl = document.querySelector("#cartDrawer");
         const drawerInstance = bootstrap.Offcanvas.getInstance(cartDrawerEl);
         if (drawerInstance) drawerInstance.hide();
+        renderOrderType();
         bootstrap.Modal.getOrCreateInstance("#checkoutModal").show();
       };
 
-      document.querySelector("#orderType").onchange = (e) =>
-        document
-          .querySelector("#tableField")
-          .classList.toggle("d-none", e.target.value !== "DINE_IN");
+      // Scanner Event Listeners
+      document.querySelector("#orderType").onchange = renderOrderType;
+      document.querySelector("#btnStartScan").onclick = startTableScanner;
+      document.querySelector("#btnStopScan").onclick = stopTableScanner;
+      document.querySelector("#btnRescan").onclick = () => {
+        tableContext = null;
+        sessionStorage.removeItem(TABLE_CONTEXT_KEY);
+        renderOrderType();
+      };
+
+      document
+        .querySelector("#checkoutModal")
+        .addEventListener("hidden.bs.modal", stopTableScanner);
 
       document.querySelector("#checkoutForm").onsubmit = async (e) => {
         e.preventDefault();
         const data = Object.fromEntries(new FormData(e.target));
         const error = document.querySelector("#checkoutError");
+        error.classList.add("d-none");
+
+        if (data.order_type === "DINE_IN" && !tableContext) {
+          error.textContent = "Mohon pindai QR meja terlebih dahulu.";
+          error.classList.remove("d-none");
+          return;
+        }
+
+        const payload = {
+          ...data,
+          table_token:
+            data.order_type === "DINE_IN" ? tableContext?.token : null,
+        };
+
         try {
-          const order = await api("/api/orders/checkout/", {
+          const res = await api("/api/orders/checkout/", {
             method: "POST",
-            body: JSON.stringify(data),
+            body: JSON.stringify(payload),
           });
           bootstrap.Modal.getInstance("#checkoutModal").hide();
-          await refreshCart();
-          toast(
-            `Pesanan ${order.public_id} berhasil dibuat — Total ${money(order.total)}`,
-          );
+          toast("Pesanan berhasil dibuat!");
+          window.location.href = `/orders/${res.public_id}/`;
         } catch (err) {
           error.textContent = err.message;
           error.classList.remove("d-none");
         }
       };
 
-      Promise.all([api("/api/menu/"), refreshCart()])
-        .then(([data]) => {
-          menu = data.items;
+      window.addEventListener("DOMContentLoaded", async () => {
+        try {
+          await establishTableContext();
+          const menuResponse = await api("/api/menu/");
+          menu = menuResponse.items;
           renderCategories();
           renderMenu();
-        })
-        .catch((e) => {
+          await refreshCart();
+        } catch (e) {
+          console.error("Initialization error:", e);
           document.querySelector("#menuGrid").innerHTML =
-            `<div class="col-12"><div class="alert alert-danger">${e.message}</div></div>`;
-        });
+            `<div class="col-12"><div class="alert alert-danger">Gagal memuat menu. Silakan muat ulang halaman.</div></div>`;
+        }
+      });
     </script>
   </body>
 </html>
