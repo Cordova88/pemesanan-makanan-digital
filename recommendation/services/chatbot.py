@@ -4,7 +4,10 @@ from .recommendation import RecommendationService
 class ChatbotService:
     KEY = 'recommendation_state'
     def __init__(self, session): self.session=session; self.extractor=TagExtractor(); self.recommender=RecommendationService()
-    def reset(self): self.session.pop(self.KEY, None); self.session.modified=True
+    def reset(self):
+        self.session.pop(self.KEY, None)
+        self.session.pop('recommendation_shown', None)
+        self.session.modified=True
     def _prefs(self):
         data=self.session.get(self.KEY, {}); return Preferences(set(data.get('tags', [])), data.get('max_price'), data.get('category'))
     def reply(self, message, more=False):

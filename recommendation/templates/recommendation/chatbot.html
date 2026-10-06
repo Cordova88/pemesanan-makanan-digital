@@ -128,6 +128,12 @@
         }
       }
 
+      function resetChat() {
+        box.replaceChildren();
+        input.value = "";
+        sendMessage("mulai lagi", false);
+      }
+
       function configure(item) {
         bubble("Atur pilihan untuk " + item.name + ".");
         const card = document.createElement("div");
@@ -227,9 +233,7 @@
         event.preventDefault();
         sendMessage(input.value);
       });
-      document.querySelector("#reset").addEventListener("click", () => {
-        sendMessage("mulai lagi");
-      });
+      document.querySelector("#reset").addEventListener("click", resetChat);
 
       sendMessage("", false);
     </script>

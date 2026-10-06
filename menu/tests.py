@@ -13,7 +13,8 @@ class StorefrontTests(TestCase):
     def test_storefront_is_available(self):
         response = self.client.get("/")
         self.assertTemplateUsed(response, "menu/storefront.html")
-        self.assertContains(response, "Keranjangmu")
+        self.assertContains(response, "/static/menu/css/storefront.css")
+        self.assertContains(response, "/static/menu/js/storefront.mjs")
 
     def test_menu_api_exposes_selection_data(self):
         response = self.client.get("/api/menu/")

@@ -9,8 +9,22 @@ Backend Django/SQLite untuk pemesanan tanpa akun pelanggan. Harga dan pilihan me
 3. Jalankan `python manage.py migrate`, `python manage.py seed_demo`, dan `python manage.py runserver`.
 4. Jalankan `python manage.py expire_orders` secara periodik (mis. setiap menit melalui Task Scheduler/cron) untuk mematerialkan status EXPIRED. Pembayaran juga memeriksa expiry secara atomik.
 
+Untuk development lokal, `DEBUG` aktif secara default agar `runserver` menyajikan file CSS dan JavaScript storefront. Pada deployment, set `DEBUG=false` dan sajikan static files melalui web server/CDN setelah `collectstatic`.
+
 Endpoint publik: `GET /api/menu/`, `POST /api/orders/checkout/`, `GET /api/orders/<public_id>/`.
 Endpoint kasir memerlukan login Django serta group `Cashier` (atau admin): tambah item, ubah kuantitas, data pelanggan, bayar, dan batalkan. Refund hanya `is_staff` admin.
+
+## Struktur frontend storefront
+
+Template `menu/templates/menu/storefront.html` berisi markup halaman dan memuat aset statis dari `menu/static/menu/`. CSS berada di `css/storefront.css`; JavaScript modular berada di `js/`:
+
+- `storefront.mjs` menginisialisasi halaman dan menghubungkan fitur.
+- `state.mjs` menyimpan state halaman dan konteks meja.
+- `api.mjs` menangani request JSON, CSRF, format harga, dan notifikasi.
+- `menu.mjs` menangani katalog, pencarian, kategori, dan pilihan item.
+- `cart.mjs` menangani keranjang sesi melalui endpoint `/api/cart/`.
+- `table-scanner.mjs` menangani QR meja dan status makan di tempat.
+- `checkout.mjs` menangani validasi dan pengiriman checkout.
 
 ## Siklus dan aturan penting
 

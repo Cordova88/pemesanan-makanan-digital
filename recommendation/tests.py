@@ -24,3 +24,26 @@ class RecommendationTests(TestCase):
         self.assertEqual(response.status_code,200); self.assertEqual(response.json()['recommendations'][0]['id'],self.best.id)
         response=self.client.post('/api/recommendation/add/', data='{"menu_item_id": %s, "quantity": 1, "variant_ids": [], "addon_ids": []}' % self.best.id, content_type='application/json')
         self.assertEqual(response.status_code,200); self.assertEqual(len(self.client.get('/api/cart/').json()['items']),1)
+
+    def test_reset_clears_chat_preferences_and_recommendation_history(self):
+        response = self.client.post(
+            '/api/recommendation/chat/',
+            data='{"message":"Aku mau makanan pedas"}',
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(self.client.session['recommendation_state']['tags'])
+        self.assertTrue(self.client.session['recommendation_shown'])
+
+        response = self.client.post(
+            '/api/recommendation/chat/',
+            data='{"message":"mulai lagi"}',
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['state'], 'COLLECTING_PREFERENCES')
+        self.assertEqual(response.json()['preferences']['tags'], [])
+        self.assertEqual(response.json()['recommendations'], [])
+        self.assertNotIn('recommendation_state', self.client.session)
+        self.assertNotIn('recommendation_shown', self.client.session)
