@@ -15,6 +15,14 @@ class Category(models.Model):
     def __str__(self):
         return self.name
 
+
+class MenuTag(models.Model):
+    name = models.SlugField(max_length=50, unique=True)
+    display_name = models.CharField(max_length=80, blank=True)
+
+    def __str__(self):
+        return self.display_name or self.name
+
 # Class untuk item menunya langsung
 class MenuItem(models.Model):
     category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="items")
@@ -25,6 +33,7 @@ class MenuItem(models.Model):
     is_active = models.BooleanField(default=True, db_index=True)
     is_available = models.BooleanField(default=True, db_index=True)
     stock_estimate = models.PositiveIntegerField(null=True, blank=True)
+    tags = models.ManyToManyField(MenuTag, related_name="menu_items", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

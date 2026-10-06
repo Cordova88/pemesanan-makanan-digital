@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Bantu Pilih Menu — RasaKita</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+      body{background:#f8fafc}
+      .chat{max-width:680px;height:100vh;margin:auto;background:#fff;display:flex;flex-direction:column}
+      .messages{overflow:auto;flex:1}
+      .bot,.me{max-width:84%;padding:.7rem .9rem;border-radius:1rem;margin:.5rem 0}
+      .bot{background:#f0fdf4}
+      .me{background:#10b981;color:#fff;margin-left:auto}
+      .card{border-radius:1rem}
+      .quick{border-radius:2rem}
+    </style>
+  </head>
+  <body>
+    <main class="chat shadow">
+      <header class="p-3 border-bottom d-flex justify-content-between">
+        <a href="/" class="text-decoration-none text-dark">← Kembali</a>
+        <strong>Bantu Pilih Menu</strong>
+        <button class="btn btn-sm btn-outline-success" id="reset" type="button">🔄 Mulai lagi</button>
+      </header>
+      <section class="messages p-3" id="messages" aria-live="polite"></section>
+      <form class="p-3 border-top d-flex gap-2" id="form">
+        {% csrf_token %}
+        <input id="input" class="form-control" placeholder="Ada yang kamu inginkan?" autocomplete="off">
+        <button class="btn btn-success" id="send" type="submit">Kirim</button>
+      </form>
+    </main>
+
+    <script>
+      const box = document.querySelector("#messages");
+      const input = document.querySelector("#input");
+      const form = document.querySelector("#form");
+      const sendButton = document.querySelector("#send");
+      const csrf = document.querySelector("[name=csrfmiddlewaretoken]").value;
+      const errorMessage = "Maaf, terjadi masalah. Coba kirim pesan lagi.";
+
+      function bubble(text, isUser = false) {
+        const element = document.createElement("div");
+        element.className = isUser ? "me" : "bot";
+        element.textContent = text;
+        box.append(element);
+        box.scrollTop = box.scrollHeight;
+      }
+
+      async function postJson(url, body) {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrf
+          },
+          body: JSON.stringify(body)
+        });
+        let data;
+        try {
+          data = await response.json();
+        } catch {
+          throw new Error("Respons server tidak valid.");
+        }
+        if (!response.ok) {
+          throw new Error(data.error || "Permintaan tidak berhasil.");
+        }
+        return data;
+      }
+
+      function render(data) {
+        if (typeof data.message !== "string") {
+          throw new Error("Respons chatbot tidak valid.");
+        }
+        bubble(data.message);
+
+        const quickReplies = document.createElement("div");
+        (data.quick_replies || []).forEach((reply) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "btn btn-outline-success btn-sm quick me-1 mb-2";
+          button.textContent = reply.label;
+          button.addEventListener("click", () => sendMessage(reply.value));
+          quickReplies.append(button);
+        });
+        if (quickReplies.childElementCount) {
+          box.append(quickReplies);
+        }
+
+        (data.recommendations || []).forEach((item, index) => {
+          const card = document.createElement("div");
+          card.className = "card shadow-sm p-3 my-2";
+          const name = document.createElement("strong");
+          name.textContent = (index ? "" : "⭐ Paling cocok: ") + item.name;
+          const details = document.createElement("div");
+          details.className = "small text-secondary";
+          details.textContent = (item.tags || []).join(" • ") + " · Rp" +
+            Number(item.price).toLocaleString("id-ID");
+          const choose = document.createElement("button");
+          choose.type = "button";
+          choose.className = "btn btn-success btn-sm mt-2";
+          choose.textContent = "Pilih Menu";
+          choose.addEventListener("click", () => configure(item));
+          card.append(name, details, choose);
+          box.append(card);
+        });
+        box.scrollTop = box.scrollHeight;
+      }
+
+      async function sendMessage(message, showUserMessage = true) {
+        const text = (message || "").trim();
+        if (showUserMessage && !text) {
+          return;
+        }
+        if (showUserMessage) {
+          bubble(text, true);
+        }
+        input.value = "";
+        sendButton.disabled = true;
+        try {
+          const data = await postJson("/api/recommendation/chat/", { message: text });
+          render(data);
+        } catch {
+          bubble(errorMessage);
+        } finally {
+          sendButton.disabled = false;
+          box.scrollTop = box.scrollHeight;
+        }
+      }
+
+      function configure(item) {
+        bubble("Atur pilihan untuk " + item.name + ".");
+        const card = document.createElement("div");
+        card.className = "card p-3 my-2";
+
+        (item.variants || []).forEach((group) => {
+          const title = document.createElement("label");
+          title.className = "form-label fw-semibold mt-2";
+          title.textContent = group.name + (group.required ? " *" : "");
+          card.append(title);
+          (group.options || []).forEach((option) => {
+            const row = document.createElement("div");
+            row.className = "form-check";
+            const radio = document.createElement("input");
+            radio.type = "radio";
+            radio.name = "group-" + group.id;
+            radio.value = option.id;
+            radio.required = group.required;
+            radio.className = "form-check-input";
+            const label = document.createElement("label");
+            label.className = "form-check-label";
+            label.textContent = option.name +
+              (Number(option.price_adjustment)
+                ? " +Rp" + Number(option.price_adjustment).toLocaleString("id-ID")
+                : "");
+            row.append(radio, label);
+            card.append(row);
+          });
+        });
+
+        if ((item.addons || []).length) {
+          const title = document.createElement("label");
+          title.className = "form-label fw-semibold mt-3";
+          title.textContent = "Mau tambahan?";
+          card.append(title);
+          item.addons.forEach((addon) => {
+            const row = document.createElement("div");
+            row.className = "form-check";
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.value = addon.id;
+            checkbox.className = "form-check-input addon";
+            const label = document.createElement("label");
+            label.className = "form-check-label";
+            label.textContent = addon.name + " +Rp" +
+              Number(addon.price).toLocaleString("id-ID");
+            row.append(checkbox, label);
+            card.append(row);
+          });
+        }
+
+        const addButton = document.createElement("button");
+        addButton.type = "button";
+        addButton.className = "btn btn-success btn-sm mt-3";
+        addButton.textContent = "Tambahkan ke Keranjang";
+        addButton.addEventListener("click", async () => {
+          const requiredGroups = (item.variants || []).filter((group) => group.required);
+          const hasAllRequired = requiredGroups.every((group) =>
+            card.querySelector('input[name="group-' + group.id + '"]:checked')
+          );
+          if (!hasAllRequired) {
+            bubble("Pilih semua varian wajib terlebih dahulu.");
+            return;
+          }
+
+          addButton.disabled = true;
+          try {
+            const result = await postJson("/api/recommendation/add/", {
+              menu_item_id: item.id,
+              quantity: 1,
+              variant_ids: [...card.querySelectorAll('input[type="radio"]:checked')]
+                .map((option) => Number(option.value)),
+              addon_ids: [...card.querySelectorAll(".addon:checked")]
+                .map((addon) => Number(addon.value))
+            });
+            bubble(result.message || errorMessage);
+            if (result.message) {
+              const cartLink = document.createElement("a");
+              cartLink.href = "/";
+              cartLink.className = "btn btn-outline-success btn-sm mt-2";
+              cartLink.textContent = "Lihat Keranjang";
+              box.append(cartLink);
+            }
+          } catch {
+            bubble(errorMessage);
+          } finally {
+            addButton.disabled = false;
+            box.scrollTop = box.scrollHeight;
+          }
+        });
+        card.append(addButton);
+        box.append(card);
+        box.scrollTop = box.scrollHeight;
+      }
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        sendMessage(input.value);
+      });
+      document.querySelector("#reset").addEventListener("click", () => {
+        sendMessage("mulai lagi");
+      });
+
+      sendMessage("", false);
+    </script>
+  </body>
+</html>

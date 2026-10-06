@@ -27,4 +27,6 @@ urlpatterns = [
     path('api/menu/', include('menu.urls')),
     path('api/cart/', include('cart.urls')),
     path('api/orders/', include('orders.urls')),
+    path('api/recommendation/', include('recommendation.urls')),
+    path('chatbot/', include('recommendation.urls_page')),
 ]
