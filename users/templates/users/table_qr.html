@@ -1,1 +1,30 @@
-{% extends 'users/base.html' %}{% block content %}<div class="d-flex justify-content-between align-items-center mb-4"><div><h1 class="h3">QR Meja {{ table.number }}</h1><p class="text-secondary mb-0">Pindai untuk mulai memesan di meja ini.</p></div><a href="{% url 'staff:tables' %}" class="btn btn-outline-secondary">Kembali</a></div><div class="card border-0 shadow-sm p-4 text-center" style="max-width:520px"><img class="img-fluid mx-auto" style="max-width:320px" src="data:image/png;base64,{{ qr_data|safe }}" alt="QR Meja {{ table.number }}"><h2 class="h4 mt-3">Meja {{ table.number }}</h2><p class="small text-secondary text-break">{{ table_url }}</p><div class="d-flex justify-content-center gap-2"><a class="btn btn-success" href="{% url 'staff:table-qr-download' table.pk %}">Unduh PNG</a><button class="btn btn-outline-secondary" onclick="window.print()">Cetak</button></div></div>{% endblock %}
+{% extends 'users/base.html' %}{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="h3">QR Meja {{ table.number }}</h1>
+    <p class="text-secondary mb-0">Pindai untuk mulai memesan di meja ini.</p>
+  </div>
+  <a href="{% url 'staff:tables' %}" class="btn btn-outline-secondary"
+    >Kembali</a
+  >
+</div>
+<div class="card border-0 shadow-sm p-4 text-center" style="max-width: 520px">
+  <img
+    class="img-fluid mx-auto"
+    style="max-width: 320px"
+    src="data:image/png;base64,{{ qr_data|safe }}"
+    alt="QR Meja {{ table.number }}"
+  />
+  <h2 class="h4 mt-3">Meja {{ table.number }}</h2>
+  <p class="small text-secondary text-break">{{ table_url }}</p>
+  <div class="d-flex justify-content-center gap-2">
+    <a
+      class="btn btn-success"
+      href="{% url 'staff:table-qr-download' table.pk %}"
+      >Unduh PNG</a
+    ><button class="btn btn-outline-secondary" onclick="window.print()">
+      Cetak
+    </button>
+  </div>
+</div>
+{% endblock %}

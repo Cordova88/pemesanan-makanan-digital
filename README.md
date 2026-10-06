@@ -2,6 +2,8 @@
 
 Aplikasi pemesanan makanan berbasis Django untuk katalog restoran, keranjang sesi, checkout, pemesanan meja melalui QR, pengelolaan kasir, dan rekomendasi menu melalui chatbot berbahasa Indonesia.
 
+Panduan onboarding frontend/backend yang lebih rinci tersedia di [docs/PANDUAN_PENGEMBANGAN.md](docs/PANDUAN_PENGEMBANGAN.md).
+
 ## Prasyarat
 
 - Python 3.12 atau lebih baru.

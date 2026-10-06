@@ -1,1 +1,38 @@
-{% extends 'users/base.html' %}{% block content %}<h1 class="h3 mb-4">Orders</h1><div class="card border-0 shadow-sm"><div class="table-responsive"><table class="table mb-0"><thead><tr><th>ID</th><th>Waktu</th><th>Pelanggan</th><th>Jenis</th><th>Status</th><th>Total</th></tr></thead><tbody>{% for order in orders %}<tr><td>{{ order.public_id }}</td><td>{{ order.created_at|date:'d M Y H:i' }}</td><td>{{ order.customer_name }}</td><td>{{ order.get_order_type_display }}{% if order.table %} · {{ order.table }}{% endif %}</td><td>{{ order.get_status_display }}</td><td>Rp{{ order.total }}</td></tr>{% empty %}<tr><td colspan="6" class="text-center py-4">Belum ada pesanan.</td></tr>{% endfor %}</tbody></table></div></div>{% endblock %}
+{% extends 'users/base.html' %}{% block content %}
+<h1 class="h3 mb-4">Orders</h1>
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Waktu</th>
+          <th>Pelanggan</th>
+          <th>Jenis</th>
+          <th>Status</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in orders %}
+        <tr>
+          <td>{{ order.public_id }}</td>
+          <td>{{ order.created_at|date:'d M Y H:i' }}</td>
+          <td>{{ order.customer_name }}</td>
+          <td>
+            {{ order.get_order_type_display }}{% if order.table %} · {{
+            order.table }}{% endif %}
+          </td>
+          <td>{{ order.get_status_display }}</td>
+          <td>Rp{{ order.total }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="text-center py-4">Belum ada pesanan.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
