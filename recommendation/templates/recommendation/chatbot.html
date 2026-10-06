@@ -80,7 +80,13 @@
           button.type = "button";
           button.className = "btn btn-outline-success btn-sm quick me-1 mb-2";
           button.textContent = reply.label;
-          button.addEventListener("click", () => sendMessage(reply.value));
+          button.addEventListener("click", () => {
+            if (reply.action === "reset") {
+              resetChat();
+            } else {
+              sendMessage(reply.value, reply.label, reply.action);
+            }
+          });
           quickReplies.append(button);
         });
         if (quickReplies.childElementCount) {
@@ -91,34 +97,51 @@
           const card = document.createElement("div");
           card.className = "card shadow-sm p-3 my-2";
           const name = document.createElement("strong");
-          name.textContent = (index ? "" : "⭐ Paling cocok: ") + item.name;
+          name.textContent = item.name;
           const details = document.createElement("div");
           details.className = "small text-secondary";
-          details.textContent = (item.tags || []).join(" • ") + " · Rp" +
-            Number(item.price).toLocaleString("id-ID");
+          details.textContent = (item.labels || []).slice(0, 4).join(" • ");
+          const price = document.createElement("div");
+          price.className = "fw-semibold mt-2";
+          price.textContent = "Rp" + Number(item.price).toLocaleString("id-ID");
+          const fit = document.createElement("div");
+          fit.className = "small fw-semibold text-success mt-2";
+          fit.textContent = index === 0
+            ? "⭐ Paling cocok buat kamu"
+            : "⭐ Cocok juga buat kamu";
+          const reasons = document.createElement("ul");
+          reasons.className = "list-unstyled small mb-1 mt-1";
+          (item.match_reasons || []).forEach((reason) => {
+            const row = document.createElement("li");
+            row.textContent = reason;
+            reasons.append(row);
+          });
           const choose = document.createElement("button");
           choose.type = "button";
           choose.className = "btn btn-success btn-sm mt-2";
           choose.textContent = "Pilih Menu";
           choose.addEventListener("click", () => configure(item));
-          card.append(name, details, choose);
+          card.append(name, details, price, fit, reasons, choose);
           box.append(card);
         });
         box.scrollTop = box.scrollHeight;
       }
 
-      async function sendMessage(message, showUserMessage = true) {
+      async function sendMessage(message, displayMessage = message, action = "") {
         const text = (message || "").trim();
-        if (showUserMessage && !text) {
+        if (!text && displayMessage !== "") {
           return;
         }
-        if (showUserMessage) {
-          bubble(text, true);
+        if (displayMessage) {
+          bubble(displayMessage, true);
         }
         input.value = "";
         sendButton.disabled = true;
         try {
-          const data = await postJson("/api/recommendation/chat/", { message: text });
+          const data = await postJson("/api/recommendation/chat/", {
+            message: text,
+            action
+          });
           render(data);
         } catch {
           bubble(errorMessage);
@@ -131,7 +154,7 @@
       function resetChat() {
         box.replaceChildren();
         input.value = "";
-        sendMessage("mulai lagi", false);
+        sendMessage("mulai lagi", "", "reset");
       }
 
       function configure(item) {
@@ -235,7 +258,7 @@
       });
       document.querySelector("#reset").addEventListener("click", resetChat);
 
-      sendMessage("", false);
+      sendMessage("", "");
     </script>
   </body>
 </html>
