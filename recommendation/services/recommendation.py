@@ -100,3 +100,29 @@ class RecommendationService:
             match.item
             for match in self.rank(preferences, limit=limit, exclude_ids=exclude_ids)
         ]
+
+    def get_available_match(self, item_id):
+        item = (
+            MenuItem.objects.filter(
+                pk=item_id,
+                is_active=True,
+                is_available=True,
+                category__is_active=True,
+            )
+            .select_related("category")
+            .prefetch_related("tags")
+            .first()
+        )
+        if item is None:
+            return None
+        labels = tuple(
+            TAG_LABELS[tag.name]
+            for tag in item.tags.all()
+            if tag.name in TAG_LABELS
+        )
+        return RecommendationMatch(
+            item=item,
+            score=0,
+            match_reasons=(),
+            labels=labels,
+        )

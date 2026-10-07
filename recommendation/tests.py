@@ -18,6 +18,10 @@ from .services.language import IndonesianPriceParser, TAG_LABELS, normalize_text
 from .services.mood_extractor import MoodExtractor
 from .services.recommendation import RecommendationService
 from .services.tag_extractor import Preferences, TagExtractor
+from .services.conversation_interpreter import (
+    ConversationIntent,
+    ConversationInterpreter,
+)
 
 
 class LanguageRuleTests(SimpleTestCase):
@@ -116,6 +120,90 @@ class LanguageRuleTests(SimpleTestCase):
                 self.assertEqual(self.price_parser.parse_maximum(phrase), expected)
         self.assertIsNone(self.price_parser.parse_maximum("mau yang murah dong"))
         self.assertTrue(self.price_parser.prefers_affordable("jangan mahal"))
+
+
+class ConversationInterpreterTests(SimpleTestCase):
+    def setUp(self):
+        self.interpreter = ConversationInterpreter()
+
+    def test_interprets_add_remove_and_replacement_as_current_message_operations(self):
+        add = self.interpreter.interpret("Aku mau pedas")
+        self.assertEqual(add.intent, ConversationIntent.RECOMMEND)
+        self.assertEqual(add.operations[0].action, "ADD")
+        self.assertIn("spicy", add.operations[0].tags)
+
+        remove = self.interpreter.interpret("Eh jangan pedas deh")
+        self.assertEqual(remove.intent, ConversationIntent.REMOVE_PREFERENCES)
+        self.assertIn("spicy", remove.excluded_tags)
+
+        replace = self.interpreter.interpret("Ganti ayam jadi sapi")
+        self.assertEqual(replace.intent, ConversationIntent.REPLACE_PREFERENCES)
+        self.assertEqual(replace.operations[0].remove_tags, ("chicken",))
+        self.assertEqual(replace.operations[0].tags, ("beef",))
+        self.assertFalse(replace.excluded_tags)
+
+        clear = self.interpreter.interpret("Hapus pilihan sebelumnya")
+        self.assertEqual(clear.intent, ConversationIntent.RESET)
+        self.assertEqual(clear.operations[0].action, "CLEAR")
+
+    def test_unknown_messages_and_bare_numbers_are_not_food_requests(self):
+        for message in ("test", "asdfgh", "123123", "haha"):
+            with self.subTest(message=message):
+                self.assertEqual(
+                    self.interpreter.interpret(message).intent,
+                    ConversationIntent.UNKNOWN,
+                )
+
+    def test_recommendation_references_resolve_to_context_positions(self):
+        references = (
+            ("Yang pertama", "first"),
+            ("Yang nomor 2", "second"),
+            ("Yang terakhir", "last"),
+            ("Menu kedua aja", "second"),
+            ("Yang tadi", "last"),
+        )
+        for message, reference in references:
+            with self.subTest(message=message):
+                result = self.interpreter.interpret(
+                    message,
+                    last_recommendations=[11, 22, 33],
+                )
+                self.assertEqual(
+                    result.intent,
+                    ConversationIntent.SELECT_RECOMMENDATION,
+                )
+                self.assertEqual(result.contextual_reference, reference)
+
+        self.assertEqual(
+            self.interpreter.interpret("Yang pertama").intent,
+            ConversationIntent.UNKNOWN,
+        )
+
+    def test_last_question_replaces_only_the_answered_dimension(self):
+        result = self.interpreter.interpret("Camilan", last_question="meal_type")
+        self.assertEqual(result.intent, ConversationIntent.REPLACE_PREFERENCES)
+        self.assertIn("heavy_meal", result.operations[0].remove_tags)
+        self.assertIn("snack", result.operations[0].tags)
+
+        no_context = self.interpreter.interpret("Sapi")
+        self.assertEqual(no_context.intent, ConversationIntent.RECOMMEND)
+        self.assertIn("beef", no_context.tags)
+
+        protein_answer = self.interpreter.interpret(
+            "Sapi",
+            last_question="protein",
+        )
+        self.assertEqual(protein_answer.intent, ConversationIntent.REPLACE_PREFERENCES)
+        self.assertIn("chicken", protein_answer.operations[0].remove_tags)
+        self.assertIn("beef", protein_answer.operations[0].tags)
+
+    def test_mood_cancellation_is_distinct_from_new_mood_and_tags(self):
+        result = self.interpreter.interpret(
+            "Udah nggak capek, sekarang pengen yang seger"
+        )
+        self.assertTrue(result.clear_moods)
+        self.assertNotIn("tired", result.moods)
+        self.assertIn("refreshing", result.tags)
 
 
 class RecommendationTests(TestCase):
@@ -407,6 +495,140 @@ class ChatbotIntegrationTests(TestCase):
                 self.assertEqual(response.json()["state"], "COLLECTING_PREFERENCES")
                 self.assertIn("nggak perlu mikir", response.json()["message"])
                 self.assertTrue(response.json()["quick_replies"])
+
+    def test_empty_initial_message_shows_the_start_prompt(self):
+        response = self.post_chat("")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("bantu kamu memilih menu", response.json()["message"])
+        self.assertTrue(response.json()["quick_replies"])
+
+    def test_meaningful_terserah_message_keeps_its_food_and_mood_preferences(self):
+        response = self.post_chat(
+            "Aku habis kerja, capek banget, terserah yang penting enak dan kenyang"
+        )
+        preferences = response.json()["preferences"]
+        self.assertEqual(response.json()["state"], "RECOMMENDING")
+        self.assertIn(TAG_LABELS["filling"], preferences["tags"])
+        self.assertIn("tired", preferences["moods"])
+        self.assertNotIn("nggak perlu mikir", response.json()["message"])
+
+    def test_remove_replace_and_budget_updates_preserve_unrelated_preferences(self):
+        first = self.post_chat("Aku mau pedas, ayam, dan nasi")
+        self.assertEqual(first.json()["state"], "RECOMMENDING")
+
+        removed = self.post_chat("Eh jangan pedas deh")
+        prefs = removed.json()["preferences"]
+        self.assertNotIn(TAG_LABELS["spicy"], prefs["tags"])
+        self.assertIn(TAG_LABELS["spicy"], prefs["excluded_tags"])
+        self.assertIn(TAG_LABELS["chicken"], prefs["tags"])
+        self.assertIn(TAG_LABELS["rice"], prefs["tags"])
+
+        changed = self.post_chat("Ganti ayam jadi sapi")
+        prefs = changed.json()["preferences"]
+        self.assertNotIn(TAG_LABELS["chicken"], prefs["tags"])
+        self.assertIn(TAG_LABELS["beef"], prefs["tags"])
+        self.assertIn(TAG_LABELS["rice"], prefs["tags"])
+        self.assertIn(TAG_LABELS["spicy"], prefs["excluded_tags"])
+
+        cheaper = self.post_chat("Yang murah aja")
+        prefs = cheaper.json()["preferences"]
+        self.assertIn(TAG_LABELS["beef"], prefs["tags"])
+        self.assertIn(TAG_LABELS["rice"], prefs["tags"])
+        self.assertTrue(prefs["prefer_affordable"])
+
+    def test_unknown_and_gibberish_do_not_mutate_or_replay_preferences(self):
+        first = self.post_chat("Aku mau pedas dan ayam")
+        stored = first.json()["preferences"]
+        for message in ("test", "asdfgh", "123123", "haha"):
+            with self.subTest(message=message):
+                response = self.post_chat(message)
+                self.assertEqual(response.json()["state"], "RECOMMENDING")
+                self.assertEqual(response.json()["recommendations"], [])
+                self.assertEqual(response.json()["preferences"]["tags"], stored["tags"])
+                self.assertEqual(
+                    response.json()["preferences"]["excluded_tags"],
+                    stored["excluded_tags"],
+                )
+
+    def test_rejection_excludes_shown_items_without_changing_preferences(self):
+        for number in range(5):
+            item = MenuItem.objects.create(
+                category=self.best.category,
+                name=f"Menu Pedas Tambahan {number}",
+                price=Decimal("12000") + number,
+            )
+            item.tags.add(self.spicy, self.filling)
+
+        first = self.post_chat("Aku mau pedas dan kenyang")
+        self.assertEqual(len(first.json()["recommendations"]), 3)
+        first_ids = {item["id"] for item in first.json()["recommendations"]}
+        preferences = first.json()["preferences"]
+
+        second = self.post_chat("Cari yang lain")
+        second_ids = {item["id"] for item in second.json()["recommendations"]}
+        self.assertTrue(second_ids)
+        self.assertTrue(first_ids.isdisjoint(second_ids))
+        self.assertEqual(second.json()["preferences"]["tags"], preferences["tags"])
+        self.assertEqual(second.json()["preferences"]["moods"], preferences["moods"])
+
+        third = self.post_chat("Jangan yang tadi")
+        self.assertEqual(third.json()["preferences"]["tags"], preferences["tags"])
+        self.assertTrue(second_ids.isdisjoint(
+            {item["id"] for item in third.json()["recommendations"]}
+        ))
+
+    def test_previous_recommendation_references_return_real_available_items(self):
+        result = self.post_chat("Aku mau ayam pedas dan nasi")
+        recommendations = result.json()["recommendations"]
+        self.assertGreaterEqual(len(recommendations), 1)
+
+        first = self.post_chat("Yang pertama")
+        self.assertEqual(
+            [item["id"] for item in first.json()["recommendations"]],
+            [recommendations[0]["id"]],
+        )
+        if len(recommendations) > 1:
+            second = self.post_chat("Menu kedua aja")
+            self.assertEqual(
+                [item["id"] for item in second.json()["recommendations"]],
+                [recommendations[1]["id"]],
+            )
+
+    def test_reference_without_previous_recommendations_is_handled_gracefully(self):
+        response = self.post_chat("Yang pertama")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["recommendations"], [])
+        self.assertIsInstance(response.json()["message"], str)
+
+    def test_contextual_answer_to_meal_question_replaces_only_meal_type(self):
+        asked = self.post_chat("Pengen pedas")
+        self.assertEqual(asked.json()["state"], "ASKING_FOLLOWUP")
+        response = self.post_chat("Camilan")
+        prefs = response.json()["preferences"]
+        self.assertIn(TAG_LABELS["snack"], prefs["tags"])
+        self.assertNotIn(TAG_LABELS["heavy_meal"], prefs["tags"])
+        self.assertNotIn(TAG_LABELS["filling"], prefs["tags"])
+        self.assertIn(TAG_LABELS["spicy"], prefs["tags"])
+
+    def test_mood_can_be_cleared_without_losing_new_food_preferences(self):
+        first = self.post_chat("Aku capek banget habis kerja dan mau yang mengenyangkan")
+        self.assertIn("tired", first.json()["preferences"]["moods"])
+
+        changed = self.post_chat("Udah nggak capek, sekarang pengen yang seger")
+        preferences = changed.json()["preferences"]
+        self.assertNotIn("tired", preferences["moods"])
+        self.assertIn(TAG_LABELS["refreshing"], preferences["tags"])
+        self.assertNotIn(TAG_LABELS["comfort_food"], preferences["mood_tags"])
+
+    def test_clearing_the_only_mood_persists_the_empty_mood_context(self):
+        self.post_chat("Aku capek banget")
+        response = self.post_chat("Udah nggak capek")
+        self.assertEqual(response.json()["state"], "COLLECTING_PREFERENCES")
+        self.assertEqual(response.json()["preferences"]["moods"], [])
+        self.assertEqual(
+            self.client.session["recommendation_state"]["moods"],
+            [],
+        )
 
     def test_more_results_keep_preferences_and_exclude_shown_items(self):
         first = self.post_chat("mau ayam pedas nasi")
