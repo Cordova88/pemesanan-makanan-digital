@@ -1,0 +1,5 @@
+{% if o.status == "PENDING" %}<span class="badge rounded-pill text-bg-warning">Menunggu</span>
+{% elif o.status == "PAID" %}<span class="badge rounded-pill text-bg-success">Dibayar</span>
+{% elif o.status == "CANCELLED" %}<span class="badge rounded-pill text-bg-secondary">Dibatalkan</span>
+{% elif o.status == "EXPIRED" %}<span class="badge rounded-pill text-bg-secondary">Kedaluwarsa</span>
+{% elif o.status == "REFUNDED" %}<span class="badge rounded-pill text-bg-info">Refund</span>{% endif %}

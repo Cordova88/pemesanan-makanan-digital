@@ -29,4 +29,5 @@ urlpatterns = [
     path('api/orders/', include('orders.urls')),
     path('api/recommendation/', include('recommendation.urls')),
     path('chatbot/', include('recommendation.urls_page')),
+    path('kasir/', include('users.cashier_urls')),
 ]
