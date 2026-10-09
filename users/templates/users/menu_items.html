@@ -19,13 +19,18 @@
     /><button class="btn btn-outline-secondary">Cari</button>
   </div>
 </form>
-<div class="collapse mb-4" id="add">
+<div class="collapse{% if form.errors %} show{% endif %} mb-4" id="add">
   <div class="card card-body">
     <form method="post" enctype="multipart/form-data" class="row g-3">
-      {% csrf_token %}{% for field in form %}
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+      <div class="col-12 text-danger">{{ form.non_field_errors }}</div>
+      {% endif %}
+      {% for field in form %}
       <div class="col-md-6">
-        <label class="form-label">{{ field.label }}</label>{{ field }}{{
-        field.errors }}
+        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        <div class="text-danger small">{{ field.errors }}</div>
       </div>
       {% endfor %}
       <div><button class="btn btn-success">Simpan</button></div>

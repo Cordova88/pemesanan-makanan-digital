@@ -15,6 +15,8 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+from django.conf import settings
+from django.conf.urls.static import static
 from django.urls import include, path
 from menu.views import storefront
 from orders.views import confirmation
@@ -31,3 +33,6 @@ urlpatterns = [
     path('chatbot/', include('recommendation.urls_page')),
     path('kasir/', include('users.cashier_urls')),
 ]
+
+# Uploaded files are served here only for local development (DEBUG=True).
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
