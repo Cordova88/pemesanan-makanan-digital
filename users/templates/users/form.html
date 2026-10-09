@@ -8,16 +8,21 @@
 <div class="card border-0 shadow-sm">
   <div class="card-body">
     <form method="post" enctype="multipart/form-data" class="row g-3">
-      {% csrf_token %}{% for field in form %}
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+      <div class="col-12 text-danger">{{ form.non_field_errors }}</div>
+      {% endif %}
+      {% for field in form %}
       <div class="col-md-6">
         {% if field.field.widget.input_type == 'checkbox' %}
         <div class="form-check mt-4">
-          {{ field }}<label class="form-check-label">{{ field.label }}</label>
+          {{ field }}<label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
         </div>
-        {% else %}<label class="form-label">{{ field.label }}</label>{{ field
-        }}{% endif %}{% if field.help_text %}<small class="text-secondary"
-          >{{ field.help_text }}</small
-        >{% endif %}
+        {% else %}
+        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% endif %}
+        {% if field.help_text %}<small class="text-secondary">{{ field.help_text }}</small>{% endif %}
         <div class="text-danger small">{{ field.errors }}</div>
       </div>
       {% endfor %}
