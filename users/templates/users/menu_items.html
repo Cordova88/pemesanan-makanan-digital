@@ -30,6 +30,7 @@
       <div class="col-md-6">
         <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
         {{ field }}
+        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
         <div class="text-danger small">{{ field.errors }}</div>
       </div>
       {% endfor %}
@@ -45,6 +46,7 @@
           <th>Image</th>
           <th>Name</th>
           <th>Category</th>
+          <th>Tag</th>
           <th>Price</th>
           <th>Available</th>
           <th>Active</th>
@@ -64,6 +66,7 @@
           </td>
           <td>{{ item.name }}</td>
           <td>{{ item.category.name }}</td>
+          <td>{% for tag in item.tags.all %}<span class="badge text-bg-success me-1 mb-1">{{ tag }}</span>{% empty %}<span class="text-secondary">—</span>{% endfor %}</td>
           <td>Rp{{ item.price }}</td>
           <td>{% if item.is_available %}Ya{% else %}Tidak{% endif %}</td>
           <td>{% if item.is_active %}Ya{% else %}Tidak{% endif %}</td>
@@ -77,7 +80,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="7" class="text-center py-4">Tidak ada menu.</td>
+          <td colspan="8" class="text-center py-4">Tidak ada menu.</td>
         </tr>
         {% endfor %}
       </tbody>

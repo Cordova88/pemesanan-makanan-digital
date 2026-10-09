@@ -1,0 +1,24 @@
+{% extends 'users/base.html' %}{% block content %}
+<h1 class="h3 mb-4">Hapus Tag Menu</h1>
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    {% if items %}
+    <div class="alert alert-warning">Tag <strong>{{ tag }}</strong> masih dipakai menu. Lepaskan tag dari semua menu berikut sebelum menghapusnya.</div>
+    <ul>
+      {% for item in items %}
+      <li><a href="{% url 'staff:menu-item-edit' item.pk %}">{{ item.name }}</a>{% if not item.is_active %} (nonaktif){% endif %}</li>
+      {% endfor %}
+    </ul>
+    <a class="btn btn-outline-secondary" href="{% url 'staff:tags' %}">Kembali ke Tag Menu</a>
+    {% else %}
+    <p>Hapus tag <strong>{{ tag }}</strong> ({{ tag.name }})? Tag ini belum dipakai menu.</p>
+    <p class="text-secondary">Penghapusan tidak dapat dibatalkan.</p>
+    <form method="post">
+      {% csrf_token %}
+      <button class="btn btn-danger" type="submit">Ya, hapus tag</button>
+      <a class="btn btn-outline-secondary" href="{% url 'staff:tags' %}">Batal</a>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
