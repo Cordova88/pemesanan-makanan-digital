@@ -11,6 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from menu.models import AddOn, Category, MenuItem, VariantGroup, VariantOption
 from orders.models import AuditLog, Order, Table
@@ -20,19 +21,29 @@ from .forms import AddOnForm, CategoryForm, MenuItemForm, TableForm, VariantGrou
 def _cms_user(user): return user.is_authenticated and user.is_staff
 cms_required = user_passes_test(_cms_user, login_url='staff:login')
 
+def _is_cashier(user):
+    return user.is_authenticated and user.groups.filter(name='Cashier').exists()
+
+def _home_for(user):
+    if user.is_staff:
+        return 'staff:dashboard'
+    return 'kasir:dashboard' if _is_cashier(user) else 'storefront'
+
 @require_http_methods(['GET', 'POST'])
 def staff_login(request):
     if request.user.is_authenticated:
-        return redirect('staff:dashboard') if request.user.is_staff else redirect('storefront')
+        return redirect(_home_for(request.user))
     form = AuthenticationForm(request, data=request.POST or None)
     if request.method == 'POST' and form.is_valid():
         user = form.get_user()
-        if not (user.is_staff or user.groups.filter(name='Cashier').exists()):
+        if not (user.is_staff or _is_cashier(user)):
             form.add_error(None, 'Akun ini tidak memiliki akses staf.')
         else:
             login(request, user)
-            # A cashier screen does not exist yet, so cashiers are not given CMS access.
-            return redirect('staff:dashboard' if user.is_staff else 'storefront')
+            nxt = request.GET.get('next', '')
+            if nxt and url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()}):
+                return redirect(nxt)
+            return redirect(_home_for(user))
     return render(request, 'users/login.html', {'form': form})
 
 @login_required
