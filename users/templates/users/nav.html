@@ -8,6 +8,7 @@
     >Categories</a
   ><a class="rounded px-3 py-2" href="{% url 'staff:menu-items' %}"
     >Menu Items</a
+  ><a class="rounded px-3 py-2 {% if request.resolver_match.url_name == 'tags' or request.resolver_match.url_name == 'tag-edit' or request.resolver_match.url_name == 'tag-delete' %}active{% endif %}" href="{% url 'staff:tags' %}">Tag Menu</a
   ><a class="rounded px-3 py-2" href="{% url 'staff:variants' %}">Variants</a
   ><a class="rounded px-3 py-2" href="{% url 'staff:addons' %}">Add-ons</a
   ><span class="nav-label mt-3 px-3">RESTAURANT</span

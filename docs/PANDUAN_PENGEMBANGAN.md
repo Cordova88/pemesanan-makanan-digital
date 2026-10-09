@@ -384,13 +384,16 @@ Pemindaian kamera di browser memerlukan izin kamera dan umumnya secure context (
 | `/staff/` | `users/dashboard.html` | Ringkasan menu aktif, kategori, order, stok rendah. |
 | `/staff/categories/` | `users/categories.html` | Tambah/lihat kategori; edit melalui route edit. |
 | `/staff/menu-items/` | `users/menu_items.html` | Tambah, cari, lihat, edit menu. |
+| `/staff/tags/` | `users/tags.html` | Tambah, lihat jumlah menu, edit tag melalui `/staff/tags/<id>/edit/`, dan hapus tag yang belum dipakai melalui `/staff/tags/<id>/delete/`. |
 | `/staff/variants/` | `users/variants.html` | Tambah grup/opsi varian, lihat/edit. |
 | `/staff/addons/` | `users/addons.html` | Tambah/lihat/edit add-on. |
 | `/staff/tables/` | `users/tables.html` | Tambah/lihat/edit meja dan buka/download QR. |
 | `/staff/orders/` | `users/orders.html` | Daftar order. |
 | `/staff/audit-log/` | `users/audit_log.html` | Riwayat aksi order. |
 
-Form `ModelForm` dan widget Bootstrap berada di `users/forms.py`. Template edit yang dipakai bersama adalah `users/form.html`. CMS custom yang ada sekarang **tidak** menyediakan CRUD untuk user staf atau tag; untuk itu gunakan Django Admin atau tambahkan fitur terpisah.
+Form `ModelForm` dan widget Bootstrap berada di `users/forms.py`. Template edit yang dipakai bersama adalah `users/form.html`. Tag dikelola melalui halaman Tag Menu dan dipilih pada form tambah/edit menu; pilihan kosong menghapus hubungan tag dari menu tersebut. Daftar menu menampilkan tag yang terpasang. Kode tag harus unik dan tanpa spasi. Gunakan kode yang dikenali `TagExtractor` dan `TAG_LABELS` untuk rekomendasi chatbot; menambahkan kode baru melalui CMS saja tidak menambah kemampuan pemahaman chatbot. CMS custom belum menyediakan pengelolaan user staf.
+
+Tombol Hapus tag membuka halaman konfirmasi (`users/tag_confirm_delete.html`); GET tidak menghapus data. Penghapusan hanya dilakukan melalui POST ber-CSRF oleh admin. Tag yang masih terhubung ke menu, termasuk menu nonaktif atau tidak tersedia, ditolak dan halaman konfirmasi menampilkan tautan edit menu terkait. Server memeriksa ulang hubungan saat POST; admin harus melepas tag dari seluruh menu terlebih dahulu.
 
 ### Role
 
@@ -586,7 +589,7 @@ Peta tes:
 - SQLite dipakai untuk development/demo. Untuk banyak kasir dengan transaksi serentak, gunakan database yang mendukung row-level locking seperti PostgreSQL.
 - Tidak ada integrasi payment gateway eksternal; API pembayaran saat ini adalah aksi internal terautentikasi untuk workflow staf.
 - Halaman CMS order menampilkan daftar; belum ada dashboard kasir terpisah untuk cashier. User grup `Cashier` dapat mengakses endpoint operasional yang diizinkan, tetapi login mereka diarahkan ke storefront.
-- CMS custom saat ini tidak mengelola akun staf atau tag.
+- CMS custom saat ini tidak mengelola akun staf; tag mendukung tambah, edit, pemasangan pada menu, dan hapus jika belum dipakai.
 - Bootstrap dan beberapa library browser (QR/kamera) dimuat dari CDN; operasi UI terkait membutuhkan akses jaringan. Kamera juga membutuhkan izin browser.
 - `DEBUG` default lokal aktif supaya Django menyajikan static files saat `runserver`; deployment harus memakai `DEBUG=false`, secret key sendiri, host yang benar, dan strategi static files production.
 - `seed_demo` adalah data/akun development, bukan mekanisme provisioning akun production.

@@ -5,7 +5,8 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
-from django.db.models import Q
+from django.db import transaction
+from django.db.models import Count, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -13,9 +14,9 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django.utils.http import url_has_allowed_host_and_scheme
 
-from menu.models import AddOn, Category, MenuItem, VariantGroup, VariantOption
+from menu.models import AddOn, Category, MenuItem, MenuTag, VariantGroup, VariantOption
 from orders.models import AuditLog, Order, Table
-from .forms import AddOnForm, CategoryForm, MenuItemForm, TableForm, VariantGroupForm, VariantOptionForm
+from .forms import AddOnForm, CategoryForm, MenuItemForm, MenuTagForm, TableForm, VariantGroupForm, VariantOptionForm
 
 
 def _cms_user(user): return user.is_authenticated and user.is_staff
@@ -113,8 +114,39 @@ def category_edit(request, pk): return _save_form(request, CategoryForm, get_obj
 
 @cms_required
 @require_http_methods(['GET', 'POST'])
+def tags(request):
+    records = MenuTag.objects.annotate(menu_count=Count('menu_items')).order_by('name')
+    if request.method == 'POST':
+        return _save_form(request, MenuTagForm, None, 'users/tags.html', 'Tambah Tag Menu', 'staff:tags', tags=records)
+    return render(request, 'users/tags.html', {'form': MenuTagForm(), 'tags': records})
+
+@cms_required
+@require_http_methods(['GET', 'POST'])
+def tag_edit(request, pk):
+    return _save_form(request, MenuTagForm, get_object_or_404(MenuTag, pk=pk), 'users/form.html', 'Edit Tag Menu', 'staff:tags')
+
+@cms_required
+@require_http_methods(['GET', 'POST'])
+def tag_delete(request, pk):
+    if request.method == 'POST':
+        with transaction.atomic():
+            tag = get_object_or_404(MenuTag.objects.select_for_update(), pk=pk)
+            if tag.menu_items.exists():
+                messages.error(request, 'Tag masih dipakai menu. Lepaskan tag dari semua menu sebelum menghapusnya.')
+            else:
+                tag.delete()
+                messages.success(request, 'Tag berhasil dihapus.')
+        return redirect('staff:tags')
+    tag = get_object_or_404(MenuTag, pk=pk)
+    return render(request, 'users/tag_confirm_delete.html', {
+        'tag': tag,
+        'items': tag.menu_items.order_by('name'),
+    })
+
+@cms_required
+@require_http_methods(['GET', 'POST'])
 def menu_items(request):
-    query = request.GET.get('q', '').strip(); records = MenuItem.objects.select_related('category').order_by('category__name', 'name')
+    query = request.GET.get('q', '').strip(); records = MenuItem.objects.select_related('category').prefetch_related('tags').order_by('category__name', 'name')
     if query: records = records.filter(Q(name__icontains=query) | Q(category__name__icontains=query))
     if request.method == 'POST': return _save_form(request, MenuItemForm, None, 'users/menu_items.html', 'Tambah Menu', 'staff:menu-items', items=records, query=query)
     return render(request, 'users/menu_items.html', {'form': MenuItemForm(), 'items': records, 'query': query})
