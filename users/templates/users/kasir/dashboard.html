@@ -1,0 +1,57 @@
+{% extends "users/kasir/base.html" %}
+{% block content %}
+<h1 class="h4 fw-bold mb-1">Daftar Pesanan</h1>
+<p class="text-secondary small mb-3">Cari ID pesanan atau pilih dari daftar di bawah.</p>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-4"><div class="k-card p-3"><div class="k-label">Menunggu bayar</div><div class="fs-3 fw-bold">{{ pending_count }}</div></div></div>
+  <div class="col-6 col-md-4"><div class="k-card p-3"><div class="k-label">Dibayar hari ini</div><div class="fs-3 fw-bold">{{ paid_today_count }}</div></div></div>
+  <div class="col-12 col-md-4"><div class="k-card p-3"><div class="k-label">Pendapatan hari ini</div><div class="fs-3 fw-bold">Rp {{ paid_today_total|floatformat:"0g" }}</div></div></div>
+</div>
+
+<form method="get" class="d-flex gap-2 mb-3">
+  <input id="q" name="q" value="{{ q }}" class="form-control k-input text-uppercase" placeholder="🔍 Cari ID pesanan, mis. A1B2C3D4" maxlength="12" autofocus>
+  <input type="hidden" name="status" value="{{ status }}">
+  <button class="btn btn-primary-app">Cari</button>
+</form>
+
+{% if not_found %}<div class="alert alert-warning">Pesanan dengan ID <strong>{{ q }}</strong> tidak ditemukan.</div>{% endif %}
+
+<div class="d-flex gap-2 overflow-auto pb-2 mb-3">
+  {% for value, label in status_tabs %}
+    <a class="category-chip {% if status == value %}active{% endif %}" href="?status={{ value }}">{{ label }}</a>
+  {% endfor %}
+</div>
+
+<div class="k-card p-2 p-md-3">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead><tr class="k-label"><th>ID</th><th>Pelanggan</th><th>Jenis</th><th class="text-end">Total</th><th>Status</th><th>Jam</th><th></th></tr></thead>
+      <tbody>
+      {% for o in orders %}
+        <tr>
+          <td><code class="fs-6">{{ o.public_id }}</code></td>
+          <td>{{ o.customer_name }}</td>
+          <td>{% if o.order_type == "DINE_IN" %}Meja {{ o.table.number }}{% else %}Bawa pulang{% endif %}</td>
+          <td class="text-end fw-semibold">Rp {{ o.total|floatformat:"0g" }}</td>
+          <td>{% include "users/kasir/_status.html" with o=o %}{% if o.status == "PENDING" and o.expires_at < now %} <span class="small text-muted">(lewat batas)</span>{% endif %}</td>
+          <td>{{ o.created_at|date:"H:i" }}</td>
+          <td class="text-end"><a class="btn btn-sm btn-primary-app" href="{% url 'kasir:order' o.public_id %}">Buka</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7" class="text-center text-muted py-4">Tidak ada pesanan.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if status == "PENDING" and not q %}
+<script>
+// Segarkan daftar pesanan baru tiap 20 detik, kecuali kasir sedang mengetik.
+setInterval(() => { if (document.activeElement.id !== "q") location.reload(); }, 20000);
+</script>
+{% endif %}
+{% endblock %}

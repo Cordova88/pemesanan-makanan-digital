@@ -1,0 +1,160 @@
+{% extends "users/kasir/base.html" %}
+{% block title %}Pesanan {{ order.public_id }} — Kasir{% endblock %}
+{% block content %}
+<a href="{% url 'kasir:dashboard' %}" class="text-decoration-none text-secondary small">&larr; Kembali ke daftar</a>
+
+<div class="d-flex align-items-center gap-3 mt-2 mb-3 flex-wrap">
+  <h1 class="h4 fw-bold mb-0">Pesanan <code class="fs-4">{{ order.public_id }}</code></h1>
+  {% include "users/kasir/_status.html" with o=order %}
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="k-card p-3 p-md-4 mb-3">
+      <div class="row g-3">
+        <div class="col-sm-6">
+          <div class="k-label">Pelanggan</div>
+          <div class="fw-semibold">{{ order.customer_name }}</div>
+          {% if order.phone %}<div class="text-secondary small">{{ order.phone }}</div>{% endif %}
+        </div>
+        <div class="col-sm-6">
+          <div class="k-label">Jenis pesanan</div>
+          <div class="fw-semibold">{% if order.order_type == "DINE_IN" %}Makan di tempat — Meja {{ order.table.number }}{% else %}Bawa pulang{% endif %}</div>
+          {% if order.status == "PENDING" and order.order_type == "DINE_IN" and tables %}
+            <div class="d-flex gap-2 mt-2">
+              <select id="table-select" class="form-select form-select-sm w-auto">
+                {% for t in tables %}<option value="{{ t.token }}" {% if t.pk == order.table_id %}selected{% endif %}>Meja {{ t.number }}</option>{% endfor %}
+              </select>
+              <button id="btn-table" class="btn btn-sm btn-outline-secondary btn-pill">Pindah meja</button>
+            </div>
+          {% endif %}
+        </div>
+        {% if order.note %}<div class="col-12"><div class="k-label">Catatan</div>{{ order.note }}</div>{% endif %}
+        <div class="col-sm-6"><div class="k-label">Dibuat</div>{{ order.created_at|date:"d M Y H:i" }}</div>
+        {% if order.status == "PENDING" %}<div class="col-sm-6"><div class="k-label">Berlaku sampai</div>{{ order.expires_at|date:"H:i" }}</div>{% endif %}
+      </div>
+    </div>
+
+    <div class="k-card p-3 p-md-4">
+      <div class="k-label mb-2">Isi pesanan</div>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead><tr class="small text-muted"><th>Menu</th><th class="text-center">Jumlah</th><th class="text-end">Harga</th><th class="text-end">Subtotal</th></tr></thead>
+          <tbody>
+          {% for line in order.items.all %}
+            <tr>
+              <td>
+                <div class="fw-semibold">{{ line.item_name }}</div>
+                {% for v in line.variants.all %}<div class="small text-muted">{{ v.group_name }}: {{ v.option_name }}</div>{% endfor %}
+                {% for a in line.addons.all %}<div class="small text-muted">+ {{ a.addon_name }}{% if a.quantity > 1 %} ×{{ a.quantity }}{% endif %}</div>{% endfor %}
+              </td>
+              <td class="text-center">
+                {% if order.status == "PENDING" %}
+                  <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary" data-act="dec" data-line="{{ line.id }}" data-qty="{{ line.quantity }}">−</button>
+                    <span class="btn disabled border text-dark">{{ line.quantity }}</span>
+                    <button class="btn btn-outline-secondary" data-act="inc" data-line="{{ line.id }}" data-qty="{{ line.quantity }}">+</button>
+                  </div>
+                  <div><button class="btn btn-link btn-sm text-danger p-0" data-act="del" data-line="{{ line.id }}">Hapus</button></div>
+                {% else %}{{ line.quantity }}{% endif %}
+              </td>
+              <td class="text-end">Rp {{ line.unit_price|floatformat:"0g" }}</td>
+              <td class="text-end fw-semibold">Rp {{ line.line_total|floatformat:"0g" }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="text-center text-muted py-3">Pesanan kosong.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="k-card p-3 p-md-4 position-sticky" style="top:80px">
+      <div class="k-label">Total</div>
+      <div class="display-6 fw-bold mb-3">Rp {{ order.total|floatformat:"0g" }}</div>
+
+      {% if order.status == "PENDING" %}
+        {% if order.items.all %}
+          <label class="form-label small fw-semibold" for="method">Metode bayar</label>
+          <select id="method" class="form-select k-input mb-2">
+            <option value="CASH">Tunai</option><option value="CARD">Kartu</option>
+            <option value="QRIS">QRIS</option><option value="OTHER">Lainnya</option>
+          </select>
+          <div id="cash-box" class="mb-2">
+            <label class="form-label small fw-semibold" for="received">Uang diterima</label>
+            <input id="received" type="number" min="0" step="500" class="form-control k-input">
+            <div id="change" class="small mt-1 text-secondary"></div>
+          </div>
+          <div id="ref-box" class="mb-2 d-none">
+            <label class="form-label small fw-semibold" for="ref">No. referensi</label>
+            <input id="ref" maxlength="128" class="form-control k-input">
+          </div>
+          <button id="btn-pay" class="btn btn-primary-app w-100 mb-2">Konfirmasi pembayaran</button>
+        {% endif %}
+        <button id="btn-cancel" class="btn btn-outline-danger btn-pill w-100">Batalkan pesanan</button>
+      {% elif order.payment %}
+        <div class="small text-secondary">Dibayar dengan <strong>{{ order.payment.get_method_display }}</strong><br>{{ order.payment.paid_at|date:"d M Y H:i" }}</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const orderId = "{{ order.public_id }}";
+const csrf = "{{ csrf_token }}";
+const total = Number("{{ order.total|stringformat:'f' }}");
+const rp = n => "Rp " + new Intl.NumberFormat("id-ID").format(n);
+
+async function api(path, body) {
+  const r = await fetch(`/api/orders/${orderId}/${path}/`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json", "X-CSRFToken": csrf},
+    body: JSON.stringify(body || {}),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) { alert(data.error || "Gagal memproses pesanan."); return; }
+  location.reload();
+}
+
+document.querySelectorAll("[data-act]").forEach(btn => btn.addEventListener("click", () => {
+  const qty = Number(btn.dataset.qty || 0), act = btn.dataset.act;
+  const next = act === "inc" ? qty + 1 : act === "dec" ? qty - 1 : 0;
+  if (next <= 0 && !confirm("Hapus item ini dari pesanan?")) return;
+  api(`items/${btn.dataset.line}`, {quantity: next});
+}));
+
+document.getElementById("btn-table")?.addEventListener("click", () =>
+  api("table", {table_token: document.getElementById("table-select").value}));
+
+const method = document.getElementById("method");
+const received = document.getElementById("received");
+function refreshPayUI() {
+  if (!method) return;
+  const cash = method.value === "CASH";
+  document.getElementById("cash-box").classList.toggle("d-none", !cash);
+  document.getElementById("ref-box").classList.toggle("d-none", cash);
+}
+function refreshChange() {
+  const v = Number(received.value || 0), el = document.getElementById("change");
+  el.textContent = !v ? "" : v >= total ? "Kembalian: " + rp(v - total) : "Kurang: " + rp(total - v);
+}
+method?.addEventListener("change", refreshPayUI);
+received?.addEventListener("input", refreshChange);
+refreshPayUI();
+
+document.getElementById("btn-pay")?.addEventListener("click", () => {
+  if (method.value === "CASH" && received.value && Number(received.value) < total) {
+    alert("Uang yang diterima kurang dari total."); return;
+  }
+  if (confirm("Konfirmasi pembayaran " + rp(total) + "?"))
+    api("pay", {method: method.value, external_reference: document.getElementById("ref").value});
+});
+document.getElementById("btn-cancel")?.addEventListener("click", () => {
+  if (confirm("Batalkan pesanan ini?")) api("cancel");
+});
+</script>
+{% endblock %}
