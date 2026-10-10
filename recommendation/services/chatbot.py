@@ -368,7 +368,7 @@ class ChatbotService:
         ):
             self.session["gemini_calls"] = self.session.get("gemini_calls", 0) + 1
             self.session.modified = True
-            ai_interpretation = GeminiInterpreter().interpret(message)
+            ai_interpretation = self.gemini_interpreter.interpret(message)
             if ai_interpretation is not None:
                 interpretation = ai_interpretation
 

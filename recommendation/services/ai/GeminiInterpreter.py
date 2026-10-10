@@ -21,6 +21,16 @@ MAX_LIST_SIZE = 8
 def validate(data, allowed_tags, allowed_moods):
     if not isinstance(data, dict):
         return False
+    required = {
+        "intent",
+        "tags",
+        "excluded_tags",
+        "soft_excluded_tags",
+        "moods",
+        "message_is_meaningful",
+    }
+    if set(data) != required:
+        return False
     if data.get("intent") not in ALLOWED_INTENTS:
         return False
     
