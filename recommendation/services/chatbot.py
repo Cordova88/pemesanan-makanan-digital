@@ -4,6 +4,9 @@ from .mood_extractor import MoodExtractor
 from .mood_resolver import MoodResolver
 from .recommendation import RecommendationService
 from .tag_extractor import Preferences, TagExtractor
+from recommendation.services.ai.GeminiInterpreter import GeminiInterpreter
+from django.conf import settings
+
 
 
 class ChatbotService:
@@ -38,6 +41,7 @@ class ChatbotService:
         self.mood_resolver = MoodResolver()
         self.recommender = RecommendationService()
         self.interpreter = ConversationInterpreter()
+        self.gemini_interpreter = GeminiInterpreter()
 
     def reset(self):
         self.session.pop(self.SESSION_KEY, None)
@@ -353,6 +357,20 @@ class ChatbotService:
             ),
             last_recommendations=session_state.get("last_recommendations", []),
         )
+        
+        if (
+            interpretation.intent == ConversationIntent.UNKNOWN
+            and not interpretation.contextual_reference
+            and message.strip()
+            and len(message) <= 500
+            and self.session.get("gemini_calls", 0) < settings.GEMINI_MAX_CALLS_PER_SESSION
+
+        ):
+            self.session["gemini_calls"] = self.session.get("gemini_calls", 0) + 1
+            self.session.modified = True
+            ai_interpretation = GeminiInterpreter().interpret(message)
+            if ai_interpretation is not None:
+                interpretation = ai_interpretation
 
         if interpretation.intent == ConversationIntent.RESET:
             self.reset()
