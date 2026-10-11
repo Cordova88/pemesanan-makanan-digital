@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 
 from menu.models import MenuItem
@@ -14,6 +14,34 @@ class RecommendationMatch:
     labels: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class SearchConstraints:
+    required_tags: frozenset[str] = field(default_factory=frozenset)
+    excluded_tags: frozenset[str] = field(default_factory=frozenset)
+    category: str | None = None
+    max_price: int | None = None
+    moods: frozenset[str] = field(default_factory=frozenset)
+
+    def to_dict(self):
+        return {
+            "required_tags": sorted(self.required_tags),
+            "excluded_tags": sorted(self.excluded_tags),
+            "category": self.category,
+            "max_price": self.max_price,
+            "moods": sorted(self.moods),
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            required_tags=frozenset(data.get("required_tags", [])),
+            excluded_tags=frozenset(data.get("excluded_tags", [])),
+            category=data.get("category"),
+            max_price=data.get("max_price"),
+            moods=frozenset(data.get("moods", [])),
+        )
+
+
 class RecommendationService:
     DIRECT_TAG_WEIGHT = 4
     MOOD_TAG_WEIGHT = 2
@@ -21,8 +49,25 @@ class RecommendationService:
     BUDGET_WEIGHT = 3
     AFFORDABLE_PRICE_CEILING = Decimal("15000.00")
     SOFT_EXCLUSION_PENALTY = 2
+    PROTEIN_TAGS = {
+        "chicken",
+        "beef",
+        "seafood",
+        "shrimp",
+        "fish",
+        "egg",
+        "tofu",
+        "tempeh",
+    }
 
-    def rank(self, preferences, limit=3, exclude_ids=None):
+    def rank(
+        self,
+        preferences,
+        limit=3,
+        exclude_ids=None,
+        required_tags=None,
+        constraints=None,
+    ):
         items = (
             MenuItem.objects.filter(
                 is_active=True,
@@ -33,29 +78,47 @@ class RecommendationService:
             .prefetch_related("tags")
         )
         excluded_ids = set(exclude_ids or [])
+        if constraints is not None:
+            required_tags = set(constraints.required_tags)
+            max_price = constraints.max_price
+            category = constraints.category
+            excluded_tags = preferences.excluded_tags | set(constraints.excluded_tags)
+        else:
+            required_tags = (
+                set(required_tags)
+                if required_tags is not None
+                else preferences.tags & self.PROTEIN_TAGS
+            )
+            max_price = preferences.max_price
+            category = preferences.category
+            excluded_tags = preferences.excluded_tags
         ranked = []
 
         for item in items:
             if item.id in excluded_ids:
                 continue
-
             item_tags = {tag.name for tag in item.tags.all()}
-            if item_tags & preferences.excluded_tags:
+            if not required_tags.issubset(item_tags):
                 continue
-            if preferences.max_price is not None and item.price > preferences.max_price:
+            if item_tags & excluded_tags:
+                continue
+            if max_price is not None and item.price > max_price:
+                continue
+            if category and item.category.name.casefold() != category.casefold():
                 continue
 
             score = 1 if (
-                preferences.excluded_tags or preferences.soft_excluded_tags
+                excluded_tags or preferences.soft_excluded_tags
             ) else 0
             reasons = []
             reasons.extend(
                 "✅ Tanpa " + TAG_LABELS[tag]
-                for tag in sorted(preferences.excluded_tags & set(TAG_LABELS))
+                for tag in sorted(excluded_tags & set(TAG_LABELS))
             )
             for tag in sorted(item_tags & preferences.tags):
                 score += self.DIRECT_TAG_WEIGHT
-                reasons.append(TAG_LABELS.get(tag))
+                if constraints is None or tag in constraints.required_tags:
+                    reasons.append(TAG_LABELS.get(tag))
             for tag in sorted((item_tags & preferences.mood_tags) - preferences.tags):
                 score += self.MOOD_TAG_WEIGHT
                 reasons.append(TAG_LABELS.get(tag))
@@ -63,11 +126,11 @@ class RecommendationService:
             if item_tags & preferences.soft_excluded_tags:
                 score -= self.SOFT_EXCLUSION_PENALTY
 
-            if preferences.category and item.category.name.casefold() == preferences.category.casefold():
+            if category and item.category.name.casefold() == category.casefold():
                 score += self.CATEGORY_WEIGHT
                 reasons.append("🍽️ Sesuai pilihan makanan")
 
-            if preferences.max_price is not None:
+            if max_price is not None:
                 score += self.BUDGET_WEIGHT
                 reasons.append("💰 Sesuai batas harga")
             elif preferences.prefer_affordable and item.price <= self.AFFORDABLE_PRICE_CEILING:
@@ -101,19 +164,30 @@ class RecommendationService:
             for match in self.rank(preferences, limit=limit, exclude_ids=exclude_ids)
         ]
 
-    def find_catalog_matches(self, tags, excluded_tags=None):
+    def find_catalog_matches(
+        self,
+        tags,
+        excluded_tags=None,
+        category=None,
+        max_price=None,
+    ):
         required_tags = set(tags)
         excluded_tags = set(excluded_tags or [])
         if not required_tags:
             return []
 
-        items = (
-            MenuItem.objects.filter(
+        item_query = MenuItem.objects.filter(
                 is_active=True,
                 is_available=True,
                 category__is_active=True,
                 tags__name__in=required_tags,
             )
+        if category:
+            item_query = item_query.filter(category__name__iexact=category)
+        if max_price is not None:
+            item_query = item_query.filter(price__lte=max_price)
+        items = (
+            item_query
             .select_related("category")
             .prefetch_related("tags")
             .distinct()

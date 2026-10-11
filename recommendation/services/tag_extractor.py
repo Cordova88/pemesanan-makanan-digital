@@ -120,7 +120,7 @@ class TagExtractor:
     SOFT_NEGATION = ("kurang suka", "tidak terlalu suka", "tidak kuat", "kurang kuat")
     CATEGORY_RULES = {
         "Minuman": ("minuman", "pengen minum", "ingin minum"),
-        "Makanan": ("makanan", "masakan", "makan aja"),
+        "Makanan": ("makanan", "masakan", "makan aja", "hidangan"),
     }
 
     def __init__(self):
@@ -147,6 +147,7 @@ class TagExtractor:
 
     def extract(self, text):
         normalized = normalize_text(text)
+        normalized = re.sub(r"\bada tidak\b", "ada", normalized)
         tags = set()
         excluded = set()
         soft_excluded = set()

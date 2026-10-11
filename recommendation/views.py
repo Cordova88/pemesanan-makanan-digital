@@ -77,6 +77,22 @@ def _public_preferences(preferences):
     }
 
 
+def _public_active_search(search):
+    return {
+        **search,
+        "required_tags": [
+            TAG_LABELS[tag]
+            for tag in search.get("required_tags", [])
+            if tag in TAG_LABELS
+        ],
+        "excluded_tags": [
+            TAG_LABELS[tag]
+            for tag in search.get("excluded_tags", [])
+            if tag in TAG_LABELS
+        ],
+    }
+
+
 @require_POST
 def chat(request):
     try:
@@ -92,6 +108,8 @@ def chat(request):
             for item in result["recommendations"]
         ]
         result["preferences"] = _public_preferences(result["preferences"])
+        if "active_search" in result:
+            result["active_search"] = _public_active_search(result["active_search"])
         return JsonResponse(result)
     except (ValueError, json.JSONDecodeError):
         return JsonResponse({"error": "Pesan tidak valid."}, status=400)
