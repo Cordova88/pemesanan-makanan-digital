@@ -193,7 +193,7 @@ Order 1 ───── * AuditLog
 - `Table` mempunyai nomor dan token QR unik.
 - `Order` memiliki `public_id`, status, pelanggan, jenis dine-in/takeaway, meja opsional, total, expiry, serta aktor pembayaran/pembatalan/refund.
 - `OrderItem`, `OrderItemVariant`, dan `OrderItemAddOn` menyimpan snapshot nama/harga transaksi agar perubahan menu tidak mengubah transaksi lama.
-- `Payment` mencatat satu pembayaran per order.
+- `Payment` mencatat satu pembayaran per order; `amount` adalah nominal order yang dibayar. Untuk tunai, `amount_received` dan `change_given` menyimpan uang tendered dan kembalian; metode non-tunai menyimpan kedua field tersebut sebagai null.
 - `AuditLog` menyimpan aksi serta nilai before/after/metadata.
 
 Constraint database dan `clean()` menjaga konsistensi jenis order-meja, nilai harga/kuantitas nonnegatif/positif, serta relasi unik tertentu. Detail final constraint ada di `orders/models.py`.
@@ -398,7 +398,7 @@ Tombol Hapus tag membuka halaman konfirmasi (`users/tag_confirm_delete.html`); G
 ### Role
 
 - Akses halaman CMS custom dibatasi oleh `cms_required` di `users/views.py`, yang mensyaratkan `user.is_staff`.
-- Login di `/staff/login/` menerima user `is_staff` atau anggota grup `Cashier`. Kasir saat ini diarahkan ke storefront karena halaman kasir khusus belum dibuat.
+- Login di `/staff/login/` menerima user `is_staff` atau anggota grup `Cashier`. Kasir diarahkan ke dashboard kasir `/kasir/`; admin dapat membuka CMS dan halaman kasir.
 - Endpoint operasional order memeriksa login dan grup Cashier/admin melalui `orders/permissions.py`.
 - Refund diperiksa terpisah di `orders/services.py` dan hanya diberikan kepada `is_staff`.
 
@@ -561,7 +561,7 @@ Aturan utama berada di `orders/services.py`; views mengatur protokol HTTP dan JS
 - `create_order()` berjalan dalam `transaction.atomic()` dan menggunakan harga database.
 - `add_item()` memeriksa status menu/kategori, pilihan varian, add-on, menghitung total, membuat snapshot, lalu mencatat audit.
 - Perubahan order mengunci order dengan `select_for_update()` dan hanya mengizinkan perubahan pada status `PENDING`.
-- Pembayaran merekam metode, nilai, kasir, waktu bayar, dan audit; pembayaran ulang ditolak setelah status berubah.
+- Pembayaran menghitung ulang jumlah yang harus dibayar dari baris order di server, menolak order kosong, metode yang tidak didukung, dan tunai yang kurang; pembayaran merekam nominal order, kasir, waktu bayar, serta audit. Untuk tunai, nilai diterima dan kembalian juga dicatat. Pembayaran ulang ditolak setelah status berubah.
 - Refund hanya untuk order berstatus `PAID`; refund tidak mengubah detail snapshot.
 - Order baru memiliki masa berlaku satu jam.
 - `expire_order_if_due()` dapat memperbarui expiry saat order dibaca; command `expire_orders` memproses seluruh pending yang jatuh tempo secara berkala.
@@ -618,8 +618,8 @@ Peta tes:
 ## 15. Batasan implementasi yang perlu diketahui
 
 - SQLite dipakai untuk development/demo. Untuk banyak kasir dengan transaksi serentak, gunakan database yang mendukung row-level locking seperti PostgreSQL.
-- Tidak ada integrasi payment gateway eksternal; API pembayaran saat ini adalah aksi internal terautentikasi untuk workflow staf.
-- Halaman CMS order menampilkan daftar; belum ada dashboard kasir terpisah untuk cashier. User grup `Cashier` dapat mengakses endpoint operasional yang diizinkan, tetapi login mereka diarahkan ke storefront.
+- Tidak ada integrasi payment gateway eksternal; API pembayaran saat ini adalah aksi internal terautentikasi untuk workflow staf. Pilihan CARD/QRIS/OTHER hanya mencatat metode yang dipilih, bukan memproses transaksi ke penyedia eksternal.
+- Dashboard kasir terpisah tersedia pada `/kasir/`; perubahan order dan pembayaran tetap dilakukan melalui service transaksional.
 - CMS custom saat ini tidak mengelola akun staf; tag mendukung tambah, edit, pemasangan pada menu, dan hapus jika belum dipakai.
 - Bootstrap dan beberapa library browser (QR/kamera) dimuat dari CDN; operasi UI terkait membutuhkan akses jaringan. Kamera juga membutuhkan izin browser.
 - `DEBUG` default lokal aktif supaya Django menyajikan static files saat `runserver`; deployment harus memakai `DEBUG=false`, secret key sendiri, host yang benar, dan strategi static files production.

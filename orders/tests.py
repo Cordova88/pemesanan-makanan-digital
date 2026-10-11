@@ -6,7 +6,8 @@ from django.test import TestCase
 from django.utils import timezone
 from menu.models import Category, MenuItem
 from .models import AuditLog, Order, Table
-from .services import cancel, change_table, create_order, pay
+from .models import Payment
+from .services import cancel, change_table, create_order, edit_item, pay
 
 class OrderServiceTests(TestCase):
     def setUp(self):
@@ -39,8 +40,122 @@ class OrderServiceTests(TestCase):
         self.item.is_available=False; self.item.save()
         with self.assertRaises(ValidationError): self.checkout()
     def test_payment_records_cashier_and_cannot_repeat(self):
-        order=pay(self.checkout().public_id,self.cashier); self.assertEqual(order.status,Order.Status.PAID); self.assertEqual(order.processed_by_cashier,self.cashier)
+        order=pay(self.checkout().public_id,self.cashier,amount_received=Decimal("30000")); self.assertEqual(order.status,Order.Status.PAID); self.assertEqual(order.processed_by_cashier,self.cashier)
         with self.assertRaises(ValidationError): pay(order.public_id,self.cashier)
+
+    def test_insufficient_cash_is_rejected_without_payment_or_paid_audit(self):
+        self.item.price = Decimal("25000")
+        self.item.save()
+        order = self.checkout(items=[{"menu_item_id": self.item.id, "quantity": 1}])
+
+        with self.assertRaises(ValidationError):
+            pay(order.public_id, self.cashier, amount_received=Decimal("10000"))
+
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.Status.PENDING)
+        self.assertFalse(Payment.objects.filter(order=order).exists())
+        self.assertFalse(order.audit_logs.filter(action=AuditLog.Action.PAID).exists())
+
+    def test_empty_order_cannot_be_paid(self):
+        order = self.checkout()
+        line = order.items.get()
+        edit_item(order.public_id, line.pk, 0, self.cashier)
+
+        with self.assertRaises(ValidationError):
+            pay(order.public_id, self.cashier, amount_received=Decimal("30000"))
+
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.Status.PENDING)
+        self.assertEqual(order.total, Decimal("0.00"))
+        self.assertFalse(Payment.objects.filter(order=order).exists())
+        self.assertFalse(order.audit_logs.filter(action=AuditLog.Action.PAID).exists())
+
+    def test_unsupported_payment_method_is_rejected_without_payment(self):
+        order = self.checkout()
+
+        with self.assertRaises(ValidationError):
+            pay(order.public_id, self.cashier, method="BITCOIN", amount_received=Decimal("30000"))
+
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.Status.PENDING)
+        self.assertFalse(Payment.objects.filter(order=order).exists())
+        self.assertFalse(order.audit_logs.filter(action=AuditLog.Action.PAID).exists())
+
+    def test_exact_cash_records_due_and_zero_change(self):
+        order = self.checkout()
+
+        paid = pay(order.public_id, self.cashier, amount_received=Decimal("30000"))
+
+        payment = paid.payment
+        self.assertEqual(payment.amount, Decimal("30000.00"))
+        self.assertEqual(payment.amount_received, Decimal("30000.00"))
+        self.assertEqual(payment.change_given, Decimal("0.00"))
+        audit = paid.audit_logs.get(action=AuditLog.Action.PAID)
+        self.assertEqual(audit.after["amount"], "30000.00")
+        self.assertEqual(audit.after["amount_received"], "30000.00")
+        self.assertEqual(audit.after["change_given"], "0.00")
+
+    def test_cash_overpayment_records_correct_change(self):
+        order = self.checkout()
+
+        paid = pay(order.public_id, self.cashier, amount_received=Decimal("50000"))
+
+        self.assertEqual(paid.payment.amount, Decimal("30000.00"))
+        self.assertEqual(paid.payment.amount_received, Decimal("50000.00"))
+        self.assertEqual(paid.payment.change_given, Decimal("20000.00"))
+
+    def test_payment_recalculates_due_from_order_items_not_cached_total(self):
+        order = self.checkout()
+        order.total = Decimal("1.00")
+        order.save(update_fields=["total"])
+
+        paid = pay(order.public_id, self.cashier, amount_received=Decimal("30000"))
+
+        self.assertEqual(paid.total, Decimal("30000.00"))
+        self.assertEqual(paid.payment.amount, Decimal("30000.00"))
+
+    def test_valid_non_cash_methods_do_not_record_cash_tender_or_change(self):
+        for method in (Payment.Method.CARD, Payment.Method.QRIS, Payment.Method.OTHER):
+            with self.subTest(method=method):
+                order = self.checkout()
+                paid = pay(order.public_id, self.cashier, method=method)
+                self.assertEqual(paid.status, Order.Status.PAID)
+                self.assertEqual(paid.payment.amount, Decimal("30000.00"))
+                self.assertIsNone(paid.payment.amount_received)
+                self.assertIsNone(paid.payment.change_given)
+
+    def test_payment_api_rejects_invalid_method_and_uses_order_total(self):
+        order = self.checkout()
+        self.client.force_login(self.cashier)
+
+        insufficient = self.client.post(
+            f"/api/orders/{order.public_id}/pay/",
+            data='{"method":"CASH","amount_received":"10000","total":"1.00"}',
+            content_type="application/json",
+        )
+        self.assertEqual(insufficient.status_code, 400)
+        self.assertFalse(Payment.objects.filter(order=order).exists())
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.Status.PENDING)
+
+        invalid = self.client.post(
+            f"/api/orders/{order.public_id}/pay/",
+            data='{"method":"BITCOIN","amount_received":"30000"}',
+            content_type="application/json",
+        )
+        self.assertEqual(invalid.status_code, 400)
+        self.assertFalse(Payment.objects.filter(order=order).exists())
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.Status.PENDING)
+
+        response = self.client.post(
+            f"/api/orders/{order.public_id}/pay/",
+            data='{"method":"CASH","amount_received":"30000","total":"1.00"}',
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        payment = Payment.objects.get(order=order)
+        self.assertEqual(payment.amount, Decimal("30000.00"))
     def test_expired_order_cannot_pay(self):
         order=self.checkout(); order.expires_at=timezone.now()-timedelta(seconds=1); order.save()
         with self.assertRaises(ValidationError): pay(order.public_id,self.cashier)
