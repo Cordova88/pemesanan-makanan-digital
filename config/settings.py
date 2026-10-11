@@ -136,3 +136,8 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+
+GEMINI_MAX_CALLS_PER_SESSION = int(
+    os.environ.get("GEMINI_MAX_CALLS_PER_SESSION", "50")
+)
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")

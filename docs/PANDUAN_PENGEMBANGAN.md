@@ -71,7 +71,7 @@ Alamat lokal:
 - `http://127.0.0.1:8000/staff/login/` — login staf/CMS admin.
 - `http://127.0.0.1:8000/admin/` — Django Admin.
 
-Database lokal default adalah `db.sqlite3` di root proyek. Pengaturan dibaca dari environment proses, bukan `.env` otomatis. Nama variabel yang digunakan: `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`, `SQLITE_DATABASE_NAME`. SQLite tidak perlu server terpisah.
+Database lokal default adalah `db.sqlite3` di root proyek. Pengaturan Django utama dibaca dari environment proses. Klien Gemini memuat `.env` di root proyek bila ada. Nama variabel yang digunakan: `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`, `SQLITE_DATABASE_NAME`, `GEMINI_API_KEY`, `GEMINI_MODEL`, dan `GEMINI_MAX_CALLS_PER_SESSION`. SQLite tidak perlu server terpisah.
 
 `seed_demo` dapat membuat admin `admin` dan kasir `cashier` untuk development. Password awal hanya dipasang saat user belum punya password yang dapat digunakan; command tidak mereset password user yang sudah ada.
 
@@ -404,7 +404,7 @@ Tombol Hapus tag membuka halaman konfirmasi (`users/tag_confirm_delete.html`); G
 
 ## 11. Chatbot rekomendasi
 
-Implementasinya berada di `recommendation/`; chatbot sepenuhnya rule-based dan tidak menggunakan model AI atau layanan eksternal untuk memahami teks.
+Implementasinya berada di `recommendation/`. Pemahaman lokal tetap menjadi jalur utama; Gemini hanya dipanggil untuk pesan makanan `UNKNOWN` yang memenuhi penanda kelayakan atau pesan revisi kontekstual tertentu. AI tidak mengambil alih ranking, item katalog, keranjang, atau pesanan.
 
 ```text
 POST /api/recommendation/chat/
@@ -415,7 +415,9 @@ POST /api/recommendation/chat/
       ├─ MoodExtractor.extract()
       ├─ MoodResolver.resolve()
       ├─ Preferences digabung dengan state sesi
+      ├─ GeminiInterpreter hanya untuk pesan UNKNOWN/revisi yang eligible
       └─ RecommendationService.rank()
+  → RecommendationExplanationService dapat membuat penjelasan batch untuk item hasil ranking
   → view menerjemahkan tag ke label Indonesia + serialize pilihan item
   → chatbot.html menampilkan respons dan kartu
   → pilih item → POST /api/recommendation/add/
@@ -432,8 +434,37 @@ POST /api/recommendation/chat/
 | `services/mood_resolver.py` | Menerjemahkan mood ke tag karakteristik dengan bobot tidak langsung. |
 | `services/recommendation.py` | Filter item, hitung skor, alasan cocok, ranking deterministik. |
 | `services/chatbot.py` | State dialog, follow-up, pesan kontekstual, reset, rekomendasi berikutnya. |
+| `services/gemini.py` | Komunikasi opsional dengan provider Gemini; timeout dan kegagalan provider menghasilkan fallback lokal. |
+| `services/ai/GeminiInterpreter.py` | Interpretasi AI berbentuk JSON, validasi intent/tag/mood/delta sebelum dibuat menjadi operasi preferensi. |
+| `services/ai/explanations.py` | Penjelasan batch display-only dengan validasi ID, panjang, markup, tag dan alasan yang cocok. |
 | `views.py` | Adaptasi HTTP/JSON, serializer kartu, endpoint tambah ke cart. |
 | `templates/recommendation/chatbot.html` | UI chat, quick replies, kartu, form pilihan varian/add-on. |
+
+### Fitur AI: status dan batas tanggung jawab
+
+| Fitur | Status | Implementasi dan batasan |
+|---|---|---|
+| Interpretasi lokal-first | **Diimplementasikan** | Reset, salam, bantuan, pesan di luar topik, referensi biasa seperti “yang pertama”, serta preferensi yang dikenali diproses lokal. Gemini hanya eligible untuk pesan `UNKNOWN` yang tampak terkait makanan atau pesan revisi kontekstual tertentu; panjang pesan dibatasi 500 karakter. |
+| Revisi preferensi dengan konteks | **Diimplementasikan** | Prompt hanya menerima preferensi sesi yang relevan (tag positif/negatif, mood, batas harga, preferensi hemat, dan pertanyaan terakhir), bukan riwayat percakapan. Output delta membedakan tambah, hapus, pantangan kuat/lunak, dan penggantian. `remove_tags` harus subset tag tersimpan; Django mengubahnya menjadi `PreferenceOperation`. Perubahan budget/mood hanya diterapkan jika output tervalidasi meminta perubahan. |
+| Validasi dan batas keamanan interpretasi | **Diimplementasikan** | Schema harus memiliki tepat field yang diharapkan. Intent, tag, mood, tipe data, batas jumlah/harga, duplikasi, overlap, dan konteks penghapusan divalidasi. Respons tidak valid, kosong, timeout, atau gagal provider tidak diterapkan dan alur lokal tetap berjalan. Tidak ada akses AI ke cart, checkout, pembayaran, atau operasi ORM. |
+| Penjelasan rekomendasi | **Diimplementasikan dengan fallback** | `RecommendationService.rank()` selalu memilih dan mengurutkan item aktual terlebih dahulu. Satu prompt batch menerima ID, nama, kategori, deskripsi, harga, tag katalog, preferensi, dan alasan hasil ranking. AI hanya mengembalikan teks untuk ID terpilih; validasi membatasi schema/ID/markup/panjang dan memeriksa nama, alasan, serta tag. Jika ditolak/gagal, kartu tetap menampilkan alasan deterministik. |
+| Render keluaran AI | **Diimplementasikan** | Pesan dan penjelasan ditampilkan melalui `textContent`, bukan HTML. Ranking, harga dan data untuk cart tetap berasal dari Django/katalog. |
+| Konfigurasi dan batas panggilan | **Diimplementasikan** | `GEMINI_API_KEY` bersifat opsional dan tidak boleh dimasukkan ke git. `GEMINI_MODEL` default `gemini-3.5-flash`; `GEMINI_MAX_CALLS_PER_SESSION` default `50`. Jika key tidak tersedia atau batas tercapai, jalur lokal/fallback dipakai. |
+| Pertanyaan katalog berbasis fakta | **Direncanakan** | Belum ada sistem tanya-jawab bebas tentang bahan, stok, komposisi, atau detail menu. Jangan menyimpulkan fakta tersebut dari tag atau nama. |
+| Pertanyaan lanjutan cerdas | **Direncanakan** | Pertanyaan follow-up yang adaptif masih memakai aturan yang ada; belum dibuat oleh Gemini. |
+| Monitoring penggunaan AI | **Direncanakan** | Batas panggilan sesi sudah ada, tetapi belum tersedia dashboard/analitik biaya, latensi, maupun tingkat penolakan output. |
+
+Kegagalan output penjelasan tidak mengubah menu, urutan ranking, harga, maupun status ketersediaan. Deskripsi katalog merupakan data CMS; hanya masukkan fakta yang memang tersimpan di katalog. Jangan gunakan model untuk mengarang bahan, alergen, tekstur, atau klaim kesehatan. Variabel rahasia jangan dicetak dalam log.
+
+Konfigurasi lokal opsional pada `.env` di root proyek (jangan commit nilai key):
+
+```dotenv
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3.5-flash
+GEMINI_MAX_CALLS_PER_SESSION=50
+```
+
+Tes AI menggunakan fake/mock client agar tidak menghubungi provider: `python manage.py test recommendation.tests.GeminiInterpreterTests recommendation.tests.RecommendationExplanationServiceTests recommendation.tests.ChatbotIntegrationTests`. Jalankan `python manage.py check` setelah perubahan konfigurasi atau URL.
 
 ### Mood yang dikenali
 
