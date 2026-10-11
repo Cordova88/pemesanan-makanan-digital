@@ -35,13 +35,30 @@ class ChatbotService:
         "lainnya",
         "rekomendasi lain",
     }
+    OPEN_FOLLOWUP_ANSWERS = {
+        "bebas",
+        "bebas aja",
+        "bebas saja",
+        "bebas kok",
+        "apa aja",
+        "apa saja",
+        "terserah",
+        "terserah deh",
+        "mana aja",
+        "mana saja",
+    }
     GEMINI_FOOD_CUES = (
         "makan", "menu", "masakan", "minum", "ayam", "sapi", "nasi",
         "mie", "pedas", "manis", "gurih", "berat", "ringan", "murah",
         "mahal", "kenyang", "nagih", "eneg", "pengen", "mau", "cari",
         "ada yang", "mirip",
     )
-    GEMINI_UNCERTAIN_CUES = ("berminyak", "eneg", "bikin nagih")
+    GEMINI_UNCERTAIN_CUES = (
+        "berminyak",
+        "berminya",
+        "eneg",
+        "bikin nagih",
+    )
     GEMINI_CALLS_KEY = "gemini_calls"
 
     def __init__(self, session):
@@ -371,8 +388,17 @@ class ChatbotService:
         if not normalized and not self._has_preferences(self._preferences()):
             return self._question()
 
+        session_state = self.session.get(self.SESSION_KEY, {})
+        pending_question = session_state.get(
+            "last_question",
+            self.session.get("last_question"),
+        )
+        open_followup_answer = (
+            normalized in self.OPEN_FOLLOWUP_ANSWERS
+            and pending_question in {"meal_type", "base"}
+        )
         confusion = next((phrase for phrase in self.CONFUSION_PHRASES if phrase in normalized), None)
-        if confusion:
+        if confusion and not open_followup_answer:
             extracted = self.tag_extractor.extract(normalized)
             moods = self.mood_extractor.extract(normalized)
             meaningful = bool(
@@ -410,6 +436,9 @@ class ChatbotService:
             ),
             last_recommendations=session_state.get("last_recommendations", []),
         )
+        if open_followup_answer:
+            self.session["last_question"] = None
+            return self._recommend(preferences, normalized)
         if (
             self._eligible_for_gemini(normalized, interpretation)
             and self._consume_gemini_call()
@@ -574,6 +603,8 @@ class ChatbotService:
                 and updated.max_price is None
                 and not updated.prefer_affordable
                 and not updated.excluded_tags
+                and not updated.soft_excluded_tags
+                and not updated.category
             )
             if only_spicy and old_follow_up is None:
                 return self._ask_meal_type(updated)

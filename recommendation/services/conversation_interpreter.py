@@ -83,6 +83,15 @@ class ConversationInterpreter:
         "ada yang lain",
     )
     CONFIRM_PHRASES = {"iya", "ya", "oke", "ok", "setuju", "betul", "yoi"}
+    PREFERENCE_CORRECTION_CUES = (
+        "gajadi",
+        "gak jadi",
+        "nggak jadi",
+        "tidak jadi",
+        "salah",
+        "maksudku",
+        "maksudnya",
+    )
     OUT_OF_SCOPE_HINTS = (
         "python",
         "javascript",
@@ -251,6 +260,20 @@ class ConversationInterpreter:
                     tags=tuple(sorted(tags)),
                     remove_tags=tuple(sorted(answer_removals)),
                 )
+            ]
+            intent = ConversationIntent.REPLACE_PREFERENCES
+
+        is_explicit_correction = any(
+            cue in normalized for cue in self.PREFERENCE_CORRECTION_CUES
+        )
+        if is_explicit_correction:
+            operations = [
+                PreferenceOperation(action="CLEAR"),
+                *(
+                    operation
+                    for operation in operations
+                    if operation.action != "KEEP"
+                ),
             ]
             intent = ConversationIntent.REPLACE_PREFERENCES
 

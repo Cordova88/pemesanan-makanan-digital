@@ -1,4 +1,5 @@
 import json
+import logging
 
 from recommendation.services.conversation_interpreter import (
     ConversationInterpretation,
@@ -9,6 +10,8 @@ from recommendation.services.gemini import GeminiClient
 from recommendation.services.language import TAG_LABELS
 from recommendation.services.mood_extractor import MoodExtractor
 from recommendation.services.tag_extractor import TagExtractor
+
+logger = logging.getLogger(__name__)
 
 ALLOWED_INTENTS = {
     ConversationIntent.RECOMMEND,
@@ -199,17 +202,21 @@ Aturan:
         prompt = self.build_prompt(message, context)
         raw = self.gemini_client.generate(prompt)
         if not raw:
+            logger.info("Gemini interpretation unavailable (no response text)")
             return None
 
         try:
             data = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
+            logger.info("Gemini interpretation rejected (invalid JSON)")
             return None
 
         current_tags = set(context.get("tags", []))
         if not validate(data, self.allowed_tags, self.allowed_moods, current_tags):
+            logger.info("Gemini interpretation rejected (schema or value validation)")
             return None
         if not data["message_is_meaningful"] or data["intent"] == ConversationIntent.UNKNOWN:
+            logger.info("Gemini interpretation rejected (unknown or not meaningful)")
             return None
 
         add_tags = set(data["add_tags"])
@@ -230,6 +237,7 @@ Aturan:
             or data["clear_max_price"]
             or data["clear_prefer_affordable"]
         ):
+            logger.info("Gemini interpretation rejected (no preference changes)")
             return None
 
         operations = []
@@ -257,7 +265,7 @@ Aturan:
         if not operations:
             operations.append(PreferenceOperation(action="KEEP"))
 
-        return ConversationInterpretation(
+        result = ConversationInterpretation(
             intent=data["intent"],
             operations=operations,
             tags=add_tags,
@@ -271,3 +279,5 @@ Aturan:
             clear_prefer_affordable=data["clear_prefer_affordable"],
             message_is_meaningful=True,
         )
+        logger.info("Gemini interpretation accepted (intent=%s)", result.intent)
+        return result

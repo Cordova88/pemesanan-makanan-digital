@@ -3,6 +3,7 @@ import os
 import logging
 from pathlib import Path
 
+from django.conf import settings
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -26,12 +27,18 @@ class GeminiClient:
     def generate(self, prompt):
         if self.client is None:
             return None
+        model = settings.GEMINI_MODEL
         try:
             response = self.client.models.generate_content(
-                model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
+                model=model,
                 contents=prompt,
             )
-            return response.text or None
+            text = response.text or None
+            if text:
+                logger.info("Gemini provider response received (model=%s)", model)
+            else:
+                logger.info("Gemini provider returned no text (model=%s)", model)
+            return text
         except Exception as exc:
             logger.warning("Gemini provider request failed (%s)", type(exc).__name__)
             return None
