@@ -16,9 +16,9 @@ def _body(request):
     return json.loads(request.body or "{}")
 
 
-def _item(match):
+def _item(match, explanation=None):
     item = match.item
-    return {
+    result = {
         "id": item.id,
         "name": item.name,
         "description": item.description,
@@ -46,6 +46,9 @@ def _item(match):
             for addon in item.allowed_addons.filter(is_active=True, is_available=True)
         ],
     }
+    if explanation:
+        result["explanation"] = explanation
+    return result
 
 
 def _public_preferences(preferences):
@@ -78,13 +81,15 @@ def _public_preferences(preferences):
 def chat(request):
     try:
         body = _body(request)
-        result=ChatbotService(request.session).reply(
+        result = ChatbotService(request.session).reply(
             body.get("message", ""),
             body.get("action") == "more",
             body.get("action"),
         )
+        explanations = result.pop("explanations", {})
         result["recommendations"] = [
-            _item(item) for item in result["recommendations"]
+            _item(item, explanations.get(item.item.id))
+            for item in result["recommendations"]
         ]
         result["preferences"] = _public_preferences(result["preferences"])
         return JsonResponse(result)

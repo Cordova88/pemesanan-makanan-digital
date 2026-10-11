@@ -1,5 +1,7 @@
 from decimal import Decimal
 from io import StringIO
+import json
+from unittest.mock import patch
 
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase
@@ -22,6 +24,9 @@ from .services.conversation_interpreter import (
     ConversationIntent,
     ConversationInterpreter,
 )
+from .services.ai.GeminiInterpreter import GeminiInterpreter, validate
+from .services.ai.explanations import RecommendationExplanationService
+from .services.gemini import GeminiClient
 
 
 class LanguageRuleTests(SimpleTestCase):
@@ -206,6 +211,150 @@ class ConversationInterpreterTests(SimpleTestCase):
         self.assertIn("refreshing", result.tags)
 
 
+class GeminiInterpreterTests(SimpleTestCase):
+    def setUp(self):
+        self.client = type(
+            "FakeGeminiClient",
+            (),
+            {"generate": lambda _self, _prompt: None},
+        )()
+        self.interpreter = GeminiInterpreter(self.client)
+        self.valid_response = {
+            "intent": ConversationIntent.REPLACE_PREFERENCES,
+            "add_tags": ["light_meal"],
+            "remove_tags": ["heavy_meal"],
+            "excluded_tags": [],
+            "soft_excluded_tags": [],
+            "moods": [],
+            "clear_moods": False,
+            "max_price": None,
+            "prefer_affordable": None,
+            "clear_max_price": False,
+            "clear_prefer_affordable": False,
+            "message_is_meaningful": True,
+        }
+
+    def test_validated_replacement_delta_maps_to_existing_replace_operation(self):
+        raw = json.dumps(self.valid_response)
+        self.client.generate = lambda _prompt: raw
+        result = self.interpreter.interpret(
+            "yang tadi terlalu berat, cari yang lebih ringan",
+            context={"tags": ["heavy_meal"]},
+        )
+        self.assertEqual(result.intent, ConversationIntent.REPLACE_PREFERENCES)
+        self.assertEqual(result.operations[0].action, "REPLACE")
+        self.assertEqual(result.operations[0].remove_tags, ("heavy_meal",))
+        self.assertEqual(result.operations[0].tags, ("light_meal",))
+
+    def test_invalid_fields_tags_and_contextual_removal_are_rejected(self):
+        allowed_tags = set(self.interpreter.allowed_tags)
+        allowed_moods = set(self.interpreter.allowed_moods)
+        self.assertTrue(
+            validate(self.valid_response, allowed_tags, allowed_moods, {"heavy_meal"})
+        )
+
+        invalid_responses = []
+        extra = dict(self.valid_response, extra=True)
+        invalid_responses.append(extra)
+        unknown_tag = dict(self.valid_response, add_tags=["fictional_tag"])
+        invalid_responses.append(unknown_tag)
+        unknown_removal = dict(self.valid_response, remove_tags=["chicken"])
+        invalid_responses.append(unknown_removal)
+        malformed_list = dict(self.valid_response, add_tags=[["nested"]])
+        invalid_responses.append(malformed_list)
+        for response in invalid_responses:
+            with self.subTest(response=response):
+                self.assertFalse(
+                    validate(response, allowed_tags, allowed_moods, {"heavy_meal"})
+                )
+
+    def test_malformed_provider_output_returns_none(self):
+        self.client.generate = lambda _prompt: "not-json"
+        self.assertIsNone(self.interpreter.interpret("yang bikin nagih"))
+
+    def test_gemini_client_returns_none_for_provider_timeout_without_leaking_details(self):
+        class FailingModels:
+            @staticmethod
+            def generate_content(**_kwargs):
+                raise TimeoutError("provider timeout")
+
+        client = GeminiClient()
+        client.client = type(
+            "FakeProvider",
+            (),
+            {"models": FailingModels()},
+        )()
+        with self.assertLogs("recommendation.services.gemini", level="WARNING") as logs:
+            self.assertIsNone(client.generate("test prompt"))
+        self.assertIn("TimeoutError", logs.output[0])
+        self.assertNotIn("provider timeout", logs.output[0])
+
+
+class RecommendationExplanationServiceTests(TestCase):
+    def test_grounded_explanation_is_accepted_and_does_not_change_ranked_items(self):
+        food = Category.objects.create(name="Makanan")
+        spicy = MenuTag.objects.create(name="spicy", display_name=TAG_LABELS["spicy"])
+        item = MenuItem.objects.create(
+            category=food,
+            name="Ayam Geprek",
+            price=Decimal("15000"),
+        )
+        item.tags.add(spicy)
+        preferences = Preferences(tags={"spicy"})
+        matches = RecommendationService().rank(preferences)
+        before = [match.item.pk for match in matches]
+        fake = type(
+            "FakeGeminiClient",
+            (),
+            {
+                "generate": lambda _self, _prompt: json.dumps(
+                    {
+                        "explanations": [
+                            {
+                                "id": item.pk,
+                                "text": "Ayam Geprek sesuai dengan Pedas.",
+                            }
+                        ]
+                    }
+                )
+            },
+        )()
+        result = RecommendationExplanationService(fake).explain(matches, preferences)
+        after = [match.item.pk for match in RecommendationService().rank(preferences)]
+        self.assertEqual(result, {item.pk: "Ayam Geprek sesuai dengan Pedas."})
+        self.assertEqual(before, after)
+
+    def test_unsupported_or_malformed_explanations_are_rejected(self):
+        food = Category.objects.create(name="Makanan")
+        spicy = MenuTag.objects.create(name="spicy", display_name=TAG_LABELS["spicy"])
+        item = MenuItem.objects.create(
+            category=food,
+            name="Ayam Geprek",
+            price=Decimal("15000"),
+        )
+        item.tags.add(spicy)
+        preferences = Preferences(tags={"spicy"})
+        matches = RecommendationService().rank(preferences)
+        unsafe = {
+            "explanations": [
+                {
+                    "id": item.pk,
+                    "text": "Ayam Geprek mengandung protein tinggi dan Pedas.",
+                }
+            ]
+        }
+        fake = type(
+            "FakeGeminiClient",
+            (),
+            {"generate": lambda _self, _prompt: json.dumps(unsafe)},
+        )()
+        service = RecommendationExplanationService(fake)
+        self.assertEqual(service.explain(matches, preferences), {})
+        fake.generate = lambda _prompt: "{"
+        self.assertEqual(service.explain(matches, preferences), {})
+        self.assertIn("Pedas", service.fallback(matches[0]))
+
+
 class RecommendationTests(TestCase):
     def setUp(self):
         self.food = Category.objects.create(name="Makanan")
@@ -366,6 +515,12 @@ class DemoSeedTests(TestCase):
 
 class ChatbotIntegrationTests(TestCase):
     def setUp(self):
+        self.gemini_patch = patch(
+            "recommendation.services.gemini.GeminiClient.generate",
+            return_value=None,
+        )
+        self.gemini_generate = self.gemini_patch.start()
+        self.addCleanup(self.gemini_patch.stop)
         food = Category.objects.create(name="Makanan")
         self.spicy = MenuTag.objects.create(name="spicy", display_name=TAG_LABELS["spicy"])
         self.chicken = MenuTag.objects.create(
@@ -536,6 +691,39 @@ class ChatbotIntegrationTests(TestCase):
         self.assertIn(TAG_LABELS["rice"], prefs["tags"])
         self.assertTrue(prefs["prefer_affordable"])
 
+    def test_contextual_revision_uses_validated_gemini_delta(self):
+        self.post_chat("Aku mau makanan berat")
+        response = {
+            "intent": ConversationIntent.REPLACE_PREFERENCES,
+            "add_tags": ["light_meal"],
+            "remove_tags": ["heavy_meal"],
+            "excluded_tags": [],
+            "soft_excluded_tags": [],
+            "moods": [],
+            "clear_moods": False,
+            "max_price": None,
+            "prefer_affordable": None,
+            "clear_max_price": False,
+            "clear_prefer_affordable": False,
+            "message_is_meaningful": True,
+        }
+        self.gemini_generate.return_value = json.dumps(response)
+        result = self.post_chat("Yang tadi terlalu berat, cari yang lebih ringan")
+        preferences = result.json()["preferences"]
+        self.assertNotIn(TAG_LABELS["heavy_meal"], preferences["tags"])
+        self.assertIn(TAG_LABELS["light_meal"], preferences["tags"])
+
+    def test_provider_failure_does_not_change_saved_preferences(self):
+        first = self.post_chat("Aku mau pedas dan ayam")
+        saved = first.json()["preferences"]
+        self.gemini_generate.return_value = None
+        response = self.post_chat("Yang tadi terlalu berat")
+        self.assertEqual(response.json()["preferences"]["tags"], saved["tags"])
+        self.assertEqual(
+            response.json()["preferences"]["excluded_tags"],
+            saved["excluded_tags"],
+        )
+
     def test_unknown_and_gibberish_do_not_mutate_or_replay_preferences(self):
         first = self.post_chat("Aku mau pedas dan ayam")
         stored = first.json()["preferences"]
@@ -671,6 +859,8 @@ class ChatbotIntegrationTests(TestCase):
         )
         self.assertIn(TAG_LABELS["spicy"], card["labels"])
         self.assertIn(TAG_LABELS["chicken"], card["match_reasons"])
+        self.assertIsInstance(card["explanation"], str)
+        self.assertTrue(card["explanation"])
         self.assertTrue(card["variants"][0]["required"])
         self.assertNotIn('"spicy"', str(recommendations.json()))
 

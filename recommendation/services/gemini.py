@@ -1,5 +1,6 @@
 
 import os
+import logging
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -7,7 +8,9 @@ from google import genai
 from google.genai import types
 
 BASE_DIR = Path(__file__).resolve().parents[2]
-load_dotenv(BASE_DIR / ".env", override=True)
+load_dotenv(BASE_DIR / ".env", override=False)
+
+logger = logging.getLogger(__name__)
 
 
 class GeminiClient:
@@ -25,12 +28,11 @@ class GeminiClient:
             return None
         try:
             response = self.client.models.generate_content(
-                model="gemini-3.5-flash",
+                model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
                 contents=prompt,
             )
-            
-            return response.text
-        except Exception as e:
-            print(f"Error generating content: {e}", flush=True)
-            return 
+            return response.text or None
+        except Exception as exc:
+            logger.warning("Gemini provider request failed (%s)", type(exc).__name__)
+            return None
         

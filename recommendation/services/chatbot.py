@@ -1,9 +1,14 @@
+from django.conf import settings
+
 from .conversation_interpreter import ConversationInterpreter, ConversationIntent
 from .language import TAG_LABELS, normalize_text
 from .mood_extractor import MoodExtractor
 from .mood_resolver import MoodResolver
 from .recommendation import RecommendationService
 from .tag_extractor import Preferences, TagExtractor
+from .ai.GeminiInterpreter import GeminiInterpreter
+from .ai.explanations import RecommendationExplanationService
+from .gemini import GeminiClient
 
 
 class ChatbotService:
@@ -30,6 +35,14 @@ class ChatbotService:
         "lainnya",
         "rekomendasi lain",
     }
+    GEMINI_FOOD_CUES = (
+        "makan", "menu", "masakan", "minum", "ayam", "sapi", "nasi",
+        "mie", "pedas", "manis", "gurih", "berat", "ringan", "murah",
+        "mahal", "kenyang", "nagih", "eneg", "pengen", "mau", "cari",
+        "ada yang", "mirip",
+    )
+    GEMINI_UNCERTAIN_CUES = ("berminyak", "eneg", "bikin nagih")
+    GEMINI_CALLS_KEY = "gemini_calls"
 
     def __init__(self, session):
         self.session = session
@@ -38,6 +51,9 @@ class ChatbotService:
         self.mood_resolver = MoodResolver()
         self.recommender = RecommendationService()
         self.interpreter = ConversationInterpreter()
+        self.gemini_client = GeminiClient()
+        self.gemini_interpreter = GeminiInterpreter(self.gemini_client)
+        self.explanation_service = RecommendationExplanationService(self.gemini_client)
 
     def reset(self):
         self.session.pop(self.SESSION_KEY, None)
@@ -46,7 +62,35 @@ class ChatbotService:
         self.session.pop("shown_recommendation_ids", None)
         self.session.pop("last_recommendations", None)
         self.session.pop("last_question", None)
+        self.session.pop(self.GEMINI_CALLS_KEY, None)
         self.session.modified = True
+
+    def _consume_gemini_call(self):
+        maximum = max(0, int(settings.GEMINI_MAX_CALLS_PER_SESSION))
+        calls = int(self.session.get(self.GEMINI_CALLS_KEY, 0))
+        if calls >= maximum:
+            return False
+        self.session[self.GEMINI_CALLS_KEY] = calls + 1
+        self.session.modified = True
+        return True
+
+    @classmethod
+    def _eligible_for_gemini(cls, message, interpretation):
+        if len(message) > 500:
+            return False
+        if interpretation.contextual_revision:
+            return True
+        normalized = normalize_text(message)
+        if interpretation.intent in {
+            ConversationIntent.RECOMMEND,
+            ConversationIntent.UPDATE_PREFERENCES,
+            ConversationIntent.REMOVE_PREFERENCES,
+            ConversationIntent.REPLACE_PREFERENCES,
+        }:
+            return any(cue in normalized for cue in cls.GEMINI_UNCERTAIN_CUES)
+        if interpretation.intent != ConversationIntent.UNKNOWN:
+            return False
+        return any(cue in normalized for cue in cls.GEMINI_FOOD_CUES)
 
     def _preferences(self):
         return Preferences.from_dict(self.session.get(self.SESSION_KEY, {}))
@@ -209,6 +253,14 @@ class ChatbotService:
             exclude_ids = list(exclude_ids or [])
             shown = []
         matches = self.recommender.rank(preferences, exclude_ids=exclude_ids)
+        explanations = {
+            match.item.id: self.explanation_service.fallback(match)
+            for match in matches
+        }
+        if matches and self._consume_gemini_call():
+            explanations.update(
+                self.explanation_service.explain(matches, preferences)
+            )
         new_ids = [match.item.id for match in matches]
         if more:
             self.session[self.SHOWN_KEY] = shown + new_ids
@@ -227,6 +279,7 @@ class ChatbotService:
             "state": "RECOMMENDING",
             "preferences": preferences.to_dict(state="RECOMMENDING"),
             "recommendations": matches,
+            "explanations": explanations,
             "quick_replies": [
                 self._quick_reply("🔄 Cari Menu Lain", "Cari menu lain", action="more"),
                 self._quick_reply("🔄 Mulai Lagi", "mulai lagi", action="reset"),
@@ -290,6 +343,10 @@ class ChatbotService:
             current.category = interpretation.category
         if interpretation.prefer_affordable:
             current.prefer_affordable = True
+        if interpretation.clear_max_price:
+            current.max_price = None
+        if interpretation.clear_prefer_affordable:
+            current.prefer_affordable = False
         return current
 
     def _select_previous_recommendation(self, interpretation, session_state):
@@ -353,6 +410,27 @@ class ChatbotService:
             ),
             last_recommendations=session_state.get("last_recommendations", []),
         )
+        if (
+            self._eligible_for_gemini(normalized, interpretation)
+            and self._consume_gemini_call()
+        ):
+            ai_interpretation = self.gemini_interpreter.interpret(
+                normalized,
+                context={
+                    "tags": sorted(preferences.tags),
+                    "excluded_tags": sorted(preferences.excluded_tags),
+                    "soft_excluded_tags": sorted(preferences.soft_excluded_tags),
+                    "moods": sorted(preferences.moods),
+                    "max_price": preferences.max_price,
+                    "prefer_affordable": preferences.prefer_affordable,
+                    "last_question": session_state.get(
+                        "last_question",
+                        self.session.get("last_question"),
+                    ),
+                },
+            )
+            if ai_interpretation is not None:
+                interpretation = ai_interpretation
 
         if interpretation.intent == ConversationIntent.RESET:
             self.reset()

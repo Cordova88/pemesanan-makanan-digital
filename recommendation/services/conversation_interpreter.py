@@ -46,6 +46,9 @@ class ConversationInterpretation:
     message_is_meaningful: bool = False
     follow_up: str | None = None
     clear_moods: bool = False
+    clear_max_price: bool = False
+    clear_prefer_affordable: bool = False
+    contextual_revision: bool = False
 
 
 class ConversationInterpreter:
@@ -135,6 +138,12 @@ class ConversationInterpreter:
 
         reference = self._pick_reference(normalized)
         if reference:
+            if self._is_contextual_revision(normalized):
+                return ConversationInterpretation(
+                    intent=ConversationIntent.UNKNOWN,
+                    message_is_meaningful=True,
+                    contextual_revision=bool(last_recommendations or last_question),
+                )
             return ConversationInterpretation(
                 intent=(
                     ConversationIntent.SELECT_RECOMMENDATION
@@ -269,6 +278,20 @@ class ConversationInterpreter:
         if any(phrase in normalized for phrase in ("yang terakhir", "menu terakhir", "yang tadi")):
             return "last"
         return None
+
+    @staticmethod
+    def _is_contextual_revision(text):
+        revision_cues = (
+            "terlalu",
+            "lebih",
+            "kurang",
+            "ganti",
+            "ubah",
+            "mirip",
+            "tapi",
+            "namun",
+        )
+        return any(cue in text for cue in revision_cues)
 
     @staticmethod
     def _contains_phrase(text, phrase):
