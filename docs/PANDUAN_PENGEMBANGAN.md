@@ -415,6 +415,7 @@ POST /api/recommendation/chat/
       ├─ MoodExtractor.extract()
       ├─ MoodResolver.resolve()
       ├─ Preferences digabung dengan state sesi
+      ├─ follow-up deterministik hanya untuk dimensi yang meningkatkan ranking
       ├─ GeminiInterpreter hanya untuk pesan UNKNOWN/revisi yang eligible
       └─ RecommendationService.rank()
   → RecommendationExplanationService dapat membuat penjelasan batch untuk item hasil ranking
@@ -433,7 +434,7 @@ POST /api/recommendation/chat/
 | `services/mood_extractor.py` | Deteksi situasi lelah, low mood, sangat lapar, gerah/haus, buru-buru, bingung. |
 | `services/mood_resolver.py` | Menerjemahkan mood ke tag karakteristik dengan bobot tidak langsung. |
 | `services/recommendation.py` | Filter item, hitung skor, alasan cocok, ranking deterministik. |
-| `services/chatbot.py` | State dialog, follow-up, pesan kontekstual, reset, rekomendasi berikutnya. |
+| `services/chatbot.py` | State dialog, keputusan follow-up deterministik, jawaban kontekstual, reset, penjelasan fallback, dan rekomendasi berikutnya. |
 | `services/gemini.py` | Komunikasi opsional dengan provider Gemini; timeout dan kegagalan provider menghasilkan fallback lokal. |
 | `services/ai/GeminiInterpreter.py` | Interpretasi AI berbentuk JSON, validasi intent/tag/mood/delta sebelum dibuat menjadi operasi preferensi. |
 | `services/ai/explanations.py` | Penjelasan batch display-only dengan validasi ID, panjang, markup, tag dan alasan yang cocok. |
@@ -444,14 +445,15 @@ POST /api/recommendation/chat/
 
 | Fitur | Status | Implementasi dan batasan |
 |---|---|---|
-| Interpretasi lokal-first | **Diimplementasikan** | Reset, salam, bantuan, pesan di luar topik, referensi biasa seperti “yang pertama”, serta preferensi yang dikenali diproses lokal. Gemini hanya eligible untuk pesan `UNKNOWN` yang tampak terkait makanan atau pesan revisi kontekstual tertentu; panjang pesan dibatasi 500 karakter. |
-| Revisi preferensi dengan konteks | **Diimplementasikan** | Prompt hanya menerima preferensi sesi yang relevan (tag positif/negatif, mood, batas harga, preferensi hemat, dan pertanyaan terakhir), bukan riwayat percakapan. Output delta membedakan tambah, hapus, pantangan kuat/lunak, dan penggantian. `remove_tags` harus subset tag tersimpan; Django mengubahnya menjadi `PreferenceOperation`. Perubahan budget/mood hanya diterapkan jika output tervalidasi meminta perubahan. |
+| Interpretasi lokal-first | **Diimplementasikan** | Reset, salam, bantuan, pesan di luar topik, referensi biasa seperti “yang pertama”, serta preferensi yang dikenali diproses lokal. Koreksi eksplisit seperti “gajadi, aku mau pedas” atau “salah, maksudku manis aja” mengganti kumpulan preferensi sebelumnya dengan preferensi baru yang dikenali, bukan menumpuknya. |
+| Interpretasi Gemini kontekstual | **Sebagian diimplementasikan** | Gemini hanya eligible untuk pesan `UNKNOWN` yang tampak terkait makanan, revisi kontekstual tertentu, atau sejumlah cue nuansa seperti “eneg/berminyak/nagih”; panjang pesan dibatasi 500 karakter. Ini bukan pemahaman umum seluruh pesan pelanggan. Prompt hanya menerima preferensi sesi relevan, bukan seluruh riwayat. Output delta tervalidasi sebelum Django mengubahnya menjadi `PreferenceOperation`; output gagal tidak mengubah preferensi. |
 | Validasi dan batas keamanan interpretasi | **Diimplementasikan** | Schema harus memiliki tepat field yang diharapkan. Intent, tag, mood, tipe data, batas jumlah/harga, duplikasi, overlap, dan konteks penghapusan divalidasi. Respons tidak valid, kosong, timeout, atau gagal provider tidak diterapkan dan alur lokal tetap berjalan. Tidak ada akses AI ke cart, checkout, pembayaran, atau operasi ORM. |
-| Penjelasan rekomendasi | **Diimplementasikan dengan fallback** | `RecommendationService.rank()` selalu memilih dan mengurutkan item aktual terlebih dahulu. Satu prompt batch menerima ID, nama, kategori, deskripsi, harga, tag katalog, preferensi, dan alasan hasil ranking. AI hanya mengembalikan teks untuk ID terpilih; validasi membatasi schema/ID/markup/panjang dan memeriksa nama, alasan, serta tag. Jika ditolak/gagal, kartu tetap menampilkan alasan deterministik. |
+| Pertanyaan lanjutan kontekstual | **Diimplementasikan (aturan deterministik)** | `ChatbotService` hanya mengajukan follow-up untuk pilihan yang belum cukup membedakan hasil, misalnya pedas saja menanyakan jenis makanan; jawaban “makanan berat” dapat menanyakan nasi atau mie. Preferensi yang sudah cukup spesifik langsung diranking tanpa pertanyaan tambahan. Satu pertanyaan disimpan sebagai `last_question`; “bebas/terserah” pada jawaban kontekstual berarti jangan menambah filter, lalu lanjut rekomendasi tanpa menghapus preferensi sebelumnya. Gemini tidak dipanggil untuk memilih atau merangkai pertanyaan ini. |
+| Penjelasan rekomendasi | **Sebagian diimplementasikan** | `RecommendationService.rank()` selalu memilih dan mengurutkan item aktual terlebih dahulu. Satu prompt batch menerima maksimal tiga hasil terpilih beserta ID, nama, kategori, deskripsi katalog terbatas, harga, tag, preferensi relevan, dan alasan ranking. Validator mengikat teks ke ID dan memeriksa schema, markup, panjang, kata sumber, nama, alasan, serta tag. Harga/atribut terstruktur tetap berasal dari katalog; jika output ditolak/gagal/kuota habis, kartu memakai alasan deterministik. Pemeriksaan kata tidak dapat membuktikan kebenaran semantik setiap kalimat; jangan perlakukan prose AI sebagai data otoritatif. |
 | Render keluaran AI | **Diimplementasikan** | Pesan dan penjelasan ditampilkan melalui `textContent`, bukan HTML. Ranking, harga dan data untuk cart tetap berasal dari Django/katalog. |
-| Konfigurasi dan batas panggilan | **Diimplementasikan** | `GEMINI_API_KEY` bersifat opsional dan tidak boleh dimasukkan ke git. `GEMINI_MODEL` default `gemini-3.5-flash`; `GEMINI_MAX_CALLS_PER_SESSION` default `50`. Jika key tidak tersedia atau batas tercapai, jalur lokal/fallback dipakai. |
+| Konfigurasi dan batas panggilan | **Diimplementasikan** | `GEMINI_API_KEY` bersifat opsional dan tidak boleh dimasukkan ke git. `GEMINI_MODEL` default `gemini-3.5-flash-lite`; `GEMINI_MAX_CALLS_PER_SESSION` default `50`. Jika key tidak tersedia atau batas tercapai, jalur lokal/fallback dipakai. |
 | Pertanyaan katalog berbasis fakta | **Direncanakan** | Belum ada sistem tanya-jawab bebas tentang bahan, stok, komposisi, atau detail menu. Jangan menyimpulkan fakta tersebut dari tag atau nama. |
-| Pertanyaan lanjutan cerdas | **Direncanakan** | Pertanyaan follow-up yang adaptif masih memakai aturan yang ada; belum dibuat oleh Gemini. |
+| Pertanyaan lanjutan buatan AI | **Direncanakan** | Gemini belum menentukan kapan bertanya atau menghasilkan pertanyaan. Follow-up saat ini sengaja diputuskan oleh aturan Django agar tidak menambah panggilan, latency, maupun risiko perubahan konteks yang salah. |
 | Monitoring penggunaan AI | **Direncanakan** | Batas panggilan sesi sudah ada, tetapi belum tersedia dashboard/analitik biaya, latensi, maupun tingkat penolakan output. |
 
 Kegagalan output penjelasan tidak mengubah menu, urutan ranking, harga, maupun status ketersediaan. Deskripsi katalog merupakan data CMS; hanya masukkan fakta yang memang tersimpan di katalog. Jangan gunakan model untuk mengarang bahan, alergen, tekstur, atau klaim kesehatan. Variabel rahasia jangan dicetak dalam log.
@@ -460,11 +462,11 @@ Konfigurasi lokal opsional pada `.env` di root proyek (jangan commit nilai key):
 
 ```dotenv
 GEMINI_API_KEY=
-GEMINI_MODEL=gemini-3.5-flash
+GEMINI_MODEL=gemini-3.5-flash-lite
 GEMINI_MAX_CALLS_PER_SESSION=50
 ```
 
-Tes AI menggunakan fake/mock client agar tidak menghubungi provider: `python manage.py test recommendation.tests.GeminiInterpreterTests recommendation.tests.RecommendationExplanationServiceTests recommendation.tests.ChatbotIntegrationTests`. Jalankan `python manage.py check` setelah perubahan konfigurasi atau URL.
+Tes AI/follow-up menggunakan fake/mock client agar tidak menghubungi provider. Jalankan `python manage.py test recommendation.tests.GeminiInterpreterTests recommendation.tests.RecommendationExplanationServiceTests recommendation.tests.ChatbotIntegrationTests` untuk interpretasi AI, penjelasan batch, fallback, ranking, dan alur follow-up. Jalankan `python manage.py check` setelah perubahan konfigurasi atau URL; `python manage.py test` menjalankan seluruh suite.
 
 ### Mood yang dikenali
 
