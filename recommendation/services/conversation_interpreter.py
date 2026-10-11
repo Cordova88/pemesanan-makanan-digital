@@ -13,6 +13,7 @@ class ConversationIntent:
     UPDATE_PREFERENCES = "UPDATE_PREFERENCES"
     REMOVE_PREFERENCES = "REMOVE_PREFERENCES"
     REPLACE_PREFERENCES = "REPLACE_PREFERENCES"
+    CATALOG_QUESTION = "CATALOG_QUESTION"
     SELECT_RECOMMENDATION = "SELECT_RECOMMENDATION"
     REJECT_RECOMMENDATION = "REJECT_RECOMMENDATION"
     CONFIRM = "CONFIRM"
@@ -49,6 +50,7 @@ class ConversationInterpretation:
     clear_max_price: bool = False
     clear_prefer_affordable: bool = False
     contextual_revision: bool = False
+    catalog_tags: set[str] = field(default_factory=set)
 
 
 class ConversationInterpreter:
@@ -179,6 +181,16 @@ class ConversationInterpreter:
 
         extracted = self.tag_extractor.extract(normalized)
         tags = set(extracted.tags)
+        if self._is_catalog_question(normalized) and tags:
+            return ConversationInterpretation(
+                intent=ConversationIntent.CATALOG_QUESTION,
+                tags=tags,
+                excluded_tags=set(extracted.excluded_tags),
+                soft_excluded_tags=set(extracted.soft_excluded_tags),
+                catalog_tags=tags,
+                message_is_meaningful=True,
+            )
+
         moods = self.mood_extractor.extract(normalized)
         moods.discard("confused")
         clear_moods = self._clears_mood(normalized) or (
@@ -398,3 +410,15 @@ class ConversationInterpreter:
     @staticmethod
     def _looks_out_of_scope(text):
         return any(hint in text for hint in ConversationInterpreter.OUT_OF_SCOPE_HINTS)
+
+    @staticmethod
+    def _is_catalog_question(text):
+        explicit_question_cues = (
+            "apa aja",
+            "apa saja",
+            "ada menu",
+            "ada pilihan",
+        )
+        return any(cue in text for cue in explicit_question_cues) or (
+            "pilihan" in text and ("apa" in text or "?" in text)
+        )

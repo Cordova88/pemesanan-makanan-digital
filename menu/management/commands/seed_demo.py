@@ -109,6 +109,45 @@ class Command(BaseCommand):
             ("chicken", "rice", "spicy", "savory", "crispy", "cheese",
              "rich", "filling", "heavy_meal", "comfort_food"),
         )
+        food_samples = (
+            ("Sate Ayam", "18000.00", ("chicken", "savory", "juicy", "sharing", "dinner")),
+            ("Soto Ayam", "16000.00", ("chicken", "brothy", "warming", "rice", "lunch")),
+            ("Bakso Sapi", "17000.00", ("beef", "brothy", "warming", "noodle", "comfort_food")),
+            ("Rendang Sapi", "28000.00", ("beef", "savory", "rich", "rice", "heavy_meal")),
+            ("Nasi Ayam Teriyaki", "22000.00", ("chicken", "rice", "sweet", "savory", "filling")),
+            ("Nasi Uduk", "14000.00", ("rice", "savory", "comfort_food", "breakfast", "filling")),
+            ("Nasi Kuning", "16000.00", ("rice", "savory", "comfort_food", "breakfast", "filling")),
+            ("Soto Betawi", "24000.00", ("beef", "brothy", "rich", "warming", "rice")),
+            ("Ikan Bakar", "26000.00", ("fish", "seafood", "savory", "juicy", "dinner")),
+            ("Udang Saus Padang", "30000.00", ("shrimp", "seafood", "spicy", "saucy", "sharing")),
+            ("Capcay Kuah", "18000.00", ("savory", "brothy", "light", "mild", "warming")),
+            ("Tumis Kangkung", "12000.00", ("savory", "light", "mild", "quick_meal", "lunch")),
+            ("Tempe Mendoan", "10000.00", ("tempeh", "snack", "soft", "savory", "sharing")),
+            ("Pisang Goreng", "10000.00", ("dessert", "sweet", "crispy", "snack", "sharing")),
+            ("Roti Bakar Cokelat", "14000.00", ("bread", "sweet", "dessert", "crispy", "snack")),
+        )
+        for name, price, item_tags in food_samples:
+            menu(name, foods, price, item_tags)
+
+        drink_samples = (
+            ("Es Kopi Susu", "15000.00", ("drink", "sweet", "cold", "creamy", "refreshing")),
+            ("Kopi Hitam", "10000.00", ("drink", "hot", "warming", "satisfying", "solo")),
+            ("Teh Hangat", "5000.00", ("drink", "sweet", "warm", "refreshing", "solo")),
+            ("Lemon Tea", "10000.00", ("drink", "sweet", "sour", "cold", "refreshing")),
+            ("Jus Alpukat", "15000.00", ("drink", "sweet", "cold", "creamy", "refreshing")),
+            ("Jus Mangga", "14000.00", ("drink", "sweet", "cold", "refreshing", "light")),
+            ("Jus Jambu", "12000.00", ("drink", "sweet", "cold", "refreshing", "light")),
+            ("Susu Cokelat", "12000.00", ("drink", "sweet", "cold", "creamy", "dessert")),
+            ("Susu Jahe", "12000.00", ("drink", "sweet", "warm", "warming", "creamy")),
+            ("Wedang Jahe", "10000.00", ("drink", "warm", "warming", "sweet", "hot")),
+            ("Bandrek", "12000.00", ("drink", "warm", "warming", "sweet", "hot")),
+            ("Es Cincau", "10000.00", ("drink", "sweet", "cold", "refreshing", "light")),
+            ("Es Cendol", "12000.00", ("drink", "sweet", "cold", "creamy", "dessert")),
+            ("Air Mineral", "4000.00", ("drink", "cold", "light", "refreshing", "solo")),
+            ("Soda Gembira", "13000.00", ("drink", "sweet", "cold", "refreshing", "sharing")),
+        )
+        for name, price, item_tags in drink_samples:
+            menu(name, drinks, price, item_tags)
 
         group, _ = VariantGroup.objects.get_or_create(
             menu_item=nasi,

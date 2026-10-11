@@ -198,9 +198,13 @@ class ChatbotService:
         }
 
     @staticmethod
-    def _response_message(preferences, source_text):
+    def _response_message(preferences, source_text, response_kind="recommendation"):
         text = normalize_text(source_text)
-        if "hot_thirsty" in preferences.moods:
+        if response_kind == "correction":
+            context = "Oke, kita ikuti perubahan pilihanmu 👍"
+        elif response_kind == "removal":
+            context = "Siap, preferensi itu aku hilangkan 👍"
+        elif "hot_thirsty" in preferences.moods:
             context = "Lagi gerah? Kita cari yang dingin dan seger dulu 🧊"
         elif "tired" in preferences.moods:
             context = "Kalau lagi capek, kita cari yang mengenyangkan dan bikin puas ya 😌"
@@ -260,7 +264,14 @@ class ChatbotService:
             f"{variants[index]}\nCoba kasih tahu misalnya kamu mau yang pedas, ayam, nasi, atau yang murah."
         )
 
-    def _recommend(self, preferences, source_text, more=False, exclude_ids=None):
+    def _recommend(
+        self,
+        preferences,
+        source_text,
+        more=False,
+        exclude_ids=None,
+        response_kind="recommendation",
+    ):
         preferences.mood_tags = self.mood_resolver.resolve(preferences.moods)
         shown = self.session.get(self.SHOWN_KEY, [])
         if more:
@@ -274,10 +285,17 @@ class ChatbotService:
             match.item.id: self.explanation_service.fallback(match)
             for match in matches
         }
+        generated_intro = None
         if matches and self._consume_gemini_call():
-            explanations.update(
-                self.explanation_service.explain(matches, preferences)
+            generated_intro, generated_explanations = (
+                self.explanation_service.explain_with_intro(
+                    matches,
+                    preferences,
+                    source_text,
+                    response_kind=response_kind,
+                )
             )
+            explanations.update(generated_explanations)
         new_ids = [match.item.id for match in matches]
         if more:
             self.session[self.SHOWN_KEY] = shown + new_ids
@@ -289,7 +307,12 @@ class ChatbotService:
         self._save(preferences, "RECOMMENDING")
         return {
             "message": (
-                self._response_message(preferences, source_text)
+                generated_intro
+                or self._response_message(
+                    preferences,
+                    source_text,
+                    response_kind=response_kind,
+                )
                 if matches
                 else "Aku belum menemukan yang pas. Coba ubah pilihan atau batas harganya, ya."
             ),
@@ -299,6 +322,74 @@ class ChatbotService:
             "explanations": explanations,
             "quick_replies": [
                 self._quick_reply("🔄 Cari Menu Lain", "Cari menu lain", action="more"),
+                self._quick_reply("🔄 Mulai Lagi", "mulai lagi", action="reset"),
+            ],
+        }
+
+    def _answer_catalog_question(self, preferences, interpretation, source_text):
+        tags = interpretation.catalog_tags
+        matches = self.recommender.find_catalog_matches(
+            tags,
+            excluded_tags=interpretation.excluded_tags,
+        )
+        state = self.session.get(self.SESSION_KEY, {}).get(
+            "state",
+            "COLLECTING_PREFERENCES",
+        )
+        if not matches:
+            tag_labels = [
+                TAG_LABELS[tag]
+                for tag in sorted(tags)
+                if tag in TAG_LABELS
+            ]
+            requested = " dan ".join(tag_labels) or "pilihan itu"
+            return {
+                "message": (
+                    f"Aku belum menemukan menu {requested} yang tersedia saat ini."
+                ),
+                "state": state,
+                "preferences": preferences.to_dict(state=state),
+                "recommendations": [],
+                "catalog_question": True,
+                "quick_replies": [],
+            }
+
+        query_preferences = Preferences(tags=set(tags))
+        explanations = {
+            match.item.id: self.explanation_service.fallback(match)
+            for match in matches
+        }
+        generated_intro = None
+        if self._consume_gemini_call():
+            generated_intro, generated_explanations = (
+                self.explanation_service.explain_with_intro(
+                    matches,
+                    query_preferences,
+                    source_text,
+                    response_kind="catalog_question",
+                )
+            )
+            explanations.update(generated_explanations)
+
+        tag_labels = [
+            TAG_LABELS[tag]
+            for tag in sorted(tags)
+            if tag in TAG_LABELS
+        ]
+        requested = " dan ".join(tag_labels) or "pilihanmu"
+        self.session["last_recommendations"] = [match.item.id for match in matches]
+        self.session[self.SHOWN_KEY] = [match.item.id for match in matches]
+        self.session["shown_recommendation_ids"] = [match.item.id for match in matches]
+        self.session.modified = True
+        return {
+            "message": generated_intro
+            or f"Ini pilihan menu {requested} yang tersedia di katalog.",
+            "state": state,
+            "preferences": preferences.to_dict(state=state),
+            "recommendations": matches,
+            "catalog_question": True,
+            "explanations": explanations,
+            "quick_replies": [
                 self._quick_reply("🔄 Mulai Lagi", "mulai lagi", action="reset"),
             ],
         }
@@ -436,6 +527,12 @@ class ChatbotService:
             ),
             last_recommendations=session_state.get("last_recommendations", []),
         )
+        if interpretation.intent == ConversationIntent.CATALOG_QUESTION:
+            return self._answer_catalog_question(
+                preferences,
+                interpretation,
+                normalized,
+            )
         if open_followup_answer:
             self.session["last_question"] = None
             return self._recommend(preferences, normalized)
@@ -617,31 +714,17 @@ class ChatbotService:
                 return self._question()
 
             self._save(updated, "RECOMMENDING")
-            result = self._recommend(updated, normalized)
-            if interpretation.intent in {
-                ConversationIntent.REMOVE_PREFERENCES,
-                ConversationIntent.REPLACE_PREFERENCES,
-            }:
-                variants = (
-                    (
-                        "Oke, kita ganti pilihannya 👍",
-                        "Siap, kita ubah.",
-                        "Noted! Preferensi sebelumnya aku sesuaikan.",
-                    )
+            result = self._recommend(
+                updated,
+                normalized,
+                response_kind=(
+                    "correction"
                     if interpretation.intent == ConversationIntent.REPLACE_PREFERENCES
-                    else (
-                        "Siap, pilihan itu aku hilangkan.",
-                        "Oke, aku sesuaikan tanpa pilihan tadi.",
-                        "Noted! Preferensinya sudah aku perbarui.",
-                    )
-                )
-                result["message"] = (
-                    self._deterministic_variant(
-                        normalized,
-                        variants,
-                    )
-                    + ("\n" + result["message"] if result["recommendations"] else "")
-                )
+                    else "removal"
+                    if interpretation.intent == ConversationIntent.REMOVE_PREFERENCES
+                    else "recommendation"
+                ),
+            )
             return result
 
         if more:

@@ -160,6 +160,15 @@ class ConversationInterpreterTests(SimpleTestCase):
                     ConversationIntent.UNKNOWN,
                 )
 
+    def test_catalog_question_is_distinct_from_a_rice_preference(self):
+        question = self.interpreter.interpret("Pilihan nasi apa aja?")
+        self.assertEqual(question.intent, ConversationIntent.CATALOG_QUESTION)
+        self.assertEqual(question.catalog_tags, {"rice"})
+
+        statement = self.interpreter.interpret("Aku mau pilihan nasi")
+        self.assertNotEqual(statement.intent, ConversationIntent.CATALOG_QUESTION)
+        self.assertIn("rice", statement.tags)
+
     def test_recommendation_references_resolve_to_context_positions(self):
         references = (
             ("Yang pertama", "first"),
@@ -337,6 +346,91 @@ class GeminiInterpreterTests(SimpleTestCase):
 
 
 class RecommendationExplanationServiceTests(TestCase):
+    def test_intro_and_explanations_share_one_grounded_gemini_call(self):
+        food = Category.objects.create(name="Makanan")
+        rice = MenuTag.objects.create(name="rice", display_name=TAG_LABELS["rice"])
+        item = MenuItem.objects.create(
+            category=food,
+            name="Nasi Goreng",
+            price=Decimal("18000"),
+        )
+        item.tags.add(rice)
+        preferences = Preferences(tags={"rice"})
+        matches = RecommendationService().rank(preferences)
+        calls = []
+
+        class FakeGeminiClient:
+            def generate(self, prompt):
+                calls.append(prompt)
+                return json.dumps(
+                    {
+                        "intro": "Oke, kita cari yang sesuai pilihanmu ya! 🍚",
+                        "explanations": [
+                            {
+                                "id": item.pk,
+                                "text": "Nasi Goreng sesuai dengan Nasi.",
+                            }
+                        ],
+                    }
+                )
+
+        intro, explanations = RecommendationExplanationService(
+            FakeGeminiClient()
+        ).explain_with_intro(
+            matches,
+            preferences,
+            "Aku mau nasi",
+            response_kind="recommendation",
+        )
+
+        self.assertEqual(len(calls), 1)
+        self.assertIn("Aku mau nasi", calls[0])
+        self.assertEqual(intro, "Oke, kita cari yang sesuai pilihanmu ya! 🍚")
+        self.assertEqual(
+            explanations,
+            {item.pk: "Nasi Goreng sesuai dengan Nasi."},
+        )
+
+    def test_unsupported_intro_is_rejected_without_losing_valid_explanations(self):
+        food = Category.objects.create(name="Makanan")
+        rice = MenuTag.objects.create(name="rice", display_name=TAG_LABELS["rice"])
+        item = MenuItem.objects.create(
+            category=food,
+            name="Nasi Goreng",
+            price=Decimal("18000"),
+        )
+        item.tags.add(rice)
+        matches = RecommendationService().rank(Preferences(tags={"rice"}))
+
+        class FakeGeminiClient:
+            @staticmethod
+            def generate(_prompt):
+                return json.dumps(
+                    {
+                        "intro": "<script>Diskon sehat 50%!</script>",
+                        "explanations": [
+                            {
+                                "id": item.pk,
+                                "text": "Nasi Goreng sesuai dengan Nasi.",
+                            }
+                        ],
+                    }
+                )
+
+        intro, explanations = RecommendationExplanationService(
+            FakeGeminiClient()
+        ).explain_with_intro(
+            matches,
+            Preferences(tags={"rice"}),
+            "Aku mau nasi",
+        )
+
+        self.assertIsNone(intro)
+        self.assertEqual(
+            explanations,
+            {item.pk: "Nasi Goreng sesuai dengan Nasi."},
+        )
+
     def test_grounded_explanation_is_accepted_and_does_not_change_ranked_items(self):
         food = Category.objects.create(name="Makanan")
         spicy = MenuTag.objects.create(name="spicy", display_name=TAG_LABELS["spicy"])
@@ -579,6 +673,15 @@ class RecommendationTests(TestCase):
         )
         self.assertNotIn(self.noodles, [match.item for match in excluding])
 
+    def test_catalog_lookup_requires_all_requested_tags_and_only_returns_available_items(self):
+        matches = self.recommender.find_catalog_matches({"spicy", "rice"})
+
+        self.assertEqual([match.item for match in matches], [self.best])
+        self.assertEqual(
+            matches[0].match_reasons,
+            (TAG_LABELS["rice"], TAG_LABELS["spicy"]),
+        )
+
 
 class DemoSeedTests(TestCase):
     def test_seed_demo_assigns_distinct_believable_tag_combinations(self):
@@ -605,6 +708,21 @@ class DemoSeedTests(TestCase):
             set(ayam_geprek.tags.values_list("name", flat=True)),
             set(mie_goreng.tags.values_list("name", flat=True)),
         )
+
+    def test_seed_demo_adds_many_items_per_category_without_duplicates(self):
+        call_command("seed_demo", stdout=StringIO())
+        call_command("seed_demo", stdout=StringIO())
+
+        self.assertEqual(
+            MenuItem.objects.filter(category__name="Makanan").count(),
+            21,
+        )
+        self.assertEqual(
+            MenuItem.objects.filter(category__name="Minuman").count(),
+            17,
+        )
+        self.assertTrue(MenuItem.objects.filter(name="Rendang Sapi").exists())
+        self.assertTrue(MenuItem.objects.filter(name="Jus Mangga").exists())
 
 
 class ChatbotIntegrationTests(TestCase):
@@ -701,6 +819,62 @@ class ChatbotIntegrationTests(TestCase):
         self.assertEqual(response.json()["state"], "COLLECTING_PREFERENCES")
         self.assertEqual(response.json()["recommendations"], [])
         self.gemini_generate.assert_called_once()
+
+    def test_catalog_question_returns_matching_available_items_without_changing_preferences(self):
+        first = self.post_chat("Aku mau pedas")
+        self.assertEqual(first.json()["state"], "ASKING_FOLLOWUP")
+        self.post_chat("Makanan berat")
+        before = self.post_chat("Aku mau nasi")
+        previous_preferences = before.json()["preferences"]
+        self.gemini_generate.reset_mock()
+        self.gemini_generate.return_value = None
+
+        result = self.post_chat("Pilihan nasi apa aja?")
+        body = result.json()
+
+        self.assertEqual(body["state"], "RECOMMENDING")
+        self.assertEqual(
+            [item["id"] for item in body["recommendations"]],
+            [self.best.id],
+        )
+        self.assertEqual(body["preferences"], previous_preferences)
+        self.assertIn("pilihan menu", body["message"])
+        self.gemini_generate.assert_called_once()
+
+    def test_catalog_question_with_no_matches_returns_safe_empty_result(self):
+        response = self.post_chat("Pilihan seafood apa aja?")
+
+        self.assertEqual(response.json()["recommendations"], [])
+        self.assertIn("belum menemukan menu", response.json()["message"])
+        self.gemini_generate.assert_not_called()
+
+    def test_catalog_question_uses_batched_natural_intro_and_catalog_card_label(self):
+        self.gemini_generate.return_value = json.dumps(
+            {
+                "intro": "Bisa, ini pilihan yang cocok dari katalog ya!",
+                "explanations": [
+                    {
+                        "id": self.best.id,
+                        "text": "Ayam Geprek sesuai dengan Nasi.",
+                    }
+                ],
+            }
+        )
+
+        result = self.post_chat("Pilihan nasi apa aja?").json()
+
+        self.assertEqual(
+            result["message"],
+            "Bisa, ini pilihan yang cocok dari katalog ya!",
+        )
+        self.assertTrue(result["catalog_question"])
+        self.assertEqual(len(result["recommendations"]), 1)
+        self.assertEqual(
+            result["recommendations"][0]["explanation"],
+            "Ayam Geprek sesuai dengan Nasi.",
+        )
+        self.gemini_generate.assert_called_once()
+
 
     def test_open_answer_to_followup_keeps_existing_preferences_and_recommends(self):
         first_question = self.post_chat("Pengen pedas")

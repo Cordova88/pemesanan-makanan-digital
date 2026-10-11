@@ -101,6 +101,54 @@ class RecommendationService:
             for match in self.rank(preferences, limit=limit, exclude_ids=exclude_ids)
         ]
 
+    def find_catalog_matches(self, tags, excluded_tags=None):
+        required_tags = set(tags)
+        excluded_tags = set(excluded_tags or [])
+        if not required_tags:
+            return []
+
+        items = (
+            MenuItem.objects.filter(
+                is_active=True,
+                is_available=True,
+                category__is_active=True,
+                tags__name__in=required_tags,
+            )
+            .select_related("category")
+            .prefetch_related("tags")
+            .distinct()
+        )
+        matches = []
+        for item in items:
+            item_tags = {tag.name for tag in item.tags.all()}
+            if (
+                not required_tags.issubset(item_tags)
+                or item_tags & excluded_tags
+            ):
+                continue
+            reasons = tuple(
+                TAG_LABELS[tag]
+                for tag in sorted(required_tags)
+                if tag in TAG_LABELS
+            )
+            labels = tuple(
+                TAG_LABELS[tag]
+                for tag in sorted(item_tags)
+                if tag in TAG_LABELS
+            )
+            matches.append(
+                RecommendationMatch(
+                    item=item,
+                    score=0,
+                    match_reasons=reasons,
+                    labels=labels,
+                )
+            )
+        return sorted(
+            matches,
+            key=lambda match: (match.item.price, match.item.name.casefold()),
+        )
+
     def get_available_match(self, item_id):
         item = (
             MenuItem.objects.filter(
