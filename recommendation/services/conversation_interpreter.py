@@ -14,6 +14,7 @@ class ConversationIntent:
     REMOVE_PREFERENCES = "REMOVE_PREFERENCES"
     REPLACE_PREFERENCES = "REPLACE_PREFERENCES"
     CATALOG_QUESTION = "CATALOG_QUESTION"
+    RETRY_SEARCH = "RETRY_SEARCH"
     SELECT_RECOMMENDATION = "SELECT_RECOMMENDATION"
     REJECT_RECOMMENDATION = "REJECT_RECOMMENDATION"
     CONFIRM = "CONFIRM"
@@ -112,7 +113,13 @@ class ConversationInterpreter:
         self.tag_extractor = TagExtractor()
         self.mood_extractor = MoodExtractor()
 
-    def interpret(self, text, last_question=None, last_recommendations=None):
+    def interpret(
+        self,
+        text,
+        last_question=None,
+        last_recommendations=None,
+        last_result_empty=False,
+    ):
         normalized = normalize_text(text or "")
         last_recommendations = last_recommendations or []
         if not normalized:
@@ -165,6 +172,27 @@ class ConversationInterpreter:
                 message_is_meaningful=bool(last_recommendations),
             )
 
+        if self._is_no_results_challenge(normalized, last_result_empty):
+            extracted = self.tag_extractor.extract(normalized)
+            if extracted.tags:
+                return ConversationInterpretation(
+                    intent=ConversationIntent.RETRY_SEARCH,
+                    operations=[
+                        PreferenceOperation(
+                            action="ADD",
+                            tags=tuple(sorted(extracted.tags)),
+                        )
+                    ],
+                    tags=set(extracted.tags),
+                    excluded_tags=set(extracted.excluded_tags),
+                    soft_excluded_tags=set(extracted.soft_excluded_tags),
+                    max_price=extracted.max_price,
+                    category=extracted.category,
+                    prefer_affordable=extracted.prefer_affordable,
+                    message_is_meaningful=True,
+                    catalog_tags=set(extracted.tags),
+                )
+
         if last_question and normalized in self.CONFIRM_PHRASES:
             return ConversationInterpretation(
                 intent=ConversationIntent.CONFIRM,
@@ -187,6 +215,8 @@ class ConversationInterpreter:
                 tags=tags,
                 excluded_tags=set(extracted.excluded_tags),
                 soft_excluded_tags=set(extracted.soft_excluded_tags),
+                max_price=extracted.max_price,
+                category=extracted.category,
                 catalog_tags=tags,
                 message_is_meaningful=True,
             )
@@ -329,6 +359,25 @@ class ConversationInterpreter:
         return any(cue in text for cue in revision_cues)
 
     @staticmethod
+    def _is_no_results_challenge(text, last_result_empty):
+        challenge_cues = (
+            "masa tidak ada",
+            "masa gak ada",
+            "masa nggak ada",
+            "kok tidak ada",
+            "kok gak ada",
+            "kok nggak ada",
+            "memang tidak ada",
+            "emang gak ada",
+            "serius tidak ada",
+            "serius gak ada",
+            "serius nggak ada",
+        )
+        return last_result_empty and any(
+            cue in text for cue in challenge_cues
+        )
+
+    @staticmethod
     def _contains_phrase(text, phrase):
         return re.search(r"(?<!\w)" + re.escape(phrase) + r"(?!\w)", text) is not None
 
@@ -418,6 +467,9 @@ class ConversationInterpreter:
             "apa saja",
             "ada menu",
             "ada pilihan",
+            "ada gak",
+            "ada nggak",
+            "ada tidak",
         )
         return any(cue in text for cue in explicit_question_cues) or (
             "pilihan" in text and ("apa" in text or "?" in text)
