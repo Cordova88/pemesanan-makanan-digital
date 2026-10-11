@@ -73,7 +73,9 @@ class TagExtractor:
         "saucy": ("banyak saus", "bersaus", "sausnya banyak", "berkuah kental"),
         "dry": ("tidak berkuah", "tanpa kuah", "kering"),
         "brothy": ("berkuah", "kuah", "sup", "soto"),
+        "boiled": ("rebus", "rebusan", "direbus", "boiled"),
         "chicken": ("ayam", "daging ayam", "olahan ayam"),
+        "duck": ("bebek", "entok", "duck"),
         "beef": ("sapi", "daging sapi", "daging merah"),
         "seafood": ("seafood", "makanan laut"),
         "shrimp": ("udang",),
@@ -129,6 +131,24 @@ class TagExtractor:
             tag: tuple(sorted((normalize_text(alias) for alias in aliases), key=len, reverse=True))
             for tag, aliases in self.ALIASES.items()
         }
+
+    def configure_catalog_tags(self, catalog_tags, catalog_aliases=()):
+        """Add current database tags and CMS-managed aliases."""
+        aliases_by_tag = {}
+        for tag_name, phrase in catalog_aliases:
+            aliases_by_tag.setdefault(tag_name, set()).add(phrase)
+        for name, display_name in catalog_tags:
+            aliases = set(self._aliases.get(name, ()))
+            aliases.add(normalize_text(name.replace("_", " ")))
+            if display_name:
+                aliases.add(normalize_text(re.sub(r"[^\w\s]", " ", display_name)))
+            aliases.update(
+                normalize_text(alias)
+                for alias in aliases_by_tag.get(name, ())
+            )
+            self._aliases[name] = tuple(
+                sorted((alias for alias in aliases if alias), key=len, reverse=True)
+            )
 
     @staticmethod
     def _contains(text, phrase):

@@ -1,361 +1,66 @@
 {% load static %}
 <!doctype html>
 <html lang="id">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>RasaKita — Pesan Online</title>
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    />
-    <link href="{% static 'menu/css/storefront.css' %}" rel="stylesheet" />
-  </head>
-  <body>
-    <a href="/chatbot/" class="btn btn-primary-app shadow chatbot-fab d-flex align-items-center justify-content-center fs-4" aria-label="Bantu pilih menu">🤖</a>
-    <!-- Top Navigation Header -->
-    <nav class="navbar bg-white border-bottom sticky-top shadow-sm py-2">
-      <div class="container d-flex align-items-center justify-content-between">
-        <a
-          class="navbar-brand fw-bold fs-5 text-dark m-0 d-flex align-items-center gap-2"
-          href="#"
-        >
-          <svg
-            width="24"
-            height="24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            viewBox="0 0 24 24"
-          >
-            <path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-          </svg>
-          <span>RasaKita</span>
-        </a>
-        <span class="badge bg-light text-secondary border fw-normal px-2 py-1">
-          Pesan mudah, makan nikmat
-        </span>
-      </div>
-    </nav>
-
-    <!-- Header / Banner Section -->
-    <header class="bg-white border-bottom py-4 mb-3">
-      <div class="container">
-        <h1 class="h4 fw-bold mb-1">Cita rasa favoritmu, siap dipesan</h1>
-        <p class="text-secondary small mb-3">
-          Pilih menu RasaKita, sesuaikan pesananmu, lalu nikmati di tempat atau bawa pulang.
-        </p>
-
-        <!-- Search Field -->
-        <div class="input-group border rounded-3 bg-light overflow-hidden">
-          <span class="input-group-text bg-transparent border-0 text-secondary"
-            >🔍</span
-          >
-          <input
-            id="search"
-            type="search"
-            class="form-control bg-transparent border-0 shadow-none py-2"
-            placeholder="Cari menu favoritmu…"
-          />
-        </div>
-      </div>
-    </header>
-
-    <!-- Main Content Area -->
-    <main class="container">
-      <!-- Categories Scrollbar -->
-      <div id="categories" class="d-flex gap-2 overflow-auto pb-2 mb-3"></div>
-
-      <!-- Menu Section Header -->
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2
-          class="h6 fw-bold mb-0 text-uppercase tracking-wider text-secondary"
-        >
-          Daftar Menu
-        </h2>
-        <span id="menuCount" class="small text-muted"></span>
-      </div>
-
-      <!-- Menu Grid Container -->
-      <div id="menuGrid" class="row g-3">
-        <div class="text-center py-5 text-secondary">Memuat menu…</div>
-      </div>
-    </main>
-
-    <!-- Floating Bottom Cart Trigger -->
-    <div class="floating-cart-wrapper px-3">
-      <button
-        id="floatingCart"
-        class="btn btn-primary-app floating-cart-btn shadow-lg rounded-4 w-100 py-3 px-4 d-none mx-auto d-flex justify-content-between align-items-center"
-        data-bs-toggle="offcanvas"
-        data-bs-target="#cartDrawer"
-      >
-        <div class="d-flex align-items-center gap-2">
-          <span
-            class="badge bg-white text-dark rounded-pill px-2.5 py-1.5 fw-bold"
-            id="cartCount"
-            >0</span
-          >
-          <span class="fw-semibold">Lihat Keranjang</span>
-        </div>
-        <span class="fw-bold fs-6" id="cartTotal">Rp0</span>
-      </button>
-    </div>
-
-    <!-- Bottom Sheet Cart Drawer -->
-    <div
-      class="offcanvas offcanvas-bottom cart-bottom-sheet border-0 shadow-lg"
-      tabindex="-1"
-      id="cartDrawer"
-    >
-      <!-- Drag Handle Indicator -->
-      <div class="w-100 pt-2 pb-1 d-flex justify-content-center">
-        <div
-          class="bg-secondary opacity-25 rounded-pill"
-          style="width: 40px; height: 5px"
-        ></div>
-      </div>
-
-      <!-- Drawer Header with Item Count -->
-      <div class="offcanvas-header border-bottom py-2.5 px-3">
-        <h5
-          class="fw-bold mb-0 fs-6 text-dark d-flex align-items-center gap-1.5"
-        >
-          <span>Keranjang Pesanan</span>
-          <span id="drawerItemCount" class="text-muted fw-normal fs-6"
-            >· 0 item</span
-          >
-        </h5>
-        <button
-          type="button"
-          class="btn-close"
-          data-bs-dismiss="offcanvas"
-          aria-label="Tutup"
-        ></button>
-      </div>
-
-      <!-- Cart Items Container -->
-      <div id="cartLines" class="offcanvas-body p-3 overflow-auto"></div>
-
-      <!-- Solid Performance Footer with Shadow -->
-      <div class="cart-footer p-3 rounded-bottom-0">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <span class="text-secondary fw-medium">Total Pembayaran</span>
-          <span class="fs-5 fw-bold text-dark" id="drawerTotal">Rp0</span>
-        </div>
-        <button
-          id="checkoutButton"
-          class="btn btn-primary-app w-100 py-3 rounded-3 fw-bold fs-6"
-          disabled
-        >
-          Lanjut ke Checkout
-        </button>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Menu RasaKita</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="{% static 'menu/css/storefront.css' %}" rel="stylesheet">
+</head>
+<body>
+  <nav class="sticky-top bg-white border-bottom">
+    <div class="container py-3 d-flex align-items-center justify-content-between">
+      <a href="/" class="text-decoration-none text-stone-900 fw-bold fs-5">RasaKita</a>
+      <div class="d-flex align-items-center gap-3">
+        <span class="small text-stone-500 d-none d-sm-inline">Makan enak, tanpa antre</span>
+        <button class="btn btn-light border rounded-circle p-2" data-bs-toggle="offcanvas" data-bs-target="#cartDrawer" aria-label="Buka keranjang">🛒</button>
       </div>
     </div>
-
-    <!-- Item Customization Modal -->
-    <div class="modal fade" id="itemModal" tabindex="-1">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 rounded-4 shadow">
-          <div class="modal-header border-bottom">
-            <h5 id="modalTitle" class="modal-title fw-bold fs-6"></h5>
-            <button class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div id="modalBody" class="modal-body p-3"></div>
-          <div class="modal-footer border-top bg-light rounded-bottom-4">
-            <span class="me-auto fw-bold text-success" id="modalPrice"></span>
-            <button id="confirmAdd" class="btn btn-primary-app rounded-3 px-3">
-              Tambahkan
-            </button>
-          </div>
+  </nav>
+  <header class="bg-white border-bottom">
+    <div class="container py-5">
+      <p class="text-success fw-semibold small mb-2">MENU HARI INI</p>
+      <h1 class="display-6 fw-bold tracking-tight mb-2">Mau makan apa?</h1>
+      <p class="text-secondary mb-4">Pilih favoritmu, sesuaikan, lalu kami siapkan dengan hangat.</p>
+      <div class="d-flex gap-2">
+        <div class="input-group border rounded-3 bg-stone-50 overflow-hidden flex-grow-1">
+          <span class="input-group-text bg-transparent border-0 text-secondary" aria-hidden="true">⌕</span>
+          <input id="search" type="search" class="form-control bg-transparent border-0 shadow-none py-2" placeholder="Cari nasi, mie, minuman..." aria-label="Cari menu">
         </div>
+        <button type="button" class="btn btn-outline-secondary rounded-3 px-3" aria-label="Filter menu">☷<span class="d-none d-sm-inline ms-1">Filter</span></button>
+      </div>
+      <div class="mt-3 p-3 rounded-3 bg-emerald-50 border border-emerald-100 d-flex align-items-center justify-content-between gap-3">
+        <span class="small text-emerald-900">Bingung mau makan apa? Tanya aku.</span>
+        <a href="/chatbot/" class="btn btn-sm btn-primary-app rounded-pill px-3">✦ Bantu pilih</a>
       </div>
     </div>
-
-    <!-- Checkout Modal -->
-    <div class="modal fade" id="checkoutModal" tabindex="-1">
-      <div class="modal-dialog modal-dialog-centered">
-        <form id="checkoutForm" class="modal-content border-0 rounded-4 shadow">
-          <div class="modal-header border-bottom py-3 px-3">
-            <h5 class="modal-title fw-bold fs-6">Detail Pemesanan</h5>
-            <button class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body p-3">
-            <div class="mb-3">
-              <label class="form-label small fw-semibold">Nama Pemesan</label>
-              <input
-                class="form-control"
-                name="customer_name"
-                required
-                placeholder="Masukkan nama Anda"
-              />
-            </div>
-            <div class="mb-3">
-              <label class="form-label small fw-semibold">
-                Nomor WhatsApp
-                <span class="text-muted fw-normal">(Opsional)</span>
-              </label>
-              <input
-                class="form-control"
-                name="phone"
-                placeholder="08xxxxxxxxxx"
-              />
-            </div>
-            <div class="mb-3">
-              <label class="form-label small fw-semibold">Tipe Pesanan</label>
-              <select class="form-select" name="order_type" id="orderType">
-                <option value="TAKEAWAY">Bawa Pulang (Takeaway)</option>
-                <option value="DINE_IN">Makan di Tempat (Dine In)</option>
-              </select>
-            </div>
-
-            <!-- COMPACT QR TABLE SCANNER AREA -->
-            <div id="tableScanContainer" class="d-none mb-3">
-              <!-- State 1: Table Detected Banner -->
-              <div
-                id="tableDetectedBanner"
-                class="alert alert-success border-success-subtle rounded-3 p-3 mb-0 d-none"
-              >
-                <div class="d-flex align-items-center justify-content-between">
-                  <div class="d-flex align-items-center gap-2.5">
-                    <div
-                      class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center"
-                      style="width: 32px; height: 32px"
-                    >
-                      <svg
-                        width="18"
-                        height="18"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2.5"
-                        viewBox="0 0 24 24"
-                      >
-                        <path d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <div>
-                      <span
-                        class="d-block text-success-emphasis small fw-medium"
-                        >Meja Terdeteksi</span
-                      >
-                      <strong id="detectedTableName" class="text-dark fs-6"
-                        >Meja --</strong
-                      >
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    id="btnRescan"
-                    class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 small"
-                  >
-                    Ganti Meja
-                  </button>
-                </div>
-              </div>
-
-              <!-- State 2 & 3: Compact Camera Box (Initial Prompt & Video Viewport) -->
-              <div id="scannerBox" class="qr-scanner-box">
-                <!-- Initial State inside Box -->
-                <div id="scannerInitialState" class="text-center p-3">
-                  <div class="mb-2 text-secondary opacity-75">
-                    <svg
-                      width="32"
-                      height="32"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        d="M3 7V5a2 2 0 012-2h2m10 0h2a2 2 0 012 2v2m0 10v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2M12 8v8m-4-4h8"
-                      />
-                    </svg>
-                  </div>
-                  <p class="small text-secondary mb-2 fw-medium">
-                    Pindai QR meja untuk melanjutkan
-                  </p>
-                  <button
-                    type="button"
-                    id="btnStartScan"
-                    class="btn btn-sm btn-warning px-3 py-1.5 fw-bold rounded-pill shadow-sm"
-                  >
-                    📷 Pindai QR Meja
-                  </button>
-                </div>
-
-                <!-- Live Camera Viewport -->
-                <div
-                  id="cameraViewport"
-                  class="w-100 h-100 d-none position-relative"
-                >
-                  <div id="tableQrReader"></div>
-                  <div
-                    class="position-absolute bottom-0 start-0 end-0 p-2 d-flex justify-content-between align-items-center bg-dark bg-opacity-75 text-white"
-                  >
-                    <span
-                      id="scanStatus"
-                      class="small ms-1"
-                      style="font-size: 0.75rem"
-                      >Arahkan ke QR Meja...</span
-                    >
-                    <button
-                      type="button"
-                      id="btnStopScan"
-                      class="btn btn-xs btn-outline-light rounded-pill px-2 py-0.5"
-                      style="font-size: 0.75rem"
-                    >
-                      Batal
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="mb-2">
-              <label class="form-label small fw-semibold">
-                Catatan Pesanan
-                <span class="text-muted fw-normal">(Opsional)</span>
-              </label>
-              <textarea
-                class="form-control"
-                name="note"
-                rows="2"
-                placeholder="Contoh: Tanpa pedas, sendok plastik..."
-              ></textarea>
-            </div>
-            <div
-              id="checkoutError"
-              class="alert alert-danger d-none mt-3 mb-0 py-2 small"
-            ></div>
-          </div>
-          <div
-            class="modal-footer border-top bg-light rounded-bottom-4 py-2.5 px-3"
-          >
-            <button
-              id="btnSubmitCheckout"
-              class="btn btn-primary-app w-100 py-2.5 fw-bold fs-6 rounded-3"
-              type="submit"
-            >
-              Konfirmasi & Buat Pesanan
-            </button>
-          </div>
-        </form>
-      </div>
+  </header>
+  <main class="container py-4">
+    <div id="categories" class="d-flex gap-2 overflow-auto pb-2 mb-4"></div>
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h2 class="h5 fw-bold mb-0">Pilihan menu</h2><span id="menuCount" class="small text-muted"></span>
     </div>
-
-    <!-- Notification Toast Container -->
-    <div
-      id="toastArea"
-      class="toast-container position-fixed top-0 end-0 p-3"
-      style="z-index: 1080"
-    ></div>
-    <div class="d-none">{% csrf_token %}</div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script
-      src="https://unpkg.com/html5-qrcode"
-      type="text/javascript"
-    ></script>
-    <script type="module" src="{% static 'menu/js/storefront.mjs' %}"></script>
-  </body>
+    <div id="menuGrid" class="row g-3"><div class="col-12 text-center text-secondary py-5">Memuat menu...</div></div>
+  </main>
+  <div class="floating-cart-wrapper px-3">
+    <button id="floatingCart" class="btn floating-cart-btn w-100 py-3 px-4 d-none mx-auto d-flex justify-content-between align-items-center rounded-4" data-bs-toggle="offcanvas" data-bs-target="#cartDrawer">
+      <span class="d-flex align-items-center gap-2"><span class="badge rounded-pill px-2 py-1" id="cartCount">0 item</span><span class="fw-semibold text-white">Lihat keranjang</span></span>
+      <span class="fw-bold text-white" id="cartTotal">Rp0</span>
+    </button>
+  </div>
+  <a href="/chatbot/" class="btn btn-primary-app chatbot-fab d-flex align-items-center justify-content-center gap-2 shadow" aria-label="Bantu pilih menu"><span>✦</span><span class="d-none d-sm-inline">Bantu pilih</span></a>
+  {% include "menu/partials/_cart_drawer.html" %}
+  {% include "menu/partials/_item_modal.html" %}
+  {% include "menu/partials/_checkout_modal.html" %}
+  <div id="toastArea" class="toast-container position-fixed top-0 end-0 p-3" style="z-index:1080"></div>
+  <div class="d-none">{% csrf_token %}</div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script type="module" src="{% static 'menu/js/storefront.mjs' %}"></script>
+</body>
 </html>

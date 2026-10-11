@@ -109,8 +109,8 @@ class ConversationInterpreter:
         "buatkan code",
     )
 
-    def __init__(self):
-        self.tag_extractor = TagExtractor()
+    def __init__(self, tag_extractor=None):
+        self.tag_extractor = tag_extractor or TagExtractor()
         self.mood_extractor = MoodExtractor()
 
     def interpret(

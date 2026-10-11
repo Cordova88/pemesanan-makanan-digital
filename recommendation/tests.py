@@ -11,6 +11,7 @@ from menu.models import (
     Category,
     MenuItem,
     MenuTag,
+    MenuTagAlias,
     VariantGroup,
     VariantOption,
 )
@@ -108,6 +109,10 @@ class LanguageRuleTests(SimpleTestCase):
         self.assertIn("heavy_meal", less_heavy.excluded_tags)
         soft = self.extractor.extract("aku kurang suka pedas")
         self.assertIn("spicy", soft.soft_excluded_tags)
+
+    def test_catalog_terms_include_duck_and_boiled(self):
+        result = self.extractor.extract("bebek rebus")
+        self.assertEqual(result.tags, {"duck", "boiled"})
 
     def test_price_parser_understands_rupiah_variants(self):
         examples = {
@@ -846,7 +851,6 @@ class ChatbotIntegrationTests(TestCase):
         self.assertEqual(spicy.json()["state"], "ASKING_FOLLOWUP")
         self.assertIn("makanan berat", spicy.json()["message"])
         self.assertEqual(self.client.session["recommendation_state"]["tags"], ["spicy"])
-
         meal = self.post_chat("Makanan berat")
         self.assertEqual(meal.json()["state"], "ASKING_FOLLOWUP")
         self.assertIn("nasi atau mie", meal.json()["message"])
@@ -858,6 +862,28 @@ class ChatbotIntegrationTests(TestCase):
             {"spicy", "filling", "heavy_meal", "rice"},
         )
         self.assertTrue(rice.json()["recommendations"])
+
+    def test_cms_tag_alias_is_used_by_chatbot(self):
+        smoky = MenuTag.objects.create(name="smoky", display_name="Berasap")
+        MenuTagAlias.objects.create(tag=smoky, phrase="panggang asap")
+        item = MenuItem.objects.create(
+            category=self.best.category,
+            name="Sate Asap",
+            price=Decimal("16000"),
+        )
+        item.tags.add(smoky)
+
+        response = self.post_chat("Saya mau yang panggang asap")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.client.session["recommendation_state"]["tags"],
+            ["smoky"],
+        )
+        self.assertIn(
+            "Sate Asap",
+            {item["name"] for item in response.json()["recommendations"]},
+        )
 
     def test_deterministic_followups_do_not_call_gemini_to_rephrase_questions(self):
         first = self.post_chat("Pengen pedas")

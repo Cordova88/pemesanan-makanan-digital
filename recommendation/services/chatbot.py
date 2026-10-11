@@ -1,7 +1,8 @@
 from django.conf import settings
+from menu.models import MenuTag
 
 from .conversation_interpreter import ConversationInterpreter, ConversationIntent
-from .language import TAG_LABELS, normalize_text
+from .language import TAG_LABELS, normalize_text, tag_label
 from .mood_extractor import MoodExtractor
 from .mood_resolver import MoodResolver
 from .recommendation import RecommendationService, SearchConstraints
@@ -66,12 +67,25 @@ class ChatbotService:
     def __init__(self, session):
         self.session = session
         self.tag_extractor = TagExtractor()
+        catalog_tags = MenuTag.objects.filter(
+            menu_items__is_active=True,
+            menu_items__category__is_active=True,
+        ).values_list("name", "display_name").distinct()
+        catalog_aliases = MenuTag.objects.filter(
+            aliases__is_active=True,
+            menu_items__is_active=True,
+            menu_items__category__is_active=True,
+        ).values_list("name", "aliases__phrase").distinct()
+        self.tag_extractor.configure_catalog_tags(catalog_tags, catalog_aliases)
         self.mood_extractor = MoodExtractor()
         self.mood_resolver = MoodResolver()
         self.recommender = RecommendationService()
-        self.interpreter = ConversationInterpreter()
+        self.interpreter = ConversationInterpreter(self.tag_extractor)
         self.gemini_client = GeminiClient()
-        self.gemini_interpreter = GeminiInterpreter(self.gemini_client)
+        self.gemini_interpreter = GeminiInterpreter(
+            self.gemini_client,
+            allowed_tags=self.tag_extractor._aliases,
+        )
         self.explanation_service = RecommendationExplanationService(self.gemini_client)
 
     def reset(self):
@@ -257,6 +271,7 @@ class ChatbotService:
                 self._quick_reply("🌶️ Pedas", "Pengen yang pedas"),
                 self._quick_reply("💸 Lagi hemat", "Lagi hemat"),
             ]
+        replies = self._catalog_quick_replies(replies)
         self.session["last_question"] = "menu_choice"
         return {
             "message": message,
@@ -265,6 +280,25 @@ class ChatbotService:
             "recommendations": [],
             "quick_replies": replies,
         }
+
+    def _catalog_quick_replies(self, replies):
+        existing_values = {reply["value"] for reply in replies}
+        catalog_tags = (
+            MenuTag.objects.filter(
+                menu_items__is_active=True,
+                menu_items__category__is_active=True,
+            )
+            .exclude(name__in={"spicy", "chicken", "drink"})
+            .values_list("name", "display_name")
+            .distinct()[:4]
+        )
+        for name, display_name in catalog_tags:
+            label = tag_label(name)
+            value = f"Pengen yang {display_name or name.replace('_', ' ')}"
+            if value in existing_values:
+                continue
+            replies.append(self._quick_reply(label, value))
+        return replies
 
     @staticmethod
     def _response_preferences(preferences, state, follow_up=None):
@@ -361,7 +395,7 @@ class ChatbotService:
 
         requested = []
         for tag in sorted(active.tags):
-            label = TAG_LABELS.get(tag)
+            label = tag_label(tag)
             if label and label not in requested:
                 requested.append(label)
         details = []
@@ -374,11 +408,7 @@ class ChatbotService:
         if active.prefer_affordable and active.max_price is None:
             details.append("ramah di kantong")
         if active.excluded_tags:
-            dislikes = [
-                TAG_LABELS[tag]
-                for tag in sorted(active.excluded_tags)
-                if tag in TAG_LABELS
-            ]
+            dislikes = [tag_label(tag) for tag in sorted(active.excluded_tags)]
             if dislikes:
                 details.append("tanpa " + " atau ".join(dislikes[:2]))
         summary = f"Aku carikan yang {'; '.join(details)} ya. " if details else ""
@@ -519,11 +549,7 @@ class ChatbotService:
             "COLLECTING_PREFERENCES",
         )
         if not matches:
-            tag_labels = [
-                TAG_LABELS[tag]
-                for tag in sorted(tags)
-                if tag in TAG_LABELS
-            ]
+            tag_labels = [tag_label(tag) for tag in sorted(tags)]
             requested = " dan ".join(tag_labels) or "pilihan itu"
             self.session["last_recommendations"] = []
             self.session[self.LAST_RESULT_EMPTY_KEY] = True
@@ -563,11 +589,7 @@ class ChatbotService:
             )
             explanations.update(generated_explanations)
 
-        tag_labels = [
-            TAG_LABELS[tag]
-            for tag in sorted(tags)
-            if tag in TAG_LABELS
-        ]
+        tag_labels = [tag_label(tag) for tag in sorted(tags)]
         requested = " dan ".join(tag_labels) or "pilihanmu"
         self.session["last_recommendations"] = [match.item.id for match in matches]
         self.session[self.SHOWN_KEY] = [match.item.id for match in matches]

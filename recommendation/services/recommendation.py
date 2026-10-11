@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from menu.models import MenuItem
 
-from .language import TAG_LABELS
+from .language import TAG_LABELS, tag_label
 
 
 @dataclass(frozen=True)
@@ -112,16 +112,16 @@ class RecommendationService:
             ) else 0
             reasons = []
             reasons.extend(
-                "✅ Tanpa " + TAG_LABELS[tag]
+                "✅ Tanpa " + tag_label(tag)
                 for tag in sorted(excluded_tags & set(TAG_LABELS))
             )
             for tag in sorted(item_tags & preferences.tags):
                 score += self.DIRECT_TAG_WEIGHT
                 if constraints is None or tag in constraints.required_tags:
-                    reasons.append(TAG_LABELS.get(tag))
+                    reasons.append(tag_label(tag))
             for tag in sorted((item_tags & preferences.mood_tags) - preferences.tags):
                 score += self.MOOD_TAG_WEIGHT
-                reasons.append(TAG_LABELS.get(tag))
+                reasons.append(tag_label(tag))
 
             if item_tags & preferences.soft_excluded_tags:
                 score -= self.SOFT_EXCLUSION_PENALTY
@@ -139,9 +139,8 @@ class RecommendationService:
 
             if score > 0:
                 labels = tuple(
-                    TAG_LABELS[tag]
+                    tag_label(tag)
                     for tag in sorted(item_tags)
-                    if tag in TAG_LABELS
                 )
                 ranked.append(
                     RecommendationMatch(
@@ -201,14 +200,12 @@ class RecommendationService:
             ):
                 continue
             reasons = tuple(
-                TAG_LABELS[tag]
+                tag_label(tag)
                 for tag in sorted(required_tags)
-                if tag in TAG_LABELS
             )
             labels = tuple(
-                TAG_LABELS[tag]
+                tag_label(tag)
                 for tag in sorted(item_tags)
-                if tag in TAG_LABELS
             )
             matches.append(
                 RecommendationMatch(
@@ -238,9 +235,8 @@ class RecommendationService:
         if item is None:
             return None
         labels = tuple(
-            TAG_LABELS[tag.name]
+            tag_label(tag.name)
             for tag in item.tags.all()
-            if tag.name in TAG_LABELS
         )
         return RecommendationMatch(
             item=item,

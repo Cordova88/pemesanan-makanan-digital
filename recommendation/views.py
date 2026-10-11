@@ -9,7 +9,7 @@ from cart.services import CartService
 from menu.models import MenuItem
 
 from .services.chatbot import ChatbotService
-from .services.language import TAG_LABELS
+from .services.language import tag_label
 
 
 def _body(request):
@@ -55,24 +55,20 @@ def _public_preferences(preferences):
     return {
         **preferences,
         "tags": [
-            TAG_LABELS[tag]
+            tag_label(tag)
             for tag in preferences.get("tags", [])
-            if tag in TAG_LABELS
         ],
         "mood_tags": [
-            TAG_LABELS[tag]
+            tag_label(tag)
             for tag in preferences.get("mood_tags", [])
-            if tag in TAG_LABELS
         ],
         "excluded_tags": [
-            TAG_LABELS[tag]
+            tag_label(tag)
             for tag in preferences.get("excluded_tags", [])
-            if tag in TAG_LABELS
         ],
         "soft_excluded_tags": [
-            TAG_LABELS[tag]
+            tag_label(tag)
             for tag in preferences.get("soft_excluded_tags", [])
-            if tag in TAG_LABELS
         ],
     }
 
@@ -81,14 +77,12 @@ def _public_active_search(search):
     return {
         **search,
         "required_tags": [
-            TAG_LABELS[tag]
+            tag_label(tag)
             for tag in search.get("required_tags", [])
-            if tag in TAG_LABELS
         ],
         "excluded_tags": [
-            TAG_LABELS[tag]
+            tag_label(tag)
             for tag in search.get("excluded_tags", [])
-            if tag in TAG_LABELS
         ],
     }
 

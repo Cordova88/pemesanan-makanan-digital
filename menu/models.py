@@ -23,6 +23,24 @@ class MenuTag(models.Model):
     def __str__(self):
         return self.display_name or self.name
 
+
+class MenuTagAlias(models.Model):
+    tag = models.ForeignKey(MenuTag, on_delete=models.CASCADE, related_name="aliases")
+    phrase = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tag", "phrase"],
+                name="unique_menu_tag_alias",
+            )
+        ]
+        indexes = [models.Index(fields=["is_active", "phrase"])]
+
+    def __str__(self):
+        return f"{self.tag}: {self.phrase}"
+
 # Class untuk item menunya langsung
 class MenuItem(models.Model):
     category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="items")

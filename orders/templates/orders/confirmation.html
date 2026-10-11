@@ -4,14 +4,15 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Status Pesanan — RasaKita</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
     />
     <style>
       :root {
-        --brand: #10b981;
-        --paper: #f8fafc;
+        --brand: #047857;
+        --paper: #fafaf9;
       }
       body {
         background: var(--paper);
@@ -54,6 +55,16 @@
         color: #166534;
         border-radius: 14px;
       }
+      .expiry.expiry-warning {
+        background: #fffbeb;
+        border-color: #fde68a;
+        color: #92400e;
+      }
+      .expiry.expiry-danger {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: #991b1b;
+      }
       .copy-link {
         cursor: pointer;
       }
@@ -95,10 +106,13 @@
 
           <div id="content" class="d-none">
             <!-- Order ID & Status Badge -->
-            <div class="d-flex justify-content-between align-items-center mb-3">
+            <div             class="d-flex justify-content-between align-items-center mb-3">
               <div>
                 <div class="small text-secondary fw-semibold">ID PESANAN</div>
-                <strong id="orderId" class="fs-4 text-dark"></strong>
+                <div class="d-flex align-items-center gap-2">
+                  <strong id="orderId" class="fs-4 text-dark"></strong>
+                  <button id="copyIdButton" type="button" class="btn btn-sm btn-outline-secondary rounded-pill">Salin</button>
+                </div>
               </div>
               <span
                 id="status"
@@ -135,7 +149,7 @@
                 <strong class="d-block">Batas Pembayaran</strong>
                 <span id="expiryDescription" class="small"></span>
               </div>
-              <strong id="countdown" class="fs-5"></strong>
+              <div class="text-end"><strong id="countdown" class="fs-5 d-block"></strong><span id="absoluteExpiry" class="small text-secondary"></span></div>
             </div>
 
             <!-- Order Summary Details -->
@@ -191,6 +205,7 @@
 
       let order, timer;
 
+      const statusLabels = {PENDING:"Menunggu",PAID:"Dibayar",CANCELLED:"Dibatalkan",EXPIRED:"Kedaluwarsa",REFUNDED:"Refund"};
       function statusStyle(status) {
         return (
           {
@@ -221,7 +236,7 @@
         document.querySelector("#orderId").textContent = order.public_id;
 
         const status = document.querySelector("#status");
-        status.textContent = order.status;
+        status.textContent = statusLabels[order.status] || order.status;
         status.className = `badge rounded-pill status px-3 py-2 ${statusStyle(order.status)}`;
 
         document.querySelector("#total").textContent = money(order.total);
@@ -316,8 +331,12 @@
           Math.floor((new Date(order.expires_at) - Date.now()) / 1000),
         );
 
+        const expiry = new Date(order.expires_at);
+        document.querySelector("#absoluteExpiry").textContent = `Bayar sebelum ${expiry.toLocaleTimeString("id-ID", {hour:"2-digit", minute:"2-digit"})}`;
+        box.classList.toggle("expiry-warning", seconds <= 900);
+        box.classList.toggle("expiry-danger", seconds <= 300);
         if (!seconds) {
-          document.querySelector("#countdown").textContent = "Kadaluarsa";
+          document.querySelector("#countdown").textContent = "Kedaluwarsa";
           document.querySelector("#expiryDescription").textContent =
             "Pesanan sedang diperbarui…";
           clearInterval(timer);
@@ -362,7 +381,13 @@
         }
       };
 
+      document.querySelector("#copyIdButton").onclick = async () => {
+        await navigator.clipboard.writeText(order.public_id);
+        document.querySelector("#copyIdButton").textContent = "Tersalin";
+        setTimeout(() => document.querySelector("#copyIdButton").textContent = "Salin", 1800);
+      };
       loadOrder();
+      setInterval(() => { if (order && order.status === "PENDING") loadOrder(); }, 7000);
     </script>
   </body>
 </html>

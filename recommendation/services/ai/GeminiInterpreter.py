@@ -6,7 +6,7 @@ from recommendation.services.conversation_interpreter import (
     PreferenceOperation,
 )
 from recommendation.services.gemini import GeminiClient
-from recommendation.services.language import TAG_LABELS
+from recommendation.services.language import tag_label
 from recommendation.services.mood_extractor import MoodExtractor
 from recommendation.services.tag_extractor import TagExtractor
 
@@ -131,9 +131,9 @@ def validate(data, allowed_tags, allowed_moods, current_tags=()):
 
 
 class GeminiInterpreter:
-    def __init__(self, gemini_client=None):
+    def __init__(self, gemini_client=None, allowed_tags=None):
         self.gemini_client = gemini_client or GeminiClient()
-        self.allowed_tags = set(TagExtractor.ALIASES)
+        self.allowed_tags = set(allowed_tags or TagExtractor.ALIASES)
         self.allowed_moods = set(MoodExtractor.PHRASES) - {"confused"}
 
     def build_prompt(self, message, context=None):
@@ -161,7 +161,7 @@ class GeminiInterpreter:
             "satisfying": "memuaskan menurut preferensi",
         }
         available_tags = {
-            tag: tag_descriptions.get(tag, TAG_LABELS.get(tag, tag))
+            tag: tag_descriptions.get(tag, tag_label(tag))
             for tag in sorted(self.allowed_tags)
         }
         available_moods = sorted(self.allowed_moods)

@@ -3,7 +3,7 @@ import { state } from "./state.mjs";
 
 function createCartItem(item) {
   const card = document.createElement("div");
-  card.className = "cart-item-card p-3 mb-2.5";
+  card.className = "cart-item-card";
 
   const heading = document.createElement("div");
   heading.className =
@@ -33,11 +33,13 @@ function createCartItem(item) {
   const remove = document.createElement("button");
   remove.type = "button";
   remove.className =
-    "btn btn-sm text-danger bg-danger-subtle rounded-pill px-2.5 py-1 border-0 d-inline-flex align-items-center gap-1";
+    "btn btn-sm text-danger rounded-circle border-0 d-inline-flex align-items-center justify-content-center";
+  remove.style.width = "32px";
+  remove.style.height = "32px";
   remove.setAttribute("aria-label", `Hapus ${item.name}`);
   remove.dataset.cartAction = "remove";
   remove.dataset.lineId = item.id;
-  remove.textContent = "Hapus";
+  remove.textContent = "⌫";
   itemInfo.append(icon, details);
   heading.append(itemInfo, remove);
 

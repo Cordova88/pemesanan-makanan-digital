@@ -1,17 +1,30 @@
 :root {
-  --app-primary: #10b981;
-  --app-primary-hover: #059669;
-  --app-bg: #f8fafc;
-  --app-text: #0f172a;
-  --card-bg: #f1f5f9;
-  --card-border: #eef2f6;
+  --bg: #fafaf9;
+  --surface: #ffffff;
+  --border: #e7e5e4;
+  --text: #1c1917;
+  --text-muted: #78716c;
+  --primary: #047857;
+  --primary-soft: #ecfdf5;
+  --warn: #b45309;
+  --danger: #b91c1c;
+  --radius-card: 14px;
+  --radius-control: 10px;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --app-primary: var(--primary);
+  --app-primary-hover: #065f46;
+  --app-bg: var(--bg);
+  --app-text: var(--text);
+  --card-bg: var(--surface);
+  --card-border: var(--border);
 }
 
 body {
   background-color: var(--app-bg);
   color: var(--app-text);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  padding-bottom: 90px;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  padding-bottom: 112px;
 }
 
 .btn-primary-app {
@@ -37,16 +50,19 @@ body {
 }
 
 .category-chip.active,
-.category-chip:hover {
-  background: var(--app-primary);
-  border-color: var(--app-primary);
+.category-chip.active {
+  background: var(--text);
+  border-color: var(--text);
   color: #fff;
 }
+.category-chip:hover { border-color: var(--text); color: var(--text); }
 
 .menu-card {
-  border: 1px solid #f1f5f9;
-  border-radius: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
+  overflow: hidden;
 }
 
 .menu-card:hover {
@@ -55,8 +71,9 @@ body {
 }
 
 .food-cover {
-  height: 120px;
-  background: #e2e8f0;
+  aspect-ratio: 4 / 3;
+  height: auto;
+  background: #e7e5e4;
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -70,6 +87,9 @@ body {
   height: 100%;
   object-fit: cover;
 }
+.food-placeholder { font-size: 2rem; font-weight: 700; color: #a8a29e; }
+.menu-card .card-body { padding: 0.7rem 0.75rem 0.8rem; }
+.menu-card .menu-add { width: 40px; height: 40px; padding: 0; font-size: 1.3rem; line-height: 1; }
 
 .cart-bottom-sheet {
   max-width: 540px;
@@ -81,9 +101,11 @@ body {
 }
 
 .cart-item-card {
-  background-color: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 16px;
+  background-color: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 0.8rem 0;
 }
 
 .capsule-stepper {
@@ -122,16 +144,24 @@ body {
 .floating-cart-btn {
   pointer-events: auto;
   max-width: 500px;
+  background: var(--text);
+  border-color: var(--text);
+  box-shadow: var(--shadow-float) !important;
 }
+.floating-cart-btn:hover { background: #292524; border-color: #292524; }
+.floating-cart-btn .badge { background: var(--primary) !important; color: #fff !important; }
 
 .chatbot-fab {
   position: fixed;
   right: 18px;
   bottom: 88px;
   z-index: 1029;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
+  width: auto;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.65rem 0.9rem;
+  white-space: nowrap;
+  border-radius: 999px;
 }
 
 .line-clamp-2 {
@@ -172,4 +202,12 @@ body {
   height: 100% !important;
   object-fit: cover !important;
   border-radius: 14px;
+}
+
+input[type="radio"], input[type="checkbox"] { accent-color: var(--primary); }
+.modal-content, .offcanvas { border-radius: var(--radius-card); }
+.option-row { border: 1px solid var(--border); border-radius: var(--radius-control); padding: .75rem; cursor: pointer; }
+.option-row:has(input:checked) { border-color: var(--primary); background: var(--primary-soft); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }

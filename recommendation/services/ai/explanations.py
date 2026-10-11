@@ -2,7 +2,7 @@ import json
 import re
 
 from recommendation.services.gemini import GeminiClient
-from recommendation.services.language import TAG_LABELS
+from recommendation.services.language import tag_label
 from recommendation.services.tag_extractor import TagExtractor
 
 MAX_EXPLANATION_LENGTH = 240
@@ -52,9 +52,8 @@ class RecommendationExplanationService:
             "source_message": source_message[:500],
             "response_kind": response_kind,
             "preferences": sorted(
-                TAG_LABELS[tag]
+                tag_label(tag)
                 for tag in preferences.tags | preferences.mood_tags
-                if tag in TAG_LABELS
             ),
         }
         return self._generate(matches, preferences, context)
@@ -71,10 +70,7 @@ class RecommendationExplanationService:
             catalog_tags = {tag.name for tag in item.tags.all()}
             requested_tags = set(preferences.tags) | set(preferences.mood_tags)
             supported_tags_by_id[item.pk] = catalog_tags
-            tag_labels = [
-                TAG_LABELS[tag]
-                for tag in catalog_tags & set(TAG_LABELS)
-            ]
+            tag_labels = [tag_label(tag) for tag in catalog_tags]
             match_reasons = [
                 reason
                 for reason in match.match_reasons

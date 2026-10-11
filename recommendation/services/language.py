@@ -21,7 +21,9 @@ TAG_LABELS = {
     "saucy": "🍛 Berbumbu",
     "dry": "🍽️ Tidak berkuah",
     "brothy": "🍲 Berkuah",
+    "boiled": "🍲 Rebus",
     "chicken": "🍗 Ayam",
+    "duck": "🦆 Bebek",
     "beef": "🥩 Sapi",
     "seafood": "🦐 Hasil laut",
     "shrimp": "🦐 Udang",
@@ -58,6 +60,10 @@ TAG_LABELS = {
     "sharing": "👥 Cocok untuk berbagi",
     "solo": "🍽️ Porsi sendiri",
 }
+
+def tag_label(tag):
+    """Return a readable label for built-in and staff-created tags."""
+    return TAG_LABELS.get(tag, tag.replace("_", " ").strip().title())
 
 
 NORMALIZATION_RULES = (
