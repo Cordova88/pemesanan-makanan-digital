@@ -4,7 +4,7 @@ from .conversation_interpreter import ConversationInterpreter, ConversationInten
 from .language import TAG_LABELS, normalize_text
 from .mood_extractor import MoodExtractor
 from .mood_resolver import MoodResolver
-from .recommendation import RecommendationService
+from .recommendation import RecommendationService, SearchConstraints
 from .tag_extractor import Preferences, TagExtractor
 from .ai.GeminiInterpreter import GeminiInterpreter
 from .ai.explanations import RecommendationExplanationService
@@ -14,6 +14,8 @@ from .gemini import GeminiClient
 class ChatbotService:
     SESSION_KEY = "recommendation_state"
     SHOWN_KEY = "recommendation_shown"
+    SEARCH_KEY = "recommendation_search"
+    LAST_RESULT_EMPTY_KEY = "recommendation_last_result_empty"
     RESET_PHRASES = {"reset", "mulai lagi", "mulai dari awal"}
     CONFUSION_PHRASES = {
         "bingung",
@@ -80,6 +82,9 @@ class ChatbotService:
         self.session.pop("last_recommendations", None)
         self.session.pop("last_question", None)
         self.session.pop(self.GEMINI_CALLS_KEY, None)
+        self.session.pop("recommendation_required_tags", None)
+        self.session.pop(self.SEARCH_KEY, None)
+        self.session.pop(self.LAST_RESULT_EMPTY_KEY, None)
         self.session.modified = True
 
     def _consume_gemini_call(self):
@@ -112,8 +117,91 @@ class ChatbotService:
     def _preferences(self):
         return Preferences.from_dict(self.session.get(self.SESSION_KEY, {}))
 
+    def _search_constraints(self):
+        stored = self.session.get(self.SEARCH_KEY)
+        if isinstance(stored, dict):
+            return SearchConstraints.from_dict(stored)
+        preferences = self._preferences()
+        return SearchConstraints(
+            required_tags=frozenset(
+                self.session.get("recommendation_required_tags", [])
+            ),
+            category=preferences.category,
+            max_price=preferences.max_price,
+            moods=frozenset(preferences.moods),
+        )
+
+    def _constraints_for_interpretation(self, interpretation, old_follow_up=None):
+        previous = self._search_constraints()
+        has_previous = bool(
+            previous.required_tags
+            or previous.excluded_tags
+            or previous.category
+            or previous.max_price is not None
+            or previous.moods
+        )
+        constraint_only_update = (
+            not interpretation.tags
+            and not interpretation.excluded_tags
+            and not interpretation.category
+            and (
+                interpretation.max_price is not None
+                or interpretation.clear_max_price
+                or interpretation.prefer_affordable
+                or interpretation.clear_prefer_affordable
+            )
+        )
+        continuing = (
+            old_follow_up in {"meal_type", "base"}
+            or (constraint_only_update and has_previous)
+        )
+        explicit_clear = any(
+            operation.action == "CLEAR"
+            for operation in interpretation.operations
+        )
+        if interpretation.intent == ConversationIntent.REPLACE_PREFERENCES:
+            continuing = continuing and not explicit_clear
+        if interpretation.intent == ConversationIntent.RETRY_SEARCH:
+            continuing = False
+
+        base = previous if continuing else SearchConstraints()
+        required_tags = set(base.required_tags)
+        current_tags = set(interpretation.tags)
+        if old_follow_up == "meal_type":
+            current_tags.difference_update({"heavy_meal", "filling"})
+        if continuing and interpretation.intent == ConversationIntent.REPLACE_PREFERENCES:
+            for operation in interpretation.operations:
+                if operation.action == "REPLACE":
+                    required_tags.difference_update(operation.remove_tags)
+        required_tags.update(current_tags)
+        excluded_tags = set(base.excluded_tags)
+        excluded_tags.update(interpretation.excluded_tags)
+        category = interpretation.category or (base.category if continuing else None)
+        if interpretation.clear_max_price:
+            max_price = None
+        elif interpretation.max_price is not None:
+            max_price = interpretation.max_price
+        elif interpretation.prefer_affordable:
+            max_price = None
+        else:
+            max_price = base.max_price if continuing else None
+        moods = set(base.moods)
+        if interpretation.clear_moods:
+            moods.clear()
+        if interpretation.moods:
+            moods = set(interpretation.moods)
+        return SearchConstraints(
+            required_tags=frozenset(required_tags),
+            excluded_tags=frozenset(excluded_tags),
+            category=category,
+            max_price=max_price,
+            moods=frozenset(moods),
+        )
+
     def _save(self, preferences, state, follow_up=None):
         payload = preferences.to_dict(state=state, follow_up=follow_up)
+        payload["max_price"] = None
+        payload["category"] = None
         payload["last_question"] = self.session.get("last_question")
         payload["last_recommendations"] = self.session.get("last_recommendations", [])
         payload["shown_recommendation_ids"] = self.session.get("shown_recommendation_ids", [])
@@ -130,6 +218,16 @@ class ChatbotService:
             or preferences.max_price is not None
             or preferences.category
             or preferences.prefer_affordable
+        )
+
+    def _has_active_search(self):
+        constraints = self._search_constraints()
+        return bool(
+            constraints.required_tags
+            or constraints.excluded_tags
+            or constraints.category
+            or constraints.max_price is not None
+            or constraints.moods
         )
 
     @staticmethod
@@ -168,13 +266,35 @@ class ChatbotService:
             "quick_replies": replies,
         }
 
+    @staticmethod
+    def _response_preferences(preferences, state, follow_up=None):
+        response = preferences.to_dict(state=state, follow_up=follow_up)
+        response["max_price"] = None
+        response["category"] = None
+        return response
+
+    def _explanation_preferences(self, preferences, constraints):
+        return Preferences(
+            tags=set(constraints.required_tags),
+            max_price=constraints.max_price,
+            mood_tags=self.mood_resolver.resolve(set(constraints.moods)),
+            excluded_tags=set(constraints.excluded_tags),
+            category=constraints.category,
+            prefer_affordable=preferences.prefer_affordable,
+            moods=set(constraints.moods),
+        )
+
     def _ask_meal_type(self, preferences):
         self.session["last_question"] = "meal_type"
         self._save(preferences, "ASKING_FOLLOWUP", follow_up="meal_type")
         return {
             "message": "Wah, tim pedas nih 🌶️ Kamu lebih pengen makanan berat atau cuma mau ngemil?",
             "state": "ASKING_FOLLOWUP",
-            "preferences": preferences.to_dict(state="ASKING_FOLLOWUP", follow_up="meal_type"),
+            "preferences": self._response_preferences(
+                preferences,
+                "ASKING_FOLLOWUP",
+                follow_up="meal_type",
+            ),
             "recommendations": [],
             "quick_replies": [
                 self._quick_reply("🍚 Makanan berat", "Makanan berat"),
@@ -188,7 +308,11 @@ class ChatbotService:
         return {
             "message": "Sip! Kamu lebih pengen nasi atau mie? Kalau bebas, bilang aja ya 😄",
             "state": "ASKING_FOLLOWUP",
-            "preferences": preferences.to_dict(state="ASKING_FOLLOWUP", follow_up="base"),
+            "preferences": self._response_preferences(
+                preferences,
+                "ASKING_FOLLOWUP",
+                follow_up="base",
+            ),
             "recommendations": [],
             "quick_replies": [
                 self._quick_reply("🍚 Nasi", "Pengen nasi"),
@@ -198,43 +322,61 @@ class ChatbotService:
         }
 
     @staticmethod
-    def _response_message(preferences, source_text, response_kind="recommendation"):
+    def _response_message(
+        preferences,
+        source_text,
+        response_kind="recommendation",
+        constraints=None,
+    ):
         text = normalize_text(source_text)
+        active = preferences
+        if constraints is not None:
+            active = Preferences(
+                tags=set(constraints.required_tags),
+                max_price=constraints.max_price,
+                mood_tags=preferences.mood_tags,
+                excluded_tags=set(constraints.excluded_tags),
+                category=constraints.category,
+                prefer_affordable=preferences.prefer_affordable,
+                moods=set(constraints.moods),
+            )
         if response_kind == "correction":
             context = "Oke, kita ikuti perubahan pilihanmu 👍"
         elif response_kind == "removal":
             context = "Siap, preferensi itu aku hilangkan 👍"
-        elif "hot_thirsty" in preferences.moods:
+        elif "hot_thirsty" in active.moods:
             context = "Lagi gerah? Kita cari yang dingin dan seger dulu 🧊"
-        elif "tired" in preferences.moods:
+        elif "tired" in active.moods:
             context = "Kalau lagi capek, kita cari yang mengenyangkan dan bikin puas ya 😌"
-        elif "low_mood" in preferences.moods:
+        elif "low_mood" in active.moods:
             context = "Hari yang berat cocok ditemani makanan yang bikin nyaman 😌"
-        elif "very_hungry" in preferences.moods or "heavy_meal" in preferences.tags:
+        elif "very_hungry" in active.moods or "heavy_meal" in active.tags:
             context = "Wah, sepertinya kamu butuh yang mengenyangkan nih 🍚"
-        elif "spicy" in preferences.tags:
+        elif "spicy" in active.tags:
             context = "Wah, tim pedas nih 🌶️"
-        elif preferences.prefer_affordable:
+        elif active.prefer_affordable:
             context = "Oke, kita cari yang tetap enak tapi ramah di kantong 💸"
         else:
             context = "Tenang, aku bantu pilih yang cocok buat kamu 😋"
 
         requested = []
-        for tag in sorted(preferences.tags):
+        for tag in sorted(active.tags):
             label = TAG_LABELS.get(tag)
             if label and label not in requested:
                 requested.append(label)
         details = []
         if requested:
             details.append(" dan ".join(requested[:3]))
-        if preferences.max_price is not None:
-            details.append(f"maksimal Rp{preferences.max_price:,.0f}".replace(",", "."))
-        if preferences.prefer_affordable and preferences.max_price is None:
+        if active.category:
+            details.append(active.category.casefold())
+        if active.max_price is not None:
+            details.append(f"maksimal Rp{active.max_price:,.0f}".replace(",", "."))
+        if active.prefer_affordable and active.max_price is None:
             details.append("ramah di kantong")
-        if preferences.excluded_tags:
+        if active.excluded_tags:
             dislikes = [
                 TAG_LABELS[tag]
-                for tag in sorted(preferences.excluded_tags)
+                for tag in sorted(active.excluded_tags)
                 if tag in TAG_LABELS
             ]
             if dislikes:
@@ -271,8 +413,24 @@ class ChatbotService:
         more=False,
         exclude_ids=None,
         response_kind="recommendation",
+        required_tags=None,
+        constraints=None,
     ):
         preferences.mood_tags = self.mood_resolver.resolve(preferences.moods)
+        if constraints is None:
+            if required_tags is not None:
+                constraints = SearchConstraints(
+                    required_tags=frozenset(required_tags),
+                    category=preferences.category,
+                    max_price=preferences.max_price,
+                    moods=frozenset(preferences.moods),
+                )
+            else:
+                constraints = self._search_constraints()
+        self.session[self.SEARCH_KEY] = constraints.to_dict()
+        self.session["recommendation_required_tags"] = sorted(
+            constraints.required_tags
+        )
         shown = self.session.get(self.SHOWN_KEY, [])
         if more:
             exclude_ids = list(exclude_ids or shown or [])
@@ -280,7 +438,15 @@ class ChatbotService:
         else:
             exclude_ids = list(exclude_ids or [])
             shown = []
-        matches = self.recommender.rank(preferences, exclude_ids=exclude_ids)
+        matches = self.recommender.rank(
+            preferences,
+            exclude_ids=exclude_ids,
+            constraints=constraints,
+        )
+        explanation_preferences = self._explanation_preferences(
+            preferences,
+            constraints,
+        )
         explanations = {
             match.item.id: self.explanation_service.fallback(match)
             for match in matches
@@ -290,7 +456,7 @@ class ChatbotService:
             generated_intro, generated_explanations = (
                 self.explanation_service.explain_with_intro(
                     matches,
-                    preferences,
+                    explanation_preferences,
                     source_text,
                     response_kind=response_kind,
                 )
@@ -303,6 +469,7 @@ class ChatbotService:
             self.session[self.SHOWN_KEY] = new_ids
         self.session["last_recommendations"] = [match.item.id for match in matches] if matches else []
         self.session["shown_recommendation_ids"] = list(self.session.get(self.SHOWN_KEY, []))
+        self.session[self.LAST_RESULT_EMPTY_KEY] = not matches
         self.session.modified = True
         self._save(preferences, "RECOMMENDING")
         return {
@@ -312,12 +479,17 @@ class ChatbotService:
                     preferences,
                     source_text,
                     response_kind=response_kind,
+                    constraints=constraints,
                 )
                 if matches
                 else "Aku belum menemukan yang pas. Coba ubah pilihan atau batas harganya, ya."
             ),
             "state": "RECOMMENDING",
-            "preferences": preferences.to_dict(state="RECOMMENDING"),
+            "preferences": self._response_preferences(
+                preferences,
+                "RECOMMENDING",
+            ),
+            "active_search": constraints.to_dict(),
             "recommendations": matches,
             "explanations": explanations,
             "quick_replies": [
@@ -328,9 +500,19 @@ class ChatbotService:
 
     def _answer_catalog_question(self, preferences, interpretation, source_text):
         tags = interpretation.catalog_tags
+        constraints = SearchConstraints(
+            required_tags=frozenset(tags),
+            excluded_tags=frozenset(interpretation.excluded_tags),
+            category=interpretation.category,
+            max_price=interpretation.max_price,
+        )
+        self.session[self.SEARCH_KEY] = constraints.to_dict()
+        self.session["recommendation_required_tags"] = sorted(tags)
         matches = self.recommender.find_catalog_matches(
             tags,
             excluded_tags=interpretation.excluded_tags,
+            category=interpretation.category,
+            max_price=interpretation.max_price,
         )
         state = self.session.get(self.SESSION_KEY, {}).get(
             "state",
@@ -343,18 +525,28 @@ class ChatbotService:
                 if tag in TAG_LABELS
             ]
             requested = " dan ".join(tag_labels) or "pilihan itu"
+            self.session["last_recommendations"] = []
+            self.session[self.LAST_RESULT_EMPTY_KEY] = True
+            self.session.modified = True
             return {
                 "message": (
                     f"Aku belum menemukan menu {requested} yang tersedia saat ini."
                 ),
                 "state": state,
-                "preferences": preferences.to_dict(state=state),
+                "preferences": self._response_preferences(
+                    preferences,
+                    state,
+                ),
+                "active_search": constraints.to_dict(),
                 "recommendations": [],
                 "catalog_question": True,
                 "quick_replies": [],
             }
 
-        query_preferences = Preferences(tags=set(tags))
+        query_preferences = self._explanation_preferences(
+            preferences,
+            constraints,
+        )
         explanations = {
             match.item.id: self.explanation_service.fallback(match)
             for match in matches
@@ -380,12 +572,17 @@ class ChatbotService:
         self.session["last_recommendations"] = [match.item.id for match in matches]
         self.session[self.SHOWN_KEY] = [match.item.id for match in matches]
         self.session["shown_recommendation_ids"] = [match.item.id for match in matches]
+        self.session[self.LAST_RESULT_EMPTY_KEY] = False
         self.session.modified = True
         return {
             "message": generated_intro
             or f"Ini pilihan menu {requested} yang tersedia di katalog.",
             "state": state,
-            "preferences": preferences.to_dict(state=state),
+            "preferences": self._response_preferences(
+                preferences,
+                state,
+            ),
+            "active_search": constraints.to_dict(),
             "recommendations": matches,
             "catalog_question": True,
             "explanations": explanations,
@@ -445,10 +642,8 @@ class ChatbotService:
             current.moods = moods
         current.tags.difference_update(current.excluded_tags | current.soft_excluded_tags)
         current.mood_tags = self.mood_resolver.resolve(current.moods)
-        if interpretation.max_price is not None:
-            current.max_price = interpretation.max_price
-        if interpretation.category:
-            current.category = interpretation.category
+        current.max_price = interpretation.max_price
+        current.category = interpretation.category
         if interpretation.prefer_affordable:
             current.prefer_affordable = True
         if interpretation.clear_max_price:
@@ -526,7 +721,21 @@ class ChatbotService:
                 self.session.get("last_question"),
             ),
             last_recommendations=session_state.get("last_recommendations", []),
+            last_result_empty=self.session.get(
+                self.LAST_RESULT_EMPTY_KEY,
+                False,
+            ),
         )
+        if interpretation.intent == ConversationIntent.RETRY_SEARCH:
+            updated = self._apply_interpretation(preferences, interpretation)
+            constraints = self._constraints_for_interpretation(interpretation)
+            self.session["last_question"] = None
+            return self._recommend(
+                updated,
+                normalized,
+                response_kind="retry",
+                constraints=constraints,
+            )
         if interpretation.intent == ConversationIntent.CATALOG_QUESTION:
             return self._answer_catalog_question(
                 preferences,
@@ -553,6 +762,7 @@ class ChatbotService:
                         "last_question",
                         self.session.get("last_question"),
                     ),
+                    "active_search": self._search_constraints().to_dict(),
                 },
             )
             if ai_interpretation is not None:
@@ -681,6 +891,10 @@ class ChatbotService:
             ConversationIntent.REPLACE_PREFERENCES,
         }:
             updated = self._apply_interpretation(preferences, interpretation)
+            constraints = self._constraints_for_interpretation(
+                interpretation,
+                old_follow_up=old_follow_up,
+            )
             if interpretation.intent == ConversationIntent.UPDATE_PREFERENCES and not self._has_preferences(updated):
                 if interpretation.clear_moods:
                     response = self._question()
@@ -689,6 +903,7 @@ class ChatbotService:
                 return self._question(confused=True)
 
             self.session["last_question"] = None
+            self.session[self.SEARCH_KEY] = constraints.to_dict()
             updated.mood_tags = self.mood_resolver.resolve(updated.moods)
             if old_follow_up == "meal_type" and "heavy_meal" in updated.tags and not updated.tags.intersection({"rice", "noodle", "snack"}):
                 return self._ask_base(updated)
@@ -724,11 +939,12 @@ class ChatbotService:
                     if interpretation.intent == ConversationIntent.REMOVE_PREFERENCES
                     else "recommendation"
                 ),
+                constraints=constraints,
             )
             return result
 
         if more:
-            if not self._has_preferences(preferences):
+            if not self._has_preferences(preferences) and not self._has_active_search():
                 return self._question(confused=True)
             return self._recommend(preferences, normalized, more=True)
 

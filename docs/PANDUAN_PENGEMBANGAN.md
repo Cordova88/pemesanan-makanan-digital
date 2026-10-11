@@ -515,16 +515,15 @@ Tag merupakan kosakata/kemampuan ekstraksi, bukan klaim bahwa setiap item memili
 
 ### Data preferensi dan state percakapan
 
-`Preferences` menyimpan:
+State chatbot memisahkan preferensi pelanggan, filter pencarian aktif, dan konteks percakapan:
 
-- `tags`: keinginan langsung dari pesan.
-- `mood_tags`: ciri menu hasil resolusi mood.
-- `excluded_tags`: pantangan tegas; item yang mempunyai tag terkait dikeluarkan.
-- `soft_excluded_tags`: ketidaksukaan lunak; skor item berkurang.
-- `max_price`, `category`, `prefer_affordable`, `moods`.
-- state dialog dan `follow_up` diserialisasi bersama preferensi di sesi.
+- `recommendation_state` menyimpan preferensi berkelanjutan: `tags`, `mood_tags`, pantangan tegas/lunak, `prefer_affordable`, dan mood. Batas harga numerik dan kategori tidak disimpan sebagai preferensi.
+- `recommendation_search` menyimpan filter kueri aktif: `required_tags`, `excluded_tags`, `category`, `max_price`, dan mood yang relevan dengan pencarian. Nilai ini dipakai saat mengambil hasil berikutnya dan terpisah dari preferensi berkelanjutan.
+- `recommendation_state` juga menyimpan state dialog (`COLLECTING_PREFERENCES`, `ASKING_FOLLOWUP`, atau `RECOMMENDING`), `follow_up`, dan ID rekomendasi sebelumnya. Hasil kosong terakhir ditandai terpisah untuk menangani sanggahan kontekstual.
 
-State yang dipakai mencakup `COLLECTING_PREFERENCES`, `ASKING_FOLLOWUP`, dan `RECOMMENDING`. Untuk permintaan pedas yang hanya berisi satu preferensi, bot dapat menanyakan jenis makanan lalu nasi/mie. Jika ada informasi yang cukup, bot langsung merekomendasikan. `Cari Menu Lain` mempertahankan preferensi dan mengecualikan item yang sudah tampil; `Mulai Lagi` menghapus state rekomendasi, bukan cart.
+Tanggung jawab service: `ConversationInterpreter` dan `TagExtractor` menafsirkan pola jelas secara lokal; `ChatbotService` mengelola preferensi, kriteria pencarian, dan konteks follow-up; `RecommendationService` mengambil menu katalog lalu menerapkan syarat keras sebelum memberi skor; `GeminiInterpreter` dipakai selektif untuk pesan ambigu dan hanya menerima delta yang lolos validasi; `RecommendationExplanationService` menyusun pengantar/penjelasan dari hasil katalog terpilih dan memakai teks deterministik bila output tidak valid atau Gemini gagal. Gemini tidak memilih item, menetapkan ketersediaan, maupun mengubah harga.
+
+Tag positif pada permintaan pencarian baru menggantikan syarat tag pencarian sebelumnya, tanpa menghapus preferensi berkelanjutan. Jawaban ke pertanyaan follow-up menambahkan kriteria yang relevan; pilihan makanan berat menjadi filter kategori `Makanan`, sedangkan tag `heavy_meal`/`filling` tetap sinyal preferensi agar metadata yang tidak lengkap tidak menggugurkan semua menu. Perubahan batas harga tanpa tag baru memperbarui pencarian aktif. Batas numerik berlaku hanya pada pencarian itu; preferensi “murah/hemat” dapat tetap tersimpan. Pertanyaan katalog menggunakan kategori, tag, dan batas harga pesan tersebut tanpa mengubah preferensi berkelanjutan. `Cari Menu Lain` mempertahankan filter aktif dan mengecualikan item yang telah tampil. `Mulai Lagi` menghapus ketiga state rekomendasi, bukan cart.
 
 Alur follow-up yang sudah dibuat:
 
@@ -550,12 +549,18 @@ Bobot kode saat ini:
 - Preferensi “murah/hemat” memberi `+3` jika harga item `<= Rp15.000`.
 - Tag yang tidak disukai secara lunak: `-2`.
 - Pantangan tegas: item dikeluarkan sebelum ranking.
+- Tag positif yang diminta pada pencarian terbaru menjadi syarat hasil, bukan sekadar penambah skor; pengecualian kategori/porsi yang dijawab lewat follow-up dijelaskan di atas. Preferensi sesi sebelumnya tetap bisa memengaruhi ranking, tetapi tidak mengganti kriteria pencarian terbaru. Syarat aktif dipertahankan saat pelanggan meminta hasil lain.
+- Pesan keberadaan seperti “ada gak nasi?” tidak menganggap “gak” sebagai pantangan nasi; negasi tersebut hanya bagian dari bentuk pertanyaan.
 
-Item juga harus aktif, tersedia, dan kategorinya aktif. `exclude_ids` menghindari item yang telah ditampilkan. Urutan seri dipecahkan oleh harga lalu nama sehingga hasil stabil. Skor tidak dikirim sebagai angka ke pelanggan; API mengirim label dan `match_reasons`.
+Semua syarat tag, kategori eksplisit, dan batas harga diterapkan sebelum ranking. Kategori adalah filter keras, bukan bonus skor. Item juga harus aktif, tersedia, dan kategorinya aktif. `exclude_ids` menghindari item yang telah ditampilkan. Urutan seri dipecahkan oleh harga lalu nama sehingga hasil stabil. Skor tidak dikirim sebagai angka ke pelanggan; API mengirim label dan `match_reasons`.
+
+Setelah hasil kosong, pesan sanggahan yang menyebut ulang kriteria (misalnya “masa nggak ada ikan?”) memulai pencarian ulang hanya berdasarkan kriteria yang disebut pelanggan. Django tetap memeriksa item aktif/tersedia dan metadata katalog; sistem tidak membuat item atau ketersediaan sendiri. Jika tag/kategori yang diminta tidak didukung metadata katalog, hasil tetap kosong dan chatbot menyampaikan bahwa tidak ada kecocokan.
+
+Batasan saat ini: sanggahan no-result dikenali oleh pola frasa lokal tertentu dan memerlukan hasil rekomendasi/katalog terbaru kosong; pertanyaan katalog hanya mencakup tag, kategori, dan batas harga yang dapat diekstrak; informasi bahan/stok bebas belum didukung. Filter berdasarkan tag dapat mengecualikan item katalog yang datanya belum diberi tag, jadi CMS/seed perlu menjaga metadata tetap akurat.
 
 `TAG_LABELS` mencegah identifier internal seperti `spicy` menjadi teks UI/API publik. Bila menambah tag baru, sinkronkan aturan ekstraksi, label terjemahan, data menu yang benar-benar sesuai, dan tes.
 
-Catatan kontrak: field `tags`, `mood_tags`, dan daftar pantangan pada `preferences` response diterjemahkan ke label Indonesia oleh view. Field metadata seperti `moods`, `state`, dan `follow_up` adalah identifier alur internal; frontend jangan menampilkannya langsung sebagai copy pelanggan.
+Catatan kontrak: field tag pada `preferences` dan `active_search` response diterjemahkan ke label Indonesia oleh view. `preferences` berisi nilai berkelanjutan; `active_search` berisi syarat pencarian saat ini, termasuk kategori dan batas harga. Field metadata seperti `moods`, `state`, dan `follow_up` adalah identifier alur internal; frontend jangan menampilkannya langsung sebagai copy pelanggan.
 
 ## 12. Order dan aturan transaksi
 

@@ -118,6 +118,8 @@ class LanguageRuleTests(SimpleTestCase):
             "15000": 15000,
             "maksimal 20 ribu": 20000,
             "di bawah 20k": 20000,
+            "ada gak nasi di bawah 20 ribu": 20000,
+            "nasi di bawah 150 ribu": 150000,
             "budgetku 20k": 20000,
             "sekitar 20 ribuan": 20000,
         }
@@ -126,6 +128,20 @@ class LanguageRuleTests(SimpleTestCase):
                 self.assertEqual(self.price_parser.parse_maximum(phrase), expected)
         self.assertIsNone(self.price_parser.parse_maximum("mau yang murah dong"))
         self.assertTrue(self.price_parser.prefers_affordable("jangan mahal"))
+
+    def test_existence_question_does_not_treat_gak_as_a_food_exclusion(self):
+        preferences = self.extractor.extract("ada gak nasi yang di bawah 20 ribu")
+
+        self.assertIn("rice", preferences.tags)
+        self.assertNotIn("rice", preferences.excluded_tags)
+        self.assertEqual(preferences.max_price, 20000)
+
+    def test_hidangan_is_a_food_category_constraint(self):
+        for phrase in ("makanan manis", "hidangan manis"):
+            with self.subTest(phrase=phrase):
+                preferences = self.extractor.extract(phrase)
+                self.assertEqual(preferences.category, "Makanan")
+                self.assertIn("sweet", preferences.tags)
 
 
 class ConversationInterpreterTests(SimpleTestCase):
@@ -168,6 +184,24 @@ class ConversationInterpreterTests(SimpleTestCase):
         statement = self.interpreter.interpret("Aku mau pilihan nasi")
         self.assertNotEqual(statement.intent, ConversationIntent.CATALOG_QUESTION)
         self.assertIn("rice", statement.tags)
+
+    def test_no_results_challenge_retries_only_with_catalogued_message_criteria(self):
+        message = "Masa nggak ada ikan?"
+        without_empty_result = self.interpreter.interpret(
+            message,
+            last_result_empty=False,
+        )
+        with_empty_result = self.interpreter.interpret(
+            message,
+            last_result_empty=True,
+        )
+
+        self.assertNotEqual(
+            without_empty_result.intent,
+            ConversationIntent.RETRY_SEARCH,
+        )
+        self.assertEqual(with_empty_result.intent, ConversationIntent.RETRY_SEARCH)
+        self.assertEqual(with_empty_result.tags, {"fish"})
 
     def test_recommendation_references_resolve_to_context_positions(self):
         references = (
@@ -628,6 +662,35 @@ class RecommendationTests(TestCase):
         self.assertEqual(mood_match.score, 4)
         self.assertIn(TAG_LABELS["spicy"], direct_match.match_reasons)
 
+    def test_explicit_protein_preference_excludes_unrelated_ranked_matches(self):
+        fish = MenuTag.objects.create(name="fish", display_name=TAG_LABELS["fish"])
+        sweet = MenuTag.objects.create(name="sweet", display_name=TAG_LABELS["sweet"])
+        fish_item = MenuItem.objects.create(
+            category=self.food,
+            name="Ikan Bakar",
+            price=Decimal("26000"),
+        )
+        fish_item.tags.add(fish)
+        sweet_item = MenuItem.objects.create(
+            category=self.food,
+            name="Pisang Goreng",
+            price=Decimal("10000"),
+        )
+        sweet_item.tags.add(sweet)
+
+        preferences = Preferences(tags={"fish", "sweet"}, category="Makanan")
+        fish_matches = self.recommender.rank(
+            preferences,
+            required_tags={"fish"},
+        )
+        fish_and_sweet_matches = self.recommender.rank(
+            preferences,
+            required_tags={"fish", "sweet"},
+        )
+
+        self.assertEqual([match.item for match in fish_matches], [fish_item])
+        self.assertEqual(fish_and_sweet_matches, [])
+
     def test_budget_category_moods_and_affordable_preference(self):
         within_budget = self.recommender.rank(
             Preferences(max_price=10000, category="Minuman")
@@ -811,6 +874,202 @@ class ChatbotIntegrationTests(TestCase):
         self.assertTrue(response.json()["recommendations"])
         self.assertIsNone(response.json()["preferences"]["follow_up"])
 
+    def test_new_protein_request_does_not_return_stale_flavor_only_matches(self):
+        sweet = MenuTag.objects.create(name="sweet", display_name=TAG_LABELS["sweet"])
+        fish = MenuTag.objects.create(name="fish", display_name=TAG_LABELS["fish"])
+        fish_item = MenuItem.objects.create(
+            category=self.best.category,
+            name="Ikan Bakar",
+            price=Decimal("26000"),
+        )
+        fish_item.tags.add(fish)
+        sweet_item = MenuItem.objects.create(
+            category=self.best.category,
+            name="Pisang Goreng",
+            price=Decimal("10000"),
+        )
+        sweet_item.tags.add(sweet)
+
+        self.post_chat("Aku mau yang manis aja")
+        self.post_chat("Kalau makanan manis ada gak?")
+        response = self.post_chat("ikan")
+
+        recommendations = response.json()["recommendations"]
+        self.assertEqual([item["name"] for item in recommendations], ["Ikan Bakar"])
+        self.assertIn(TAG_LABELS["fish"], response.json()["preferences"]["tags"])
+
+    def test_current_food_tags_and_budget_are_required_despite_stale_preferences(self):
+        fish = MenuTag.objects.create(name="fish", display_name=TAG_LABELS["fish"])
+        sweet = MenuTag.objects.create(name="sweet", display_name=TAG_LABELS["sweet"])
+        rice = self.rice
+        fish_item = MenuItem.objects.create(
+            category=self.best.category,
+            name="Ikan Bakar",
+            price=Decimal("26000"),
+        )
+        fish_item.tags.add(fish)
+        sweet_item = MenuItem.objects.create(
+            category=self.best.category,
+            name="Pisang Goreng",
+            price=Decimal("10000"),
+        )
+        sweet_item.tags.add(sweet)
+        rice_item = MenuItem.objects.create(
+            category=self.best.category,
+            name="Nasi Uduk",
+            price=Decimal("14000"),
+        )
+        rice_item.tags.add(rice)
+
+        self.post_chat("ikan")
+        no_exact_match = self.post_chat("ikan manis")
+        self.assertEqual(no_exact_match.json()["recommendations"], [])
+        self.assertIn("belum menemukan", no_exact_match.json()["message"])
+
+        budgeted_rice = self.post_chat("ada gak nasi di bawah 20 ribu")
+        self.assertEqual(
+            [item["name"] for item in budgeted_rice.json()["recommendations"]],
+            ["Nasi Uduk", "Ayam Geprek"],
+        )
+        self.assertTrue(
+            all(
+                item["price"] <= "20000.00"
+                for item in budgeted_rice.json()["recommendations"]
+            )
+        )
+        self.assertEqual(
+            budgeted_rice.json()["active_search"]["max_price"],
+            20000,
+        )
+
+    def test_conversation_sequence_scopes_search_filters_and_retries_empty_results(self):
+        sweet = MenuTag.objects.create(name="sweet", display_name=TAG_LABELS["sweet"])
+        fish = MenuTag.objects.create(name="fish", display_name=TAG_LABELS["fish"])
+        sweet_food = MenuItem.objects.create(
+            category=self.best.category,
+            name="Pisang Manis",
+            price=Decimal("14000"),
+        )
+        sweet_food.tags.add(sweet)
+        sweet_food_over_budget = MenuItem.objects.create(
+            category=self.best.category,
+            name="Kue Manis",
+            price=Decimal("20000"),
+        )
+        sweet_food_over_budget.tags.add(sweet)
+        drink_category = Category.objects.create(name="Minuman")
+        sweet_drink = MenuItem.objects.create(
+            category=drink_category,
+            name="Es Teh Manis",
+            price=Decimal("5000"),
+        )
+        sweet_drink.tags.add(sweet)
+        fish_item = MenuItem.objects.create(
+            category=self.best.category,
+            name="Ikan Bakar",
+            price=Decimal("26000"),
+        )
+        fish_item.tags.add(fish)
+
+        sweet_results = self.post_chat("hidangan manis di bawah 15rb").json()
+        self.assertEqual(
+            [item["id"] for item in sweet_results["recommendations"]],
+            [sweet_food.id],
+        )
+        self.assertEqual(sweet_results["active_search"]["category"], "Makanan")
+        self.assertEqual(sweet_results["active_search"]["max_price"], 15000)
+
+        fish_results = self.post_chat("ikan").json()
+        self.assertEqual(
+            [item["id"] for item in fish_results["recommendations"]],
+            [fish_item.id],
+        )
+        self.assertEqual(
+            fish_results["active_search"]["required_tags"],
+            [TAG_LABELS["fish"]],
+        )
+        self.assertIsNone(fish_results["active_search"]["max_price"])
+        self.assertIsNone(fish_results["preferences"]["max_price"])
+        self.assertNotIn("manis", fish_results["message"].casefold())
+        self.assertNotIn("15.000", fish_results["message"])
+
+        no_exact_match = self.post_chat("ikan manis").json()
+        self.assertEqual(no_exact_match["recommendations"], [])
+        challenged = self.post_chat("masa nggak ada ikan?").json()
+        self.assertEqual(
+            [item["id"] for item in challenged["recommendations"]],
+            [fish_item.id],
+        )
+        self.assertNotIn("manis", challenged["message"].casefold())
+
+        chicken_results = self.post_chat("kalau ayam ada apa?").json()
+        self.assertIn(
+            self.best.id,
+            [item["id"] for item in chicken_results["recommendations"]],
+        )
+        self.assertNotIn(TAG_LABELS["fish"].casefold(), chicken_results["message"].casefold())
+        self.assertNotIn("manis", chicken_results["message"].casefold())
+
+    def test_budget_update_keeps_the_active_food_filter_but_replaces_the_cap(self):
+        rice_item = MenuItem.objects.create(
+            category=self.best.category,
+            name="Nasi Uduk",
+            price=Decimal("14000"),
+        )
+        rice_item.tags.add(self.rice)
+        high_price_rice = MenuItem.objects.create(
+            category=self.best.category,
+            name="Nasi Spesial",
+            price=Decimal("18000"),
+        )
+        high_price_rice.tags.add(self.rice)
+
+        first = self.post_chat("nasi di bawah 20 ribu").json()
+        self.assertEqual(first["active_search"]["required_tags"], [TAG_LABELS["rice"]])
+        self.assertEqual(first["active_search"]["max_price"], 20000)
+
+        updated = self.post_chat("di bawah 15 ribu").json()
+        self.assertEqual(updated["active_search"]["required_tags"], [TAG_LABELS["rice"]])
+        self.assertEqual(updated["active_search"]["max_price"], 15000)
+        self.assertNotIn(
+            high_price_rice.id,
+            [item["id"] for item in updated["recommendations"]],
+        )
+
+    def test_catalog_question_applies_food_category_and_budget_as_hard_filters(self):
+        sweet = MenuTag.objects.create(name="sweet", display_name=TAG_LABELS["sweet"])
+        sweet_food = MenuItem.objects.create(
+            category=self.best.category,
+            name="Pisang Manis",
+            price=Decimal("14000"),
+        )
+        sweet_food.tags.add(sweet)
+        sweet_food_over_budget = MenuItem.objects.create(
+            category=self.best.category,
+            name="Kue Manis",
+            price=Decimal("20000"),
+        )
+        sweet_food_over_budget.tags.add(sweet)
+        drink_category = Category.objects.create(name="Minuman")
+        sweet_drink = MenuItem.objects.create(
+            category=drink_category,
+            name="Es Teh Manis",
+            price=Decimal("5000"),
+        )
+        sweet_drink.tags.add(sweet)
+
+        result = self.post_chat(
+            "Kalau hidangan manis di bawah 15rb ada gak?"
+        ).json()
+
+        self.assertTrue(result["catalog_question"])
+        self.assertEqual(
+            [item["id"] for item in result["recommendations"]],
+            [sweet_food.id],
+        )
+        self.assertEqual(result["active_search"]["category"], "Makanan")
+        self.assertEqual(result["active_search"]["max_price"], 15000)
+
     def test_ambiguous_food_message_reaches_gemini_before_unknown_fallback(self):
         response = self.post_chat(
             "Aku pengen yang bikin nagih tapi nggak bikin eneg"
@@ -966,6 +1225,8 @@ class ChatbotIntegrationTests(TestCase):
                         self.assertTrue(set(values) <= set(preferences[field]))
                     elif field == "moods":
                         self.assertTrue(set(values) <= set(preferences[field]))
+                    elif field == "max_price":
+                        self.assertEqual(response.json()["active_search"][field], values)
                     else:
                         self.assertEqual(preferences[field], values)
 
@@ -1186,6 +1447,8 @@ class ChatbotIntegrationTests(TestCase):
         self.assertEqual(response.json()["recommendations"], [])
         self.assertNotIn("recommendation_state", self.client.session)
         self.assertNotIn("recommendation_shown", self.client.session)
+        self.assertNotIn("recommendation_search", self.client.session)
+        self.assertNotIn("recommendation_last_result_empty", self.client.session)
 
     def test_chat_to_required_variant_addon_cart_and_order(self):
         recommendations = self.post_chat("Aku mau ayam pedas pakai nasi")
