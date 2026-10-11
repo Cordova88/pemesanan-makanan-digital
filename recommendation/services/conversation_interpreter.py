@@ -13,6 +13,7 @@ class ConversationIntent:
     UPDATE_PREFERENCES = "UPDATE_PREFERENCES"
     REMOVE_PREFERENCES = "REMOVE_PREFERENCES"
     REPLACE_PREFERENCES = "REPLACE_PREFERENCES"
+    CATALOG_QUESTION = "CATALOG_QUESTION"
     SELECT_RECOMMENDATION = "SELECT_RECOMMENDATION"
     REJECT_RECOMMENDATION = "REJECT_RECOMMENDATION"
     CONFIRM = "CONFIRM"
@@ -46,6 +47,10 @@ class ConversationInterpretation:
     message_is_meaningful: bool = False
     follow_up: str | None = None
     clear_moods: bool = False
+    clear_max_price: bool = False
+    clear_prefer_affordable: bool = False
+    contextual_revision: bool = False
+    catalog_tags: set[str] = field(default_factory=set)
 
 
 class ConversationInterpreter:
@@ -80,6 +85,15 @@ class ConversationInterpreter:
         "ada yang lain",
     )
     CONFIRM_PHRASES = {"iya", "ya", "oke", "ok", "setuju", "betul", "yoi"}
+    PREFERENCE_CORRECTION_CUES = (
+        "gajadi",
+        "gak jadi",
+        "nggak jadi",
+        "tidak jadi",
+        "salah",
+        "maksudku",
+        "maksudnya",
+    )
     OUT_OF_SCOPE_HINTS = (
         "python",
         "javascript",
@@ -135,6 +149,12 @@ class ConversationInterpreter:
 
         reference = self._pick_reference(normalized)
         if reference:
+            if self._is_contextual_revision(normalized):
+                return ConversationInterpretation(
+                    intent=ConversationIntent.UNKNOWN,
+                    message_is_meaningful=True,
+                    contextual_revision=bool(last_recommendations or last_question),
+                )
             return ConversationInterpretation(
                 intent=(
                     ConversationIntent.SELECT_RECOMMENDATION
@@ -161,6 +181,16 @@ class ConversationInterpreter:
 
         extracted = self.tag_extractor.extract(normalized)
         tags = set(extracted.tags)
+        if self._is_catalog_question(normalized) and tags:
+            return ConversationInterpretation(
+                intent=ConversationIntent.CATALOG_QUESTION,
+                tags=tags,
+                excluded_tags=set(extracted.excluded_tags),
+                soft_excluded_tags=set(extracted.soft_excluded_tags),
+                catalog_tags=tags,
+                message_is_meaningful=True,
+            )
+
         moods = self.mood_extractor.extract(normalized)
         moods.discard("confused")
         clear_moods = self._clears_mood(normalized) or (
@@ -245,6 +275,20 @@ class ConversationInterpreter:
             ]
             intent = ConversationIntent.REPLACE_PREFERENCES
 
+        is_explicit_correction = any(
+            cue in normalized for cue in self.PREFERENCE_CORRECTION_CUES
+        )
+        if is_explicit_correction:
+            operations = [
+                PreferenceOperation(action="CLEAR"),
+                *(
+                    operation
+                    for operation in operations
+                    if operation.action != "KEEP"
+                ),
+            ]
+            intent = ConversationIntent.REPLACE_PREFERENCES
+
         return ConversationInterpretation(
             intent=intent,
             operations=operations or [PreferenceOperation(action="KEEP")],
@@ -269,6 +313,20 @@ class ConversationInterpreter:
         if any(phrase in normalized for phrase in ("yang terakhir", "menu terakhir", "yang tadi")):
             return "last"
         return None
+
+    @staticmethod
+    def _is_contextual_revision(text):
+        revision_cues = (
+            "terlalu",
+            "lebih",
+            "kurang",
+            "ganti",
+            "ubah",
+            "mirip",
+            "tapi",
+            "namun",
+        )
+        return any(cue in text for cue in revision_cues)
 
     @staticmethod
     def _contains_phrase(text, phrase):
@@ -352,3 +410,15 @@ class ConversationInterpreter:
     @staticmethod
     def _looks_out_of_scope(text):
         return any(hint in text for hint in ConversationInterpreter.OUT_OF_SCOPE_HINTS)
+
+    @staticmethod
+    def _is_catalog_question(text):
+        explicit_question_cues = (
+            "apa aja",
+            "apa saja",
+            "ada menu",
+            "ada pilihan",
+        )
+        return any(cue in text for cue in explicit_question_cues) or (
+            "pilihan" in text and ("apa" in text or "?" in text)
+        )

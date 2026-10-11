@@ -137,5 +137,31 @@ MAILERS = {
     },
 }
 
+GEMINI_MAX_CALLS_PER_SESSION = int(
+    os.environ.get("GEMINI_MAX_CALLS_PER_SESSION", "50")
+)
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "loggers": {
+        "recommendation.services.gemini": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "recommendation.services.ai.GeminiInterpreter": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
+
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MAX_CALLS_PER_SESSION = 50

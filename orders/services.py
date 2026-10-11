@@ -1,5 +1,5 @@
 """Transactional domain services. Views only parse requests and invoke these."""
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Sum
@@ -93,12 +93,56 @@ def cashier_add_item(public_id, payload, actor):
     order=Order.objects.select_for_update().get(public_id=public_id); _pending(order)
     add_item(order,payload["menu_item_id"],int(payload["quantity"]),payload.get("variant_ids",[]),payload.get("addon_ids",[]),actor)
     return order
+def _cash_amount(value):
+    if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
+        raise ValidationError({"amount_received": "Enter the cash amount received."})
+    try:
+        amount = Decimal(str(value))
+    except InvalidOperation as exc:
+        raise ValidationError({"amount_received": "Enter a valid cash amount."}) from exc
+    if not amount.is_finite() or amount < 0 or amount.as_tuple().exponent < -2:
+        raise ValidationError({"amount_received": "Enter a valid cash amount."})
+    if amount > Decimal("9999999999.99"):
+        raise ValidationError({"amount_received": "Cash amount is too large."})
+    return amount
+
+
 @transaction.atomic
-def pay(public_id, cashier, method="CASH", external_reference=""):
-    order=Order.objects.select_for_update().get(public_id=public_id); _pending(order); recalculate(order)
+def pay(public_id, cashier, method="CASH", external_reference="", amount_received=None):
+    order=Order.objects.select_for_update().get(public_id=public_id); _pending(order)
+    if method not in Payment.Method.values:
+        raise ValidationError({"method": "Unsupported payment method."})
+    if not isinstance(external_reference, str) or len(external_reference) > 128:
+        raise ValidationError({"external_reference": "Invalid payment reference."})
+    if not order.items.exists():
+        raise ValidationError("An empty order cannot be paid.")
+
+    amount_due = recalculate(order)
+    cash_received = None
+    change_given = None
+    if method == Payment.Method.CASH:
+        cash_received = _cash_amount(amount_received)
+        if cash_received < amount_due:
+            raise ValidationError({"amount_received": "Cash received is less than the amount due."})
+        change_given = cash_received - amount_due
+
     order.status=Order.Status.PAID; order.paid_at=timezone.now(); order.processed_by_cashier=cashier; order.save(update_fields=["status","paid_at","processed_by_cashier","updated_at"])
-    Payment.objects.create(order=order,cashier=cashier,amount=order.total,method=method,external_reference=external_reference)
-    _audit(order,AuditLog.Action.PAID,cashier,after={"amount":str(order.total)}); return order
+    Payment.objects.create(
+        order=order,
+        cashier=cashier,
+        amount=amount_due,
+        amount_received=cash_received,
+        change_given=change_given,
+        method=method,
+        external_reference=external_reference,
+    )
+    audit_after = {"amount": format(amount_due, ".2f")}
+    if method == Payment.Method.CASH:
+        audit_after.update(
+            amount_received=format(cash_received, ".2f"),
+            change_given=format(change_given, ".2f"),
+        )
+    _audit(order,AuditLog.Action.PAID,cashier,after=audit_after); return order
 @transaction.atomic
 def cancel(public_id, cashier):
     order=Order.objects.select_for_update().get(public_id=public_id); _pending(order); order.status=Order.Status.CANCELLED; order.cancelled_at=timezone.now(); order.cancelled_by_cashier=cashier; order.save(update_fields=["status","cancelled_at","cancelled_by_cashier","updated_at"]); _audit(order,AuditLog.Action.CANCELLED,cashier); return order

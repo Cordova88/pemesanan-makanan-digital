@@ -108,9 +108,16 @@
           price.textContent = "Rp" + Number(item.price).toLocaleString("id-ID");
           const fit = document.createElement("div");
           fit.className = "small fw-semibold text-success mt-2";
-          fit.textContent = index === 0
-            ? "⭐ Paling cocok buat kamu"
-            : "⭐ Cocok juga buat kamu";
+          if (data.catalog_question) {
+            fit.textContent = "Pilihan dari katalog";
+          } else {
+            fit.textContent = index === 0
+              ? "⭐ Paling cocok buat kamu"
+              : "⭐ Cocok juga buat kamu";
+          }
+          const explanation = document.createElement("div");
+          explanation.className = "small mt-2";
+          explanation.textContent = item.explanation || "";
           const reasons = document.createElement("ul");
           reasons.className = "list-unstyled small mb-1 mt-1";
           (item.match_reasons || []).forEach((reason) => {
@@ -123,7 +130,7 @@
           choose.className = "btn btn-success btn-sm mt-2";
           choose.textContent = "Pilih Menu";
           choose.addEventListener("click", () => configure(item));
-          card.append(name, details, price, fit, reasons, choose);
+          card.append(name, details, price, fit, explanation, reasons, choose);
           box.append(card);
         });
         box.scrollTop = box.scrollHeight;

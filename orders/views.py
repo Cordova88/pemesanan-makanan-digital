@@ -42,8 +42,21 @@ def table_context(request, token):
 @login_required
 @require_POST
 def confirm_payment(request,public_id):
-    try: cashier_required(request.user); body=_body(request); return JsonResponse(_order(pay(public_id,request.user,body.get("method","CASH"),body.get("external_reference",""))))
-    except (ValidationError,Order.DoesNotExist) as exc: return JsonResponse({"error":str(exc)},status=400)
+    try:
+        cashier_required(request.user)
+        body = _body(request)
+        if not isinstance(body, dict):
+            raise ValidationError("Payment request must be a JSON object.")
+        order = pay(
+            public_id,
+            request.user,
+            body.get("method", "CASH"),
+            body.get("external_reference", ""),
+            body.get("amount_received"),
+        )
+        return JsonResponse(_order(order))
+    except (ValidationError,Order.DoesNotExist,ValueError,TypeError) as exc:
+        return JsonResponse({"error":str(exc)},status=400)
 @login_required
 @require_POST
 def cancel_order(request,public_id):

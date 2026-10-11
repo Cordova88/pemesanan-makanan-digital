@@ -84,7 +84,7 @@
           </select>
           <div id="cash-box" class="mb-2">
             <label class="form-label small fw-semibold" for="received">Uang diterima</label>
-            <input id="received" type="number" min="0" step="500" class="form-control k-input">
+            <input id="received" type="number" min="0" step="0.01" required class="form-control k-input">
             <div id="change" class="small mt-1 text-secondary"></div>
           </div>
           <div id="ref-box" class="mb-2 d-none">
@@ -95,7 +95,14 @@
         {% endif %}
         <button id="btn-cancel" class="btn btn-outline-danger btn-pill w-100">Batalkan pesanan</button>
       {% elif order.payment %}
-        <div class="small text-secondary">Dibayar dengan <strong>{{ order.payment.get_method_display }}</strong><br>{{ order.payment.paid_at|date:"d M Y H:i" }}</div>
+        <div class="small text-secondary">
+          Dibayar dengan <strong>{{ order.payment.get_method_display }}</strong><br>
+          {{ order.payment.paid_at|date:"d M Y H:i" }}
+          {% if order.payment.amount_received is not None %}
+            <br>Uang diterima: Rp {{ order.payment.amount_received|floatformat:"0g" }}
+            <br>Kembalian: Rp {{ order.payment.change_given|floatformat:"0g" }}
+          {% endif %}
+        </div>
       {% endif %}
     </div>
   </div>
@@ -147,11 +154,18 @@ received?.addEventListener("input", refreshChange);
 refreshPayUI();
 
 document.getElementById("btn-pay")?.addEventListener("click", () => {
-  if (method.value === "CASH" && received.value && Number(received.value) < total) {
+  if (method.value === "CASH" && !received.value) {
+    alert("Masukkan jumlah uang yang diterima."); return;
+  }
+  if (method.value === "CASH" && Number(received.value) < total) {
     alert("Uang yang diterima kurang dari total."); return;
   }
   if (confirm("Konfirmasi pembayaran " + rp(total) + "?"))
-    api("pay", {method: method.value, external_reference: document.getElementById("ref").value});
+    api("pay", {
+      method: method.value,
+      amount_received: method.value === "CASH" ? received.value : null,
+      external_reference: document.getElementById("ref").value
+    });
 });
 document.getElementById("btn-cancel")?.addEventListener("click", () => {
   if (confirm("Batalkan pesanan ini?")) api("cancel");

@@ -70,7 +70,7 @@ class OrderItemAddOn(models.Model):
 
 class Payment(models.Model):
     class Method(models.TextChoices): CASH="CASH","Cash"; CARD="CARD","Card"; QRIS="QRIS","QRIS"; OTHER="OTHER","Other"
-    order=models.OneToOneField(Order,on_delete=models.PROTECT,related_name="payment"); method=models.CharField(max_length=12,choices=Method.choices,default=Method.CASH); amount=models.DecimalField(max_digits=12,decimal_places=2,validators=[MinValueValidator(0)]); paid_at=models.DateTimeField(default=timezone.now); cashier=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="payments"); external_reference=models.CharField(max_length=128,blank=True)
+    order=models.OneToOneField(Order,on_delete=models.PROTECT,related_name="payment"); method=models.CharField(max_length=12,choices=Method.choices,default=Method.CASH); amount=models.DecimalField(max_digits=12,decimal_places=2,validators=[MinValueValidator(0)]); amount_received=models.DecimalField(max_digits=12,decimal_places=2,null=True,blank=True,validators=[MinValueValidator(0)]); change_given=models.DecimalField(max_digits=12,decimal_places=2,null=True,blank=True,validators=[MinValueValidator(0)]); paid_at=models.DateTimeField(default=timezone.now); cashier=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="payments"); external_reference=models.CharField(max_length=128,blank=True)
 
 class AuditLog(models.Model):
     class Action(models.TextChoices):

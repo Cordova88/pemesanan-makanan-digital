@@ -1,13 +1,16 @@
-
+import logging
 import os
 from pathlib import Path
 
+from django.conf import settings
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
 BASE_DIR = Path(__file__).resolve().parents[2]
-load_dotenv(BASE_DIR / ".env", override=True)
+load_dotenv(BASE_DIR / ".env", override=False)
+
+logger = logging.getLogger(__name__)
 
 
 class GeminiClient:
@@ -19,18 +22,22 @@ class GeminiClient:
                 api_key=api_key,
                 http_options=types.HttpOptions(timeout=15000),
             )
-        
+
     def generate(self, prompt):
         if self.client is None:
             return None
+        model = settings.GEMINI_MODEL
         try:
             response = self.client.models.generate_content(
-                model="gemini-3.5-flash",
+                model=model,
                 contents=prompt,
             )
-            
-            return response.text
-        except Exception as e:
-            print(f"Error generating content: {e}", flush=True)
-            return 
-        
+            text = response.text or None
+            if text:
+                logger.info("Gemini provider response received (model=%s)", model)
+            else:
+                logger.info("Gemini provider returned no text (model=%s)", model)
+            return text
+        except Exception as exc:
+            logger.warning("Gemini provider request failed (%s)", type(exc).__name__)
+            return None

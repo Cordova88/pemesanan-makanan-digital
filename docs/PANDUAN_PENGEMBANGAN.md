@@ -71,7 +71,7 @@ Alamat lokal:
 - `http://127.0.0.1:8000/staff/login/` — login staf/CMS admin.
 - `http://127.0.0.1:8000/admin/` — Django Admin.
 
-Database lokal default adalah `db.sqlite3` di root proyek. Pengaturan dibaca dari environment proses, bukan `.env` otomatis. Nama variabel yang digunakan: `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`, `SQLITE_DATABASE_NAME`. SQLite tidak perlu server terpisah.
+Database lokal default adalah `db.sqlite3` di root proyek. Pengaturan Django utama dibaca dari environment proses. Klien Gemini memuat `.env` di root proyek bila ada. Nama variabel yang digunakan: `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`, `SQLITE_DATABASE_NAME`, `GEMINI_API_KEY`, `GEMINI_MODEL`, dan `GEMINI_MAX_CALLS_PER_SESSION`. SQLite tidak perlu server terpisah.
 
 `seed_demo` dapat membuat admin `admin` dan kasir `cashier` untuk development. Password awal hanya dipasang saat user belum punya password yang dapat digunakan; command tidak mereset password user yang sudah ada.
 
@@ -187,13 +187,13 @@ Table 1 ───── * Order 1 ───── * OrderItem
                                 ├── * OrderItemVariant
                                 └── * OrderItemAddOn
 Order 1 ───── 0..1 Payment
-Order 1 ───── * AuditLog
+Order 1 ───── * 
 ```
 
 - `Table` mempunyai nomor dan token QR unik.
 - `Order` memiliki `public_id`, status, pelanggan, jenis dine-in/takeaway, meja opsional, total, expiry, serta aktor pembayaran/pembatalan/refund.
 - `OrderItem`, `OrderItemVariant`, dan `OrderItemAddOn` menyimpan snapshot nama/harga transaksi agar perubahan menu tidak mengubah transaksi lama.
-- `Payment` mencatat satu pembayaran per order.
+- `Payment` mencatat satu pembayaran per order; `amount` adalah nominal order yang dibayar. Untuk tunai, `amount_received` dan `change_given` menyimpan uang tendered dan kembalian; metode non-tunai menyimpan kedua field tersebut sebagai null.
 - `AuditLog` menyimpan aksi serta nilai before/after/metadata.
 
 Constraint database dan `clean()` menjaga konsistensi jenis order-meja, nilai harga/kuantitas nonnegatif/positif, serta relasi unik tertentu. Detail final constraint ada di `orders/models.py`.
@@ -398,13 +398,13 @@ Tombol Hapus tag membuka halaman konfirmasi (`users/tag_confirm_delete.html`); G
 ### Role
 
 - Akses halaman CMS custom dibatasi oleh `cms_required` di `users/views.py`, yang mensyaratkan `user.is_staff`.
-- Login di `/staff/login/` menerima user `is_staff` atau anggota grup `Cashier`. Kasir saat ini diarahkan ke storefront karena halaman kasir khusus belum dibuat.
+- Login di `/staff/login/` menerima user `is_staff` atau anggota grup `Cashier`. Kasir diarahkan ke dashboard kasir `/kasir/`; admin dapat membuka CMS dan halaman kasir.
 - Endpoint operasional order memeriksa login dan grup Cashier/admin melalui `orders/permissions.py`.
 - Refund diperiksa terpisah di `orders/services.py` dan hanya diberikan kepada `is_staff`.
 
 ## 11. Chatbot rekomendasi
 
-Implementasinya berada di `recommendation/`; chatbot sepenuhnya rule-based dan tidak menggunakan model AI atau layanan eksternal untuk memahami teks.
+Implementasinya berada di `recommendation/`. Pemahaman lokal tetap menjadi jalur utama; Gemini hanya dipanggil untuk pesan makanan `UNKNOWN` yang memenuhi penanda kelayakan atau pesan revisi kontekstual tertentu. AI tidak mengambil alih ranking, item katalog, keranjang, atau pesanan.
 
 ```text
 POST /api/recommendation/chat/
@@ -415,7 +415,10 @@ POST /api/recommendation/chat/
       ├─ MoodExtractor.extract()
       ├─ MoodResolver.resolve()
       ├─ Preferences digabung dengan state sesi
+      ├─ follow-up deterministik hanya untuk dimensi yang meningkatkan ranking
+      ├─ GeminiInterpreter hanya untuk pesan UNKNOWN/revisi yang eligible
       └─ RecommendationService.rank()
+  → RecommendationExplanationService dapat membuat penjelasan batch untuk item hasil ranking
   → view menerjemahkan tag ke label Indonesia + serialize pilihan item
   → chatbot.html menampilkan respons dan kartu
   → pilih item → POST /api/recommendation/add/
@@ -431,9 +434,40 @@ POST /api/recommendation/chat/
 | `services/mood_extractor.py` | Deteksi situasi lelah, low mood, sangat lapar, gerah/haus, buru-buru, bingung. |
 | `services/mood_resolver.py` | Menerjemahkan mood ke tag karakteristik dengan bobot tidak langsung. |
 | `services/recommendation.py` | Filter item, hitung skor, alasan cocok, ranking deterministik. |
-| `services/chatbot.py` | State dialog, follow-up, pesan kontekstual, reset, rekomendasi berikutnya. |
+| `services/chatbot.py` | State dialog, keputusan follow-up deterministik, routing pertanyaan katalog, jawaban kontekstual, reset, penjelasan fallback, dan rekomendasi berikutnya. |
+| `services/gemini.py` | Komunikasi opsional dengan provider Gemini; timeout dan kegagalan provider menghasilkan fallback lokal. |
+| `services/ai/GeminiInterpreter.py` | Interpretasi AI berbentuk JSON, validasi intent/tag/mood/delta sebelum dibuat menjadi operasi preferensi. |
+| `services/ai/explanations.py` | Satu panggilan batch untuk intro percakapan singkat dan penjelasan display-only; validasi panjang, markup, ID, tag, dan alasan yang cocok. |
 | `views.py` | Adaptasi HTTP/JSON, serializer kartu, endpoint tambah ke cart. |
 | `templates/recommendation/chatbot.html` | UI chat, quick replies, kartu, form pilihan varian/add-on. |
+
+### Fitur AI: status dan batas tanggung jawab
+
+| Fitur | Status | Implementasi dan batasan |
+|---|---|---|
+| Interpretasi lokal-first | **Diimplementasikan** | Reset, salam, bantuan, pesan di luar topik, referensi biasa seperti “yang pertama”, serta preferensi yang dikenali diproses lokal. Koreksi eksplisit seperti “gajadi, aku mau pedas” atau “salah, maksudku manis aja” mengganti kumpulan preferensi sebelumnya dengan preferensi baru yang dikenali, bukan menumpuknya. |
+| Interpretasi Gemini kontekstual | **Sebagian diimplementasikan** | Gemini hanya eligible untuk pesan `UNKNOWN` yang tampak terkait makanan, revisi kontekstual tertentu, atau sejumlah cue nuansa seperti “eneg/berminyak/nagih”; panjang pesan dibatasi 500 karakter. Ini bukan pemahaman umum seluruh pesan pelanggan. Prompt hanya menerima preferensi sesi relevan, bukan seluruh riwayat. Output delta tervalidasi sebelum Django mengubahnya menjadi `PreferenceOperation`; output gagal tidak mengubah preferensi. |
+| Validasi dan batas keamanan interpretasi | **Diimplementasikan** | Schema harus memiliki tepat field yang diharapkan. Intent, tag, mood, tipe data, batas jumlah/harga, duplikasi, overlap, dan konteks penghapusan divalidasi. Respons tidak valid, kosong, timeout, atau gagal provider tidak diterapkan dan alur lokal tetap berjalan. Tidak ada akses AI ke cart, checkout, pembayaran, atau operasi ORM. |
+| Pertanyaan lanjutan kontekstual | **Diimplementasikan (aturan deterministik)** | `ChatbotService` hanya mengajukan follow-up untuk pilihan yang belum cukup membedakan hasil, misalnya pedas saja menanyakan jenis makanan; jawaban “makanan berat” dapat menanyakan nasi atau mie. Preferensi yang sudah cukup spesifik langsung diranking tanpa pertanyaan tambahan. Satu pertanyaan disimpan sebagai `last_question`; “bebas/terserah” pada jawaban kontekstual berarti jangan menambah filter, lalu lanjut rekomendasi tanpa menghapus preferensi sebelumnya. Gemini tidak dipanggil untuk memilih atau merangkai pertanyaan ini. |
+| Intro percakapan dan penjelasan rekomendasi | **Sebagian diimplementasikan** | Setelah Django meranking item, satu panggilan batch dapat menghasilkan intro singkat untuk pesan terbaru sekaligus penjelasan maksimal tiga kartu. Intro/schema, markup, panjang, URL, angka/harga, dan klaim yang tidak didukung divalidasi; setiap penjelasan tetap diikat ke ID, nama, tag, dan alasan item. Nama, harga, ranking, ketersediaan, dan aksi kartu tetap ditentukan Django. Jika output ditolak/gagal/kuota habis, teks deterministik dan penjelasan fallback digunakan. Pemeriksaan teks tidak dapat membuktikan kebenaran semantik sepenuhnya. |
+| Pertanyaan pilihan menu dari katalog | **Sebagian diimplementasikan** | Pertanyaan spesifik yang dikenali seperti “pilihan nasi apa aja?” dipisahkan dari pernyataan preferensi. Django mengambil item aktif/tersedia yang memiliki semua tag permintaan dan mempertahankan preferensi sesi. Gemini hanya boleh merangkai intro dan penjelasan untuk item hasil query; bila tidak ada hasil/provider gagal, teks fallback dipakai. Belum mencakup tanya-jawab bebas tentang bahan, komposisi, stok, atau detail menu. |
+| Render keluaran AI | **Diimplementasikan** | Pesan dan penjelasan ditampilkan melalui `textContent`, bukan HTML. Ranking, harga dan data untuk cart tetap berasal dari Django/katalog. |
+| Konfigurasi dan batas panggilan | **Diimplementasikan** | `GEMINI_API_KEY` bersifat opsional dan tidak boleh dimasukkan ke git. `GEMINI_MODEL` default `gemini-3.5-flash-lite`; `GEMINI_MAX_CALLS_PER_SESSION` default `50`. Jika key tidak tersedia atau batas tercapai, jalur lokal/fallback dipakai. |
+| Pertanyaan katalog bebas berbasis fakta | **Direncanakan** | Pertanyaan pilihan berdasarkan tag tersedia untuk pola terbatas; belum ada tanya-jawab bebas tentang bahan, stok, komposisi, atau detail menu. Jangan menyimpulkan fakta tersebut dari tag atau nama. |
+| Pertanyaan lanjutan buatan AI | **Direncanakan** | Gemini belum menentukan kapan bertanya atau menghasilkan pertanyaan. Follow-up saat ini sengaja diputuskan oleh aturan Django agar tidak menambah panggilan, latency, maupun risiko perubahan konteks yang salah. |
+| Monitoring penggunaan AI | **Direncanakan** | Batas panggilan sesi sudah ada, tetapi belum tersedia dashboard/analitik biaya, latensi, maupun tingkat penolakan output. |
+
+Kegagalan output penjelasan tidak mengubah menu, urutan ranking, harga, maupun status ketersediaan. Deskripsi katalog merupakan data CMS; hanya masukkan fakta yang memang tersimpan di katalog. Jangan gunakan model untuk mengarang bahan, alergen, tekstur, atau klaim kesehatan. Variabel rahasia jangan dicetak dalam log.
+
+Konfigurasi lokal opsional pada `.env` di root proyek (jangan commit nilai key):
+
+```dotenv
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3.5-flash-lite
+GEMINI_MAX_CALLS_PER_SESSION=50
+```
+
+Tes AI/follow-up menggunakan fake/mock client agar tidak menghubungi provider. Jalankan `python manage.py test recommendation.tests.GeminiInterpreterTests recommendation.tests.RecommendationExplanationServiceTests recommendation.tests.ChatbotIntegrationTests` untuk interpretasi AI, penjelasan batch, fallback, ranking, dan alur follow-up. Jalankan `python manage.py check` setelah perubahan konfigurasi atau URL; `python manage.py test` menjalankan seluruh suite.
 
 ### Mood yang dikenali
 
@@ -530,7 +564,7 @@ Aturan utama berada di `orders/services.py`; views mengatur protokol HTTP dan JS
 - `create_order()` berjalan dalam `transaction.atomic()` dan menggunakan harga database.
 - `add_item()` memeriksa status menu/kategori, pilihan varian, add-on, menghitung total, membuat snapshot, lalu mencatat audit.
 - Perubahan order mengunci order dengan `select_for_update()` dan hanya mengizinkan perubahan pada status `PENDING`.
-- Pembayaran merekam metode, nilai, kasir, waktu bayar, dan audit; pembayaran ulang ditolak setelah status berubah.
+- Pembayaran menghitung ulang jumlah yang harus dibayar dari baris order di server, menolak order kosong, metode yang tidak didukung, dan tunai yang kurang; pembayaran merekam nominal order, kasir, waktu bayar, serta audit. Untuk tunai, nilai diterima dan kembalian juga dicatat. Pembayaran ulang ditolak setelah status berubah.
 - Refund hanya untuk order berstatus `PAID`; refund tidak mengubah detail snapshot.
 - Order baru memiliki masa berlaku satu jam.
 - `expire_order_if_due()` dapat memperbarui expiry saat order dibaca; command `expire_orders` memproses seluruh pending yang jatuh tempo secara berkala.
@@ -587,8 +621,8 @@ Peta tes:
 ## 15. Batasan implementasi yang perlu diketahui
 
 - SQLite dipakai untuk development/demo. Untuk banyak kasir dengan transaksi serentak, gunakan database yang mendukung row-level locking seperti PostgreSQL.
-- Tidak ada integrasi payment gateway eksternal; API pembayaran saat ini adalah aksi internal terautentikasi untuk workflow staf.
-- Halaman CMS order menampilkan daftar; belum ada dashboard kasir terpisah untuk cashier. User grup `Cashier` dapat mengakses endpoint operasional yang diizinkan, tetapi login mereka diarahkan ke storefront.
+- Tidak ada integrasi payment gateway eksternal; API pembayaran saat ini adalah aksi internal terautentikasi untuk workflow staf. Pilihan CARD/QRIS/OTHER hanya mencatat metode yang dipilih, bukan memproses transaksi ke penyedia eksternal.
+- Dashboard kasir terpisah tersedia pada `/kasir/`; perubahan order dan pembayaran tetap dilakukan melalui service transaksional.
 - CMS custom saat ini tidak mengelola akun staf; tag mendukung tambah, edit, pemasangan pada menu, dan hapus jika belum dipakai.
 - Bootstrap dan beberapa library browser (QR/kamera) dimuat dari CDN; operasi UI terkait membutuhkan akses jaringan. Kamera juga membutuhkan izin browser.
 - `DEBUG` default lokal aktif supaya Django menyajikan static files saat `runserver`; deployment harus memakai `DEBUG=false`, secret key sendiri, host yang benar, dan strategi static files production.
