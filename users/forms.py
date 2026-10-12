@@ -42,17 +42,39 @@ class MenuTagForm(BootstrapModelForm):
             'display_name': 'Nama yang ditampilkan, misalnya Pedas atau Ayam. Jika kosong, kode tag akan ditampilkan.',
         }
 
+class MenuTagEditForm(MenuTagForm):
+    menus = forms.ModelMultipleChoiceField(
+        queryset=MenuItem.objects.none(), required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label='Menu yang tetap memakai tag',
+        help_text='Hilangkan centang untuk melepas tag dari menu tersebut. Menu tidak dihapus.',
+    )
 
-# [OOP: Inheritance] MenuItemForm mewarisi BootstrapModelForm.
-# [OOP: Encapsulation] Field, widget (Textarea), label, dan help_texts untuk MenuItem
-# dikonfigurasi di dalam Meta, bukan tersebar di view.
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['menus'].queryset = self.instance.menu_items.order_by('name', 'pk')
+        self.initial['menus'] = list(self.instance.menu_items.values_list('pk', flat=True))
+
+
 class MenuItemForm(BootstrapModelForm):
     class Meta:
         model = MenuItem; fields = ('category', 'name', 'description', 'price', 'image', 'tags', 'is_available', 'is_active', 'stock_estimate')
-        widgets = {'description': forms.Textarea(attrs={'rows': 3})}
-        labels = {'tags': 'Tag menu'}
-        help_texts = {'tags': 'Boleh pilih lebih dari satu tag. Tahan Ctrl (Windows) atau Command (Mac) saat memilih. Kelola pilihan di halaman Tag Menu.'}
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 3}),
+            'tags': forms.CheckboxSelectMultiple,
+            'image': forms.ClearableFileInput(attrs={'data-menu-image-input': ''}),
+        }
+        labels = {
+            'category': 'Kategori', 'name': 'Nama menu', 'description': 'Deskripsi',
+            'price': 'Harga (Rp)', 'image': 'Gambar menu', 'tags': 'Tag menu',
+            'is_available': 'Tersedia untuk dipesan', 'is_active': 'Tampilkan di katalog',
+            'stock_estimate': 'Perkiraan stok',
+        }
+        help_texts = {'tags': 'Centang semua tag yang sesuai. Kelola pilihan tag di halaman Tag Menu.'}
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['tags'].queryset = MenuTag.objects.order_by('display_name', 'name', 'pk')
 
 # [OOP: Inheritance] VariantGroupForm mewarisi BootstrapModelForm.
 # [OOP: Encapsulation] Meta mengikat form ke model VariantGroup.
