@@ -1,8 +1,13 @@
-{% extends 'users/base.html' %}{% block content %}
-<h1 class="h3 mb-4">Audit Log</h1>
-<div class="card border-0 shadow-sm">
+{% extends 'users/base.html' %}
+{% block content %}
+<div class="mb-3">
+  <h1 class="h3 mb-0">Log Audit</h1>
+  <small class="text-secondary">Riwayat tindakan pada pesanan</small>
+</div>
+
+<div class="card stat">
   <div class="table-responsive">
-    <table class="table mb-0">
+    <table class="table align-middle mb-0">
       <thead>
         <tr>
           <th>Waktu</th>
@@ -14,14 +19,14 @@
       <tbody>
         {% for log in logs %}
         <tr>
-          <td>{{ log.created_at|date:'d M Y H:i' }}</td>
-          <td>{{ log.order.public_id }}</td>
-          <td>{{ log.get_action_display }}</td>
-          <td>{{ log.actor|default:'System' }}</td>
+          <td class="text-secondary">{{ log.created_at|date:'d M Y H:i' }}</td>
+          <td class="fw-semibold"><code class="text-body">{{ log.order.public_id }}</code></td>
+          <td><span class="badge badge-tag-more">{{ log.get_action_display }}</span></td>
+          <td>{% if log.actor %}{{ log.actor }}{% else %}<span class="text-secondary"><i class="bi bi-gear me-1"></i>System</span>{% endif %}</td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="4" class="text-center py-4">Belum ada aktivitas.</td>
+          <td colspan="4" class="text-center text-secondary py-4">Belum ada aktivitas.</td>
         </tr>
         {% endfor %}
       </tbody>

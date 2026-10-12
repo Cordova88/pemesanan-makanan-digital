@@ -17,7 +17,6 @@
         --brand: #047857;
         --brand-dark: #065f46;
         --brand-soft: #ecfdf5;
-        --bs-body-bg: #fafaf9;
         --bs-body-color: #1c1917;
         --bs-border-color: #e7e5e4;
         --bs-primary: #047857;
@@ -25,7 +24,9 @@
         --bs-border-radius: 10px;
         --bs-link-color: #047857;
         --bs-link-hover-color: #065f46;
+        --bs-body-bg: #f1f3ef;
       }
+
       body {
         background: var(--bs-body-bg);
         color: var(--bs-body-color);
@@ -123,6 +124,15 @@
         border: 1px solid var(--bs-border-color);
         border-radius: 14px;
       }
+      .stat,
+      .form-card {
+        background: #fff;
+        border: 1px solid #dde2da;
+        border-radius: 14px;
+        box-shadow:
+          0 1px 2px rgba(16, 37, 30, 0.06),
+          0 6px 16px rgba(16, 37, 30, 0.04);
+      }
       .table > * > * {
         white-space: nowrap;
       }
@@ -139,6 +149,25 @@
       }
       .table tbody tr:hover {
         background: #f5f5f4;
+      }
+
+      /* Table header gets its own tinted band */
+      .table thead th {
+        background: #f6f8f5;
+        border-bottom: 1px solid #dde2da;
+      }
+      .card-header.bg-white {
+        background: #f9faf8 !important;
+        border-bottom: 1px solid #dde2da;
+      }
+
+      /* Narrower content so wide screens don't look sparse */
+      .content {
+        max-width: 1180px;
+      }
+      .content-narrow {
+        max-width: 780px;
+        margin-left: 0;
       }
 
       /* Tags: light pill instead of solid green */
