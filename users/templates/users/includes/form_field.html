@@ -1,0 +1,10 @@
+<div class="{% if full_width %}col-12{% else %}col-md-6{% endif %}">
+  {% if field.widget_type == 'checkbox' %}
+  <div class="form-check">{{ field }}<label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label></div>
+  {% else %}
+  <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+  {{ field }}
+  {% endif %}
+  {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+  <div class="text-danger small">{{ field.errors }}</div>
+</div>
