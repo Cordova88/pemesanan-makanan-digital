@@ -1,28 +1,75 @@
 <nav class="nav flex-column gap-1 flex-grow-1">
   <a
-    class="rounded px-3 py-2 {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
+    class="px-3 py-2 {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
     href="{% url 'staff:dashboard' %}"
-    >Dashboard</a
-  ><span class="nav-label mt-3 px-3">MENU</span
-  ><a class="rounded px-3 py-2" href="{% url 'staff:categories' %}"
-    >Categories</a
-  ><a class="rounded px-3 py-2" href="{% url 'staff:menu-items' %}"
-    >Menu Items</a
-  ><a class="rounded px-3 py-2 {% if request.resolver_match.url_name == 'tags' or request.resolver_match.url_name == 'tag-edit' or request.resolver_match.url_name == 'tag-delete' %}active{% endif %}" href="{% url 'staff:tags' %}">Tag Menu</a
-  ><a class="rounded px-3 py-2" href="{% url 'staff:variants' %}">Variants</a
-  ><a class="rounded px-3 py-2" href="{% url 'staff:addons' %}">Add-ons</a
-  ><span class="nav-label mt-3 px-3">RESTAURANT</span
-  ><a class="rounded px-3 py-2" href="{% url 'staff:tables' %}"
-    >Tables & QR Codes</a
-  ><span class="nav-label mt-3 px-3">ORDERS</span
-  ><a class="rounded px-3 py-2" href="{% url 'staff:orders' %}">Orders</a
-  ><span class="nav-label mt-3 px-3">SYSTEM</span
-  ><a class="rounded px-3 py-2" href="{% url 'staff:audit-log' %}">Audit Log</a>
+    ><i class="bi bi-speedometer2 me-2"></i>Dashboard</a
+  >
+
+  <span class="nav-label mt-3 px-3">MENU</span>
+  <a
+    class="px-3 py-2 {% if 'categor' in request.resolver_match.url_name %}active{% endif %}"
+    href="{% url 'staff:categories' %}"
+    ><i class="bi bi-folder2 me-2"></i>Kategori</a
+  >
+  <a
+    class="px-3 py-2 {% if 'menu-item' in request.resolver_match.url_name %}active{% endif %}"
+    href="{% url 'staff:menu-items' %}"
+    ><i class="bi bi-egg-fried me-2"></i>Item Menu</a
+  >
+  <a
+    class="px-3 py-2 {% if 'tag' in request.resolver_match.url_name %}active{% endif %}"
+    href="{% url 'staff:tags' %}"
+    ><i class="bi bi-tags me-2"></i>Tag Menu</a
+  >
+  <a
+    class="px-3 py-2 {% if 'variant' in request.resolver_match.url_name %}active{% endif %}"
+    href="{% url 'staff:variants' %}"
+    ><i class="bi bi-sliders me-2"></i>Varian</a
+  >
+  <a
+    class="px-3 py-2 {% if 'addon' in request.resolver_match.url_name %}active{% endif %}"
+    href="{% url 'staff:addons' %}"
+    ><i class="bi bi-plus-circle me-2"></i>Tambahan</a
+  >
+
+  <span class="nav-label mt-3 px-3">RESTORAN</span>
+  <a
+    class="px-3 py-2 {% if 'table' in request.resolver_match.url_name %}active{% endif %}"
+    href="{% url 'staff:tables' %}"
+    ><i class="bi bi-qr-code me-2"></i>Meja &amp; QR</a
+  >
+
+  <span class="nav-label mt-3 px-3">PESANAN</span>
+  <a
+    class="px-3 py-2 {% if 'order' in request.resolver_match.url_name %}active{% endif %}"
+    href="{% url 'staff:orders' %}"
+    ><i class="bi bi-receipt me-2"></i>Pesanan</a
+  >
+
+  <span class="nav-label mt-3 px-3">SISTEM</span>
+  <a
+    class="px-3 py-2 {% if 'audit' in request.resolver_match.url_name %}active{% endif %}"
+    href="{% url 'staff:audit-log' %}"
+    ><i class="bi bi-clock-history me-2"></i>Log Audit</a
+  >
 </nav>
+
 <div class="border-top border-secondary pt-3 mt-3 text-white small">
-  <div class="fw-semibold">
-    {{ request.user.get_full_name|default:request.user.username }}
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <div
+      class="rounded-circle bg-success d-flex align-items-center justify-content-center fw-semibold"
+      style="width: 34px; height: 34px"
+    >
+      {{ request.user.username|slice:":1"|upper }}
+    </div>
+    <div>
+      <div class="fw-semibold lh-sm">
+        {{ request.user.get_full_name|default:request.user.username }}
+      </div>
+      <div class="text-white-50">Administrator</div>
+    </div>
   </div>
-  <div class="text-white-50 mb-2">Administrator</div>
-  <a href="{% url 'staff:logout' %}">Keluar</a>
+  <a class="px-2 py-1 d-inline-block" href="{% url 'staff:logout' %}"
+    ><i class="bi bi-box-arrow-left me-1"></i>Keluar</a
+  >
 </div>

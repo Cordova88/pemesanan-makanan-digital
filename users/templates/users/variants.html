@@ -6,16 +6,17 @@
       <div class="card-body">
         <h2 class="h6">Tambah grup varian</h2>
         <form method="post" class="row g-2">
-          {% csrf_token %}<input type="hidden" name="kind" value="group" />{%
-          for field in group_form %}
+          {% csrf_token %}<input type="hidden" name="kind" value="group" />
+          {% for field in group_form %}
           <div class="col-12">
             {% if field.field.widget.input_type == 'checkbox' %}
             <div class="form-check">
               {{ field }}
               <label class="form-check-label">{{ field.label }}</label>
             </div>
-            {% else %}<label class="form-label">{{ field.label }}</label>{{
-            field }}{% endif %}
+            {% else %}
+            <label class="form-label">{{ field.label }}</label>{{ field }}
+            {% endif %}
           </div>
           {% endfor %}
           <div><button class="btn btn-success">Simpan grup</button></div>
@@ -28,16 +29,17 @@
       <div class="card-body">
         <h2 class="h6">Tambah opsi varian</h2>
         <form method="post" class="row g-2">
-          {% csrf_token %}<input type="hidden" name="kind" value="option" />{%
-          for field in option_form %}
+          {% csrf_token %}<input type="hidden" name="kind" value="option" />
+          {% for field in option_form %}
           <div class="col-md-6">
             {% if field.field.widget.input_type == 'checkbox' %}
             <div class="form-check mt-4">
               {{ field }}
               <label class="form-check-label">{{ field.label }}</label>
             </div>
-            {% else %}<label class="form-label">{{ field.label }}</label>{{
-            field }}{% endif %}
+            {% else %}
+            <label class="form-label">{{ field.label }}</label>{{ field }}
+            {% endif %}
           </div>
           {% endfor %}
           <div><button class="btn btn-success">Simpan opsi</button></div>

@@ -35,13 +35,18 @@
           <td>{{ addon.name }}</td>
           <td>Rp{{ addon.price }}</td>
           <td>
-            {% for item in addon.menu_items.all %}{{ item.name }}{% if not
-            forloop.last %}, {% endif %}{% empty %}Semua / belum dipilih{%
-            endfor %}
+            {% for item in addon.menu_items.all %}
+              {{ item.name }}{% if not forloop.last %}, {% endif %}
+            {% empty %}
+              Semua / belum dipilih
+            {% endfor %}
           </td>
           <td>
-            {% if addon.is_active and addon.is_available %}Ya{% else %}Tidak{%
-            endif %}
+            {% if addon.is_active and addon.is_available %}
+              Ya
+            {% else %}
+              Tidak
+            {% endif %}
           </td>
           <td>
             <a

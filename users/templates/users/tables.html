@@ -5,10 +5,11 @@
     <p class="text-secondary mb-0">
       QR meja hanya menyimpan konteks meja, bukan membuat pesanan.
     </p>
-  </div>
-</div>
-<div class="card border-0 shadow-sm mb-4">
-  <div class="card-body">
+            {% if table.is_active %}
+              <span class="badge text-bg-success">Aktif</span>
+            {% else %}
+              <span class="badge text-bg-secondary">Nonaktif</span>
+            {% endif %}
     <h2 class="h6">Tambah meja</h2>
     <form method="post" class="row g-3 align-items-end">
       {% csrf_token %}
@@ -43,10 +44,11 @@
         <tr>
           <td class="fw-semibold">Meja {{ table.number }}</td>
           <td>
-            {% if table.is_active %}<span class="badge text-bg-success"
-              >Aktif</span
-            >{% else %}<span class="badge text-bg-secondary">Nonaktif</span>{%
-            endif %}
+            {% if table.is_active %}
+              <span class="badge text-bg-success">Aktif</span>
+            {% else %}
+              <span class="badge text-bg-secondary">Nonaktif</span>
+            {% endif %}
           </td>
           <td><code class="small">{{ table.token|truncatechars:22 }}</code></td>
           <td class="text-end">

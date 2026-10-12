@@ -1,41 +1,64 @@
-{% extends 'users/base.html' %}{% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+{% extends 'users/base.html' %} {% block content %}
+<div
+  class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4"
+>
   <div>
     <h1 class="h3 mb-1">Dashboard</h1>
     <p class="text-secondary mb-0">Ringkasan operasional RasaKita.</p>
   </div>
-  <a class="btn btn-success" href="{% url 'staff:tables' %}">Kelola Meja</a>
+  <a class="btn btn-success" href="{% url 'staff:tables' %}"
+    ><i class="bi bi-qr-code me-1"></i>Kelola Meja</a
+  >
 </div>
+
 <div class="row g-3 mb-4">
   <div class="col-sm-6 col-xl-3">
-    <div class="card stat shadow-sm p-3">
-      <small class="text-secondary">Menu aktif</small
-      ><strong class="fs-3">{{ active_menu_items }}</strong>
+    <div class="card stat p-3 d-flex flex-column">
+      <small class="text-secondary"
+        ><i class="bi bi-egg-fried me-1"></i>Menu aktif</small
+      >
+      <strong class="fs-3">{{ active_menu_items }}</strong>
     </div>
   </div>
   <div class="col-sm-6 col-xl-3">
-    <div class="card stat shadow-sm p-3">
-      <small class="text-secondary">Kategori</small
-      ><strong class="fs-3">{{ categories_count }}</strong>
+    <div class="card stat p-3 d-flex flex-column">
+      <small class="text-secondary"
+        ><i class="bi bi-folder2 me-1"></i>Kategori</small
+      >
+      <strong class="fs-3">{{ categories_count }}</strong>
     </div>
   </div>
   <div class="col-sm-6 col-xl-3">
-    <div class="card stat shadow-sm p-3">
-      <small class="text-secondary">Pesanan pending</small
-      ><strong class="fs-3">{{ pending_orders }}</strong>
-    </div>
+    <a class="text-decoration-none text-reset" href="{% url 'staff:orders' %}">
+      <div
+        class="card stat p-3 d-flex flex-column border-warning-subtle bg-warning-subtle"
+      >
+        <small class="text-secondary"
+          ><i class="bi bi-hourglass-split me-1"></i>Pesanan pending</small
+        >
+        <strong class="fs-3">{{ pending_orders }}</strong>
+      </div>
+    </a>
   </div>
   <div class="col-sm-6 col-xl-3">
-    <div class="card stat shadow-sm p-3">
-      <small class="text-secondary">Pesanan hari ini</small
-      ><strong class="fs-3">{{ today_orders }}</strong>
+    <div class="card stat p-3 d-flex flex-column">
+      <small class="text-secondary"
+        ><i class="bi bi-receipt me-1"></i>Pesanan hari ini</small
+      >
+      <strong class="fs-3">{{ today_orders }}</strong>
     </div>
   </div>
 </div>
+
 <div class="row g-4">
   <div class="col-lg-8">
-    <div class="card shadow-sm border-0">
-      <div class="card-header bg-white"><strong>Pesanan Terbaru</strong></div>
+    <div class="card stat">
+      <div
+        class="card-header bg-white d-flex justify-content-between align-items-center"
+      >
+        <strong>Pesanan Terbaru</strong>
+        <a class="small" href="{% url 'staff:orders' %}">Lihat semua</a>
+      </div>
       <div class="table-responsive">
         <table class="table mb-0">
           <thead>
@@ -44,24 +67,25 @@
               <th>Pelanggan</th>
               <th>Jenis</th>
               <th>Status</th>
-              <th>Total</th>
+              <th class="text-end">Total</th>
             </tr>
           </thead>
           <tbody>
             {% for order in recent_orders %}
             <tr>
-              <td>{{ order.public_id }}</td>
+              <td class="fw-semibold">{{ order.public_id }}</td>
               <td>{{ order.customer_name }}</td>
               <td>
                 {{ order.get_order_type_display }}{% if order.table %} · Meja {{
                 order.table.number }}{% endif %}
               </td>
               <td>
-                <span class="badge text-bg-secondary"
+                <span
+                  class="badge rounded-pill {% if order.status == 'paid' %}text-bg-success {% elif order.status == 'pending' %}text-bg-warning {% elif order.status == 'cancelled' or order.status == 'expired' %}text-bg-danger {% else %}text-bg-secondary{% endif %}"
                   >{{ order.get_status_display }}</span
                 >
               </td>
-              <td>Rp{{ order.total }}</td>
+              <td class="text-end">Rp {{ order.total|floatformat:"0g" }}</td>
             </tr>
             {% empty %}
             <tr>
@@ -75,12 +99,15 @@
       </div>
     </div>
   </div>
+
   <div class="col-lg-4">
-    <div class="card shadow-sm border-0">
+    <div class="card stat">
       <div class="card-header bg-white"><strong>Stok menipis</strong></div>
       <ul class="list-group list-group-flush">
         {% for item in low_stock %}
-        <li class="list-group-item d-flex justify-content-between">
+        <li
+          class="list-group-item d-flex justify-content-between align-items-center"
+        >
           {{ item.name }}<span class="badge text-bg-warning"
             >{{ item.stock_estimate }}</span
           >

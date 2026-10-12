@@ -1,26 +1,21 @@
-{% extends 'users/base.html' %}{% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h1 class="h3">Menu Items</h1>
-  <button
-    class="btn btn-success"
-    data-bs-toggle="collapse"
-    data-bs-target="#add"
-  >
-    Tambah menu
-  </button>
-</div>
-<form class="mb-3" method="get">
-  <div class="input-group">
-    <input
-      class="form-control"
-      name="q"
-      value="{{ query }}"
-      placeholder="Cari nama atau kategori"
-    /><button class="btn btn-outline-secondary">Cari</button>
+{% extends 'users/base.html' %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <h1 class="h3 mb-0">Item Menu</h1>
+    <small class="text-secondary">{{ items|length }} menu</small>
   </div>
-</form>
+  <div class="d-flex flex-wrap gap-2">
+    <form class="d-flex gap-2" method="get">
+      <input class="form-control" style="min-width:240px" name="q" value="{{ query }}" placeholder="Cari nama atau kategori">
+      <button class="btn btn-outline-secondary"><i class="bi bi-search"></i></button>
+    </form>
+    <button class="btn btn-success" data-bs-toggle="collapse" data-bs-target="#add"><i class="bi bi-plus-lg me-1"></i>Tambah menu</button>
+  </div>
+</div>
+
 <div class="collapse{% if form.errors %} show{% endif %} mb-4" id="add">
-  <div class="card card-body">
+  <div class="card stat card-body">
     <form method="post" enctype="multipart/form-data" class="row g-3">
       {% csrf_token %}
       {% if form.non_field_errors %}
@@ -38,53 +33,64 @@
     </form>
   </div>
 </div>
-<div class="card border-0 shadow-sm">
+
+<div class="card stat">
   <div class="table-responsive">
     <table class="table align-middle mb-0">
       <thead>
         <tr>
-          <th>Image</th>
-          <th>Name</th>
-          <th>Category</th>
+          <th style="width:56px"></th>
+          <th>Nama</th>
+          <th>Kategori</th>
           <th>Tag</th>
-          <th>Price</th>
-          <th>Available</th>
-          <th>Active</th>
+          <th class="text-end">Harga</th>
+          <th>Status</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
         {% for item in items %}
-        <tr>
+        <tr{% if not item.is_active %} class="text-secondary"{% endif %}>
           <td>
-            {% if item.image %}<img
-              src="{{ item.image.url }}"
-              width="40"
-              height="40"
-              class="rounded object-fit-cover"
-            />{% else %}<span class="text-secondary">—</span>{% endif %}
+            {% if item.image %}
+            <img src="{{ item.image.url }}" width="40" height="40" class="rounded object-fit-cover" alt="">
+            {% else %}
+            <div class="rounded bg-light border d-flex align-items-center justify-content-center fw-semibold text-secondary" style="width:40px;height:40px">{{ item.name|slice:":1"|upper }}</div>
+            {% endif %}
           </td>
-          <td>{{ item.name }}</td>
-          <td>{{ item.category.name }}</td>
-          <td>{% for tag in item.tags.all %}<span class="badge text-bg-success me-1 mb-1">{{ tag }}</span>{% empty %}<span class="text-secondary">—</span>{% endfor %}</td>
-          <td>Rp{{ item.price }}</td>
-          <td>{% if item.is_available %}Ya{% else %}Tidak{% endif %}</td>
-          <td>{% if item.is_active %}Ya{% else %}Tidak{% endif %}</td>
+          <td class="fw-semibold">{{ item.name }}</td>
+          <td><span class="badge badge-tag-more">{{ item.category.name }}</span></td>
           <td>
-            <a
-              class="btn btn-sm btn-outline-secondary"
-              href="{% url 'staff:menu-item-edit' item.pk %}"
-              >Edit</a
-            >
+            {% with tags=item.tags.all %}
+            {% for tag in tags|slice:":3" %}<span class="badge badge-tag me-1">{{ tag }}</span>{% empty %}<span class="text-secondary">—</span>{% endfor %}
+            {% if tags|length > 3 %}<button type="button" class="badge tag-more-btn" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-placement="top" data-bs-title="Tag lainnya" data-bs-content="{% for tag in tags|slice:'3:' %}{{ tag }}{% if not forloop.last %}, {% endif %}{% endfor %}" aria-label="Lihat {{ tags|length|add:'-3' }} tag lainnya">+{{ tags|length|add:"-3" }}</button>{% endif %}
+            {% endwith %}
+          </td>
+          <td class="text-end">Rp {{ item.price|floatformat:"0g" }}</td>
+          <td>
+            {% if not item.is_active %}<span class="badge text-bg-secondary rounded-pill">Nonaktif</span>
+            {% elif item.is_available %}<span class="badge text-bg-success rounded-pill">Tersedia</span>
+            {% else %}<span class="badge text-bg-warning rounded-pill">Habis</span>{% endif %}
+          </td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'staff:menu-item-edit' item.pk %}"><i class="bi bi-pencil me-1"></i>Edit</a>
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="8" class="text-center py-4">Tidak ada menu.</td>
+          <td colspan="7" class="text-center text-secondary py-4">Tidak ada menu.</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll('[data-bs-toggle="popover"]').forEach(function (el) {
+    new bootstrap.Popover(el);
+  });
+</script>
 {% endblock %}
