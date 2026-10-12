@@ -1,10 +1,12 @@
 from io import BytesIO
 from base64 import b64encode
+from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Q
 from django.http import HttpResponse
@@ -16,6 +18,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 
 from menu.models import AddOn, Category, MenuItem, MenuTag, VariantGroup, VariantOption
 from orders.models import AuditLog, Order, Table
+from recommendation.services.tag_extractor import TagExtractor
 from .forms import AddOnForm, CategoryForm, MenuItemForm, MenuTagForm, TableForm, VariantGroupForm, VariantOptionForm
 
 
@@ -112,13 +115,20 @@ def categories(request):
 @require_http_methods(['GET', 'POST'])
 def category_edit(request, pk): return _save_form(request, CategoryForm, get_object_or_404(Category, pk=pk), 'users/form.html', 'Edit Kategori', 'staff:categories')
 
+def _mark_recognized(records):
+    known = set(TagExtractor.ALIASES)
+    rows = list(records)
+    for tag in rows:
+        tag.recognized = tag.name in known
+    return rows
+
 @cms_required
 @require_http_methods(['GET', 'POST'])
 def tags(request):
     records = MenuTag.objects.annotate(menu_count=Count('menu_items')).order_by('name')
     if request.method == 'POST':
-        return _save_form(request, MenuTagForm, None, 'users/tags.html', 'Tambah Tag Menu', 'staff:tags', tags=records)
-    return render(request, 'users/tags.html', {'form': MenuTagForm(), 'tags': records})
+        return _save_form(request, MenuTagForm, None, 'users/tags.html', 'Tambah Tag Menu', 'staff:tags', tags=_mark_recognized(records))
+    return render(request, 'users/tags.html', {'form': MenuTagForm(), 'tags': _mark_recognized(records)})
 
 @cms_required
 @require_http_methods(['GET', 'POST'])
@@ -177,7 +187,54 @@ def addons(request):
 @cms_required
 @require_http_methods(['GET', 'POST'])
 def addon_edit(request, pk): return _save_form(request, AddOnForm, get_object_or_404(AddOn, pk=pk), 'users/form.html', 'Edit Add-on', 'staff:addons')
+
 @cms_required
-def orders(request): return render(request, 'users/orders.html', {'orders': Order.objects.select_related('table').order_by('-created_at')[:100]})
+def orders(request):
+    qs = Order.objects.select_related('table').order_by('-created_at')
+
+    q = request.GET.get('q', '').strip()
+    status = request.GET.get('status', '')
+    order_type = request.GET.get('type', '')
+    period = request.GET.get('period', '')
+
+    status_choices = list(Order._meta.get_field('status').choices)
+    type_choices = list(Order._meta.get_field('order_type').choices)
+
+    if q:
+        qs = qs.filter(Q(public_id__icontains=q) | Q(customer_name__icontains=q) | Q(table__number__icontains=q))
+    if status in {value for value, _ in status_choices}:
+        qs = qs.filter(status=status)
+    else:
+        status = ''
+    if order_type in {value for value, _ in type_choices}:
+        qs = qs.filter(order_type=order_type)
+    else:
+        order_type = ''
+    if period == 'today':
+        qs = qs.filter(created_at__date=timezone.localdate())
+    elif period == '7':
+        qs = qs.filter(created_at__gte=timezone.now() - timedelta(days=7))
+    else:
+        period = ''
+
+    paginator = Paginator(qs, 25)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    params = request.GET.copy()
+    params.pop('page', None)
+
+    return render(request, 'users/orders.html', {
+        'orders': page_obj,
+        'page_obj': page_obj,
+        'total': paginator.count,
+        'q': q,
+        'status': status,
+        'order_type': order_type,
+        'period': period,
+        'status_choices': status_choices,
+        'type_choices': type_choices,
+        'querystring': params.urlencode(),
+        'filtered': bool(q or status or order_type or period),
+    })
+
 @cms_required
 def audit_log(request): return render(request, 'users/audit_log.html', {'logs': AuditLog.objects.select_related('order', 'actor').order_by('-created_at')[:150]})

@@ -1,8 +1,45 @@
-{% extends 'users/base.html' %}{% block content %}
-<h1 class="h3 mb-4">Orders</h1>
-<div class="card border-0 shadow-sm">
+{% extends 'users/base.html' %}
+{% block content %}
+<div class="mb-3">
+  <h1 class="h3 mb-0">Pesanan</h1>
+  <small class="text-secondary">{{ total }} pesanan{% if filtered %} (difilter){% endif %}</small>
+</div>
+
+<form method="get" class="card stat card-body mb-3">
+  <div class="row g-2 align-items-center">
+    <div class="col-lg-5">
+      <div class="input-group">
+        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+        <input class="form-control" name="q" value="{{ q }}" placeholder="Cari ID, pelanggan, atau meja">
+      </div>
+    </div>
+    <div class="col-6 col-lg-2">
+      <select class="form-select" name="type" onchange="this.form.submit()">
+        <option value="">Semua jenis</option>
+        {% for value, label in type_choices %}<option value="{{ value }}"{% if value == order_type %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-lg-2">
+      <select class="form-select" name="period" onchange="this.form.submit()">
+        <option value="">Semua waktu</option>
+        <option value="today"{% if period == 'today' %} selected{% endif %}>Hari ini</option>
+        <option value="7"{% if period == '7' %} selected{% endif %}>7 hari terakhir</option>
+      </select>
+    </div>
+    <div class="col-lg-3 d-flex gap-2">
+      <button class="btn btn-success flex-grow-1" type="submit">Cari</button>
+      {% if filtered %}<a class="btn btn-outline-secondary" href="{% url 'staff:orders' %}">Reset</a>{% endif %}
+    </div>
+  </div>
+  <div class="d-flex flex-wrap gap-2 mt-3">
+    <button type="submit" name="status" value="" class="btn btn-sm {% if not status %}btn-dark{% else %}btn-outline-secondary{% endif %}">Semua</button>
+    {% for value, label in status_choices %}<button type="submit" name="status" value="{{ value }}" class="btn btn-sm {% if value == status %}btn-dark{% else %}btn-outline-secondary{% endif %}">{{ label }}</button>{% endfor %}
+  </div>
+</form>
+
+<div class="card stat">
   <div class="table-responsive">
-    <table class="table mb-0">
+    <table class="table align-middle mb-0">
       <thead>
         <tr>
           <th>ID</th>
@@ -10,29 +47,37 @@
           <th>Pelanggan</th>
           <th>Jenis</th>
           <th>Status</th>
-          <th>Total</th>
+          <th class="text-end">Total</th>
         </tr>
       </thead>
       <tbody>
         {% for order in orders %}
         <tr>
-          <td>{{ order.public_id }}</td>
-          <td>{{ order.created_at|date:'d M Y H:i' }}</td>
+          <td class="fw-semibold"><code class="text-body">{{ order.public_id }}</code></td>
+          <td class="text-secondary">{{ order.created_at|date:'d M Y H:i' }}</td>
           <td>{{ order.customer_name }}</td>
+          <td>{{ order.get_order_type_display }}{% if order.table %} · {{ order.table }}{% endif %}</td>
           <td>
-            {{ order.get_order_type_display }}{% if order.table %} · {{
-            order.table }}{% endif %}
+            <span class="badge rounded-pill {% if order.status == 'paid' %}text-bg-success{% elif order.status == 'pending' %}text-bg-warning{% elif order.status == 'cancelled' or order.status == 'expired' %}text-bg-danger{% else %}text-bg-secondary{% endif %}">{{ order.get_status_display }}</span>
           </td>
-          <td>{{ order.get_status_display }}</td>
-          <td>Rp{{ order.total }}</td>
+          <td class="text-end">Rp {{ order.total|floatformat:"0g" }}</td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="6" class="text-center py-4">Belum ada pesanan.</td>
+          <td colspan="6" class="text-center text-secondary py-4">{% if filtered %}Tidak ada pesanan yang cocok dengan filter.{% else %}Belum ada pesanan.{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+    <small class="text-secondary">Halaman {{ page_obj.number }} dari {{ page_obj.paginator.num_pages }}</small>
+    <div class="d-flex gap-2">
+      {% if page_obj.has_previous %}<a class="btn btn-sm btn-outline-secondary" href="?{% if querystring %}{{ querystring }}&amp;{% endif %}page={{ page_obj.previous_page_number }}"><i class="bi bi-chevron-left"></i> Sebelumnya</a>{% endif %}
+      {% if page_obj.has_next %}<a class="btn btn-sm btn-outline-secondary" href="?{% if querystring %}{{ querystring }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Berikutnya <i class="bi bi-chevron-right"></i></a>{% endif %}
+    </div>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}
