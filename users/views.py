@@ -19,7 +19,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from menu.models import AddOn, Category, MenuItem, MenuTag, VariantGroup, VariantOption
 from orders.models import AuditLog, Order, Table
 from recommendation.services.tag_extractor import TagExtractor
-from .forms import AddOnForm, CategoryForm, MenuItemForm, MenuTagForm, TableForm, VariantGroupForm, VariantOptionForm
+from .forms import AddOnForm, CategoryForm, MenuItemForm, MenuTagForm, MenuTagEditForm, TableForm, VariantGroupForm, VariantOptionForm
 
 
 def _cms_user(user): return user.is_authenticated and user.is_staff
@@ -133,7 +133,17 @@ def tags(request):
 @cms_required
 @require_http_methods(['GET', 'POST'])
 def tag_edit(request, pk):
-    return _save_form(request, MenuTagForm, get_object_or_404(MenuTag, pk=pk), 'users/form.html', 'Edit Tag Menu', 'staff:tags')
+    with transaction.atomic():
+        tag = get_object_or_404(MenuTag.objects.select_for_update(), pk=pk)
+        form = MenuTagEditForm(request.POST if request.method == 'POST' else None, instance=tag)
+        if request.method == 'POST' and form.is_valid():
+            form.save()
+            tag.menu_items.set(form.cleaned_data['menus'])
+            messages.success(request, 'Tag dan pemakaiannya pada menu berhasil disimpan.')
+            return redirect('staff:tags')
+    return render(request, 'users/form.html', {
+        'form': form, 'title': 'Edit Tag Menu', 'cancel_url': reverse('staff:tags'),
+    })
 
 @cms_required
 @require_http_methods(['GET', 'POST'])
@@ -141,11 +151,12 @@ def tag_delete(request, pk):
     if request.method == 'POST':
         with transaction.atomic():
             tag = get_object_or_404(MenuTag.objects.select_for_update(), pk=pk)
-            if tag.menu_items.exists():
-                messages.error(request, 'Tag masih dipakai menu. Lepaskan tag dari semua menu sebelum menghapusnya.')
+            if tag.menu_items.exists() and request.POST.get('confirm_detach') != 'yes':
+                messages.error(request, 'Konfirmasikan pelepasan tag dari semua menu sebelum menghapusnya.')
             else:
+                tag.menu_items.clear()
                 tag.delete()
-                messages.success(request, 'Tag berhasil dihapus.')
+                messages.success(request, 'Tag berhasil dihapus. Semua menu tetap tersimpan.')
         return redirect('staff:tags')
     tag = get_object_or_404(MenuTag, pk=pk)
     return render(request, 'users/tag_confirm_delete.html', {
@@ -162,7 +173,7 @@ def menu_items(request):
     return render(request, 'users/menu_items.html', {'form': MenuItemForm(), 'items': records, 'query': query})
 @cms_required
 @require_http_methods(['GET', 'POST'])
-def menu_item_edit(request, pk): return _save_form(request, MenuItemForm, get_object_or_404(MenuItem, pk=pk), 'users/form.html', 'Edit Menu', 'staff:menu-items')
+def menu_item_edit(request, pk): return _save_form(request, MenuItemForm, get_object_or_404(MenuItem, pk=pk), 'users/menu_item_form.html', 'Edit Menu', 'staff:menu-items')
 
 @cms_required
 @require_http_methods(['GET', 'POST'])

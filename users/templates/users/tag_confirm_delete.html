@@ -3,22 +3,27 @@
 <div class="card border-0 shadow-sm">
   <div class="card-body">
     {% if items %}
-    <div class="alert alert-warning">Tag <strong>{{ tag }}</strong> masih dipakai menu. Lepaskan tag dari semua menu berikut sebelum menghapusnya.</div>
+    <div class="alert alert-warning">Tag <strong>{{ tag }}</strong> masih dipakai {{ items|length }} menu. Penghapusan akan melepas tag dari semua menu berikut. Menu dan tag lainnya tetap tersimpan.</div>
     <ul>
       {% for item in items %}
       <li><a href="{% url 'staff:menu-item-edit' item.pk %}">{{ item.name }}</a>{% if not item.is_active %} (nonaktif){% endif %}</li>
       {% endfor %}
     </ul>
-    <a class="btn btn-outline-secondary" href="{% url 'staff:tags' %}">Kembali ke Tag Menu</a>
     {% else %}
     <p>Hapus tag <strong>{{ tag }}</strong> ({{ tag.name }})? Tag ini belum dipakai menu.</p>
-    <p class="text-secondary">Penghapusan tidak dapat dibatalkan.</p>
+    {% endif %}
+    <p class="text-secondary">Penghapusan tag beserta aliasnya tidak dapat dibatalkan. Membuat tag dengan kode yang sama tidak mengembalikan pemakaian sebelumnya.</p>
     <form method="post">
       {% csrf_token %}
-      <button class="btn btn-danger" type="submit">Ya, hapus tag</button>
+      {% if items %}
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" id="confirm-detach" name="confirm_detach" value="yes" required>
+        <label class="form-check-label" for="confirm-detach">Saya setuju melepas tag ini dari semua menu di atas.</label>
+      </div>
+      {% endif %}
+      <button class="btn btn-danger" type="submit">{% if items %}Lepaskan dari semua menu dan hapus tag{% else %}Ya, hapus tag{% endif %}</button>
       <a class="btn btn-outline-secondary" href="{% url 'staff:tags' %}">Batal</a>
     </form>
-    {% endif %}
   </div>
 </div>
 {% endblock %}
