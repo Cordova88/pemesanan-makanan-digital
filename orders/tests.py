@@ -9,7 +9,13 @@ from .models import AuditLog, Order, Table
 from .models import Payment
 from .services import cancel, change_table, create_order, edit_item, pay
 
+# [OOP: Inheritance] OrderServiceTests mewarisi django.test.TestCase untuk mendapat
+# database uji terisolasi dan assertion bawaan.
+# [OOP: Abstraction] Tes memanggil fungsi service (create_order, pay, cancel,
+# change_table) tanpa perlu tahu detail transaksi dan audit di dalamnya.
 class OrderServiceTests(TestCase):
+    # [OOP: Polymorphism] setUp meng-override hook bawaan TestCase (method overriding);
+    # dipanggil otomatis sebelum setiap test untuk menyiapkan menu, meja, dan akun kasir.
     def setUp(self):
         category=Category.objects.create(name="Makanan")
         self.item=MenuItem.objects.create(category=category,name="Nasi Goreng",price=Decimal("15000"))
@@ -17,6 +23,8 @@ class OrderServiceTests(TestCase):
         self.other_table = Table.objects.create(number="07")
         self.cashier=User.objects.create_user("cashier",password="secret")
         self.cashier.groups.add(Group.objects.create(name="Cashier"))
+    # [OOP: Encapsulation] Helper checkout membungkus langkah membuat pesanan
+    # (data default + override lewat **values) agar bisa dipakai ulang oleh banyak test.
     def checkout(self, **values):
         data={"customer_name":"Ani","order_type":"TAKEAWAY","items":[{"menu_item_id":self.item.id,"quantity":2}]}; data.update(values); return create_order(data)
     def test_checkout_snapshots_server_price_and_audits(self):
