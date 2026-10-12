@@ -1,0 +1,15 @@
+<fieldset class="choice-picker" data-choice-picker>
+  <legend class="form-label fw-semibold fs-6 mb-2">{{ field.label }} <span class="badge badge-tag" data-choice-count aria-live="polite"></span></legend>
+  <label class="visually-hidden" for="{{ field.auto_id }}_search">Cari {{ field.label|lower }}</label>
+  <input class="form-control mb-3" type="search" id="{{ field.auto_id }}_search" placeholder="Ketik untuk mencari pilihan…" data-choice-search aria-controls="{{ field.auto_id }}_choices" autocomplete="off">
+  <div class="choice-picker__list" id="{{ field.auto_id }}_choices">
+    {% for choice in field %}
+    <label class="choice-picker__option" data-choice-option for="{{ choice.id_for_label }}">
+      {{ choice.tag }}<span>{{ choice.choice_label }}</span>
+    </label>
+    {% empty %}
+    <p class="text-secondary mb-0">Belum ada pilihan.</p>
+    {% endfor %}
+  </div>
+  <p class="text-secondary small mt-2 mb-0" data-choice-empty hidden>Tidak ada pilihan yang cocok dengan pencarian.</p>
+</fieldset>

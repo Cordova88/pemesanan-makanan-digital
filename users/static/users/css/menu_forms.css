@@ -1,0 +1,41 @@
+.menu-editor { max-width: 1100px; }
+.choice-picker { min-width: 0; }
+.choice-picker__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: .65rem;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: .25rem;
+}
+.choice-picker__option {
+  display: flex;
+  align-items: flex-start;
+  gap: .6rem;
+  padding: .75rem;
+  border: 1px solid #dde2da;
+  border-radius: 10px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.choice-picker__option:has(input:checked) {
+  background: #ecfdf5;
+  border-color: #047857;
+}
+.choice-picker__option:focus-within {
+  outline: 2px solid #047857;
+  outline-offset: 2px;
+}
+.choice-picker__option .form-check-input { flex-shrink: 0; }
+.choice-picker__option[hidden] { display: none; }
+.menu-editor__preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #f1f3ef;
+}
+.menu-editor__preview[hidden] { display: none; }
+.menu-editor .card-body { min-width: 0; }
+.menu-editor input[type="file"] { max-width: 100%; }

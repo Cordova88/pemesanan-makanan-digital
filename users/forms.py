@@ -15,7 +15,7 @@ class BootstrapModelForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
-            if isinstance(field.widget, forms.CheckboxInput):
+            if isinstance(field.widget, (forms.CheckboxInput, forms.CheckboxSelectMultiple)):
                 field.widget.attrs['class'] = 'form-check-input'
             elif isinstance(field.widget, forms.SelectMultiple):
                 field.widget.attrs['class'] = 'form-select'
@@ -38,7 +38,7 @@ class MenuTagForm(BootstrapModelForm):
         fields = ('name', 'display_name')
         labels = {'name': 'Kode tag', 'display_name': 'Nama tampilan'}
         help_texts = {
-            'name': 'Kode unik tanpa spasi, misalnya spicy atau chicken. Gunakan kode yang dikenali chatbot agar tag dipakai dalam rekomendasi.',
+            'name': 'Kode unik tanpa spasi, misalnya spicy atau chicken. Tag baru dapat dikenali dari kode atau nama tampilannya setelah dipasang pada menu aktif dalam kategori aktif.',
             'display_name': 'Nama yang ditampilkan, misalnya Pedas atau Ayam. Jika kosong, kode tag akan ditampilkan.',
         }
 
