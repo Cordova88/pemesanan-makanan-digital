@@ -72,7 +72,7 @@ class TagExtractor:
         "juicy": ("juicy", "berair"),
         "saucy": ("banyak saus", "bersaus", "sausnya banyak", "berkuah kental"),
         "dry": ("tidak berkuah", "tanpa kuah", "kering"),
-        "brothy": ("berkuah", "kuah", "sup", "soto"),
+        "brothy": ("berkuah", "kuah", "soto"),
         "boiled": ("rebus", "rebusan", "direbus", "boiled"),
         "chicken": ("ayam", "daging ayam", "olahan ayam"),
         "duck": ("bebek", "entok", "duck"),
