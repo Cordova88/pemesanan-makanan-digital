@@ -12,6 +12,10 @@ from menu.models import AddOn, MenuItem, VariantOption
 def new_public_id(): return secrets.token_hex(4).upper()
 def new_table_token(): return secrets.token_urlsafe(18)
 
+# [OOP: Inheritance] Table mewarisi models.Model.
+# [OOP: Encapsulation] token QR dibuat otomatis (default=new_table_token) dan editable=False,
+# jadi tidak bisa diubah sembarangan dari luar.
+# [OOP: Polymorphism] __str__ di-override: "Table <nomor>".
 class Table(models.Model):
     """A physical restaurant table. Its token is encoded in a permanent table QR."""
     number=models.CharField(max_length=30, unique=True)
@@ -22,9 +26,16 @@ class Table(models.Model):
     class Meta: indexes=[models.Index(fields=["is_active","number"])]
     def __str__(self): return f"Table {self.number}"
 
+# [OOP: Inheritance] Order mewarisi models.Model.
+# [OOP: Encapsulation] Data pesanan, aturan konsistensi (constraint di Meta), dan validasi
+# (clean) dibungkus dalam satu class.
+# [OOP: Association] ForeignKey ke Table dan ke User (kasir pemroses, pembatal, dan refund).
 class Order(models.Model):
+    # [OOP: Inheritance] Status mewarisi TextChoices (turunan enum): daftar status resmi
+    # PENDING/PAID/CANCELLED/EXPIRED/REFUNDED dikelompokkan sebagai konstanta, bukan string liar.
     class Status(models.TextChoices):
         PENDING="PENDING", "Pending"; PAID="PAID", "Paid"; CANCELLED="CANCELLED", "Cancelled"; EXPIRED="EXPIRED", "Expired"; REFUNDED="REFUNDED", "Refunded"
+    # [OOP: Inheritance] OrderType mewarisi TextChoices; jenis pesanan DINE_IN/TAKEAWAY dibatasi.
     class OrderType(models.TextChoices): DINE_IN="DINE_IN", "Dine in"; TAKEAWAY="TAKEAWAY", "Takeaway"
     public_id=models.CharField(max_length=12, unique=True, default=new_public_id, editable=False)
     status=models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING, db_index=True)
@@ -39,16 +50,25 @@ class Order(models.Model):
     class Meta:
         indexes=[models.Index(fields=["status","created_at"]),models.Index(fields=["status","expires_at"])]
         constraints=[models.CheckConstraint(condition=Q(total__gte=0),name="order_total_nonnegative"),models.CheckConstraint(condition=Q(order_type="DINE_IN",table__isnull=False)|Q(order_type="TAKEAWAY",table__isnull=True),name="order_table_matches_type")]
+    # [OOP: Polymorphism] clean() meng-override method bawaan Model (method overriding).
+    # [OOP: Encapsulation] Aturan bisnis "dine-in wajib meja, takeaway tanpa meja" ditaruh di model sendiri.
     def clean(self):
         from django.core.exceptions import ValidationError
         if self.order_type==self.OrderType.DINE_IN and not self.table_id: raise ValidationError({"table":"A valid table is required for dine-in."})
         if self.order_type==self.OrderType.TAKEAWAY and self.table_id: raise ValidationError({"table":"Takeaway orders cannot have a table."})
+    # [OOP: Polymorphism] save() di-override, lalu memanggil super().save() agar penyimpanan asli tetap jalan.
+    # [OOP: Abstraction] Pembuatan public_id unik dan expires_at otomatis disembunyikan di sini;
+    # pemanggil cukup memanggil save().
     def save(self,*args,**kwargs):
         if not self.expires_at: self.expires_at=timezone.now()+timedelta(hours=1)
         while not self.pk and Order.objects.filter(public_id=self.public_id).exists(): self.public_id=new_public_id()
         super().save(*args,**kwargs)
+        # [OOP: Polymorphism] __str__ di-override: objek Order tampil sebagai public_id.
     def __str__(self): return self.public_id
 
+# [OOP: Inheritance] OrderItem mewarisi models.Model.
+# [OOP: Association] Hubungan has-a: Order punya banyak OrderItem (ForeignKey, related_name="items").
+# [OOP: Encapsulation] Nama dan harga disimpan sebagai snapshot, sehingga perubahan menu tidak mengubah transaksi lama.
 class OrderItem(models.Model):
     order=models.ForeignKey(Order,on_delete=models.PROTECT,related_name="items"); menu_item=models.ForeignKey(MenuItem,null=True,blank=True,on_delete=models.PROTECT,related_name="order_items")
     item_name=models.CharField(max_length=150); base_price=models.DecimalField(max_digits=12,decimal_places=2,validators=[MinValueValidator(0)]); unit_price=models.DecimalField(max_digits=12,decimal_places=2,validators=[MinValueValidator(0)])
@@ -56,22 +76,35 @@ class OrderItem(models.Model):
     class Meta:
         indexes=[models.Index(fields=["order","menu_item"]),models.Index(fields=["menu_item"])]
         constraints=[models.CheckConstraint(condition=Q(quantity__gt=0),name="order_item_quantity_positive"),models.CheckConstraint(condition=Q(base_price__gte=0),name="order_item_base_price_nonnegative"),models.CheckConstraint(condition=Q(unit_price__gte=0),name="order_item_unit_price_nonnegative"),models.CheckConstraint(condition=Q(line_total__gte=0),name="order_item_line_total_nonnegative")]
+    # [OOP: Polymorphism] save() di-override: line_total dihitung otomatis (unit_price x quantity),
+    # lalu super().save() dipanggil.
+    # [OOP: Abstraction] Pemanggil tidak perlu menghitung subtotal sendiri.
     def save(self,*args,**kwargs): self.line_total=self.unit_price*self.quantity; super().save(*args,**kwargs)
 
+# [OOP: Inheritance] Mewarisi models.Model.
+# [OOP: Association] Hubungan has-a: satu OrderItem punya banyak pilihan varian (snapshot).
 class OrderItemVariant(models.Model):
     order_item=models.ForeignKey(OrderItem,on_delete=models.PROTECT,related_name="variants"); variant_option=models.ForeignKey(VariantOption,null=True,blank=True,on_delete=models.PROTECT)
     group_name=models.CharField(max_length=100); option_name=models.CharField(max_length=100); price_adjustment=models.DecimalField(max_digits=12,decimal_places=2,validators=[MinValueValidator(0)])
     class Meta: constraints=[models.UniqueConstraint(fields=["order_item","group_name"],name="one_variant_per_group_per_order_item")]
 
+# [OOP: Inheritance] Mewarisi models.Model.
+# [OOP: Association] Hubungan has-a: satu OrderItem punya banyak add-on (snapshot).
 class OrderItemAddOn(models.Model):
     order_item=models.ForeignKey(OrderItem,on_delete=models.PROTECT,related_name="addons"); addon=models.ForeignKey(AddOn,null=True,blank=True,on_delete=models.PROTECT)
     addon_name=models.CharField(max_length=100); unit_price=models.DecimalField(max_digits=12,decimal_places=2,validators=[MinValueValidator(0)]); quantity=models.PositiveIntegerField(default=1,validators=[MinValueValidator(1)])
     class Meta: constraints=[models.UniqueConstraint(fields=["order_item","addon_name"],name="one_addon_name_per_order_item")]
 
+# [OOP: Inheritance] Payment mewarisi models.Model.
+# [OOP: Association] OneToOneField ke Order: satu pesanan hanya punya satu pembayaran.
+# [OOP: Inheritance] Class bersarang Method mewarisi TextChoices (CASH/CARD/QRIS/OTHER).
 class Payment(models.Model):
     class Method(models.TextChoices): CASH="CASH","Cash"; CARD="CARD","Card"; QRIS="QRIS","QRIS"; OTHER="OTHER","Other"
     order=models.OneToOneField(Order,on_delete=models.PROTECT,related_name="payment"); method=models.CharField(max_length=12,choices=Method.choices,default=Method.CASH); amount=models.DecimalField(max_digits=12,decimal_places=2,validators=[MinValueValidator(0)]); amount_received=models.DecimalField(max_digits=12,decimal_places=2,null=True,blank=True,validators=[MinValueValidator(0)]); change_given=models.DecimalField(max_digits=12,decimal_places=2,null=True,blank=True,validators=[MinValueValidator(0)]); paid_at=models.DateTimeField(default=timezone.now); cashier=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="payments"); external_reference=models.CharField(max_length=128,blank=True)
 
+# [OOP: Inheritance] AuditLog mewarisi models.Model; class bersarang Action mewarisi TextChoices.
+# [OOP: Encapsulation] Setiap aksi pesanan dicatat lengkap (aktor, before/after, metadata) dalam satu objek.
+# [OOP: Association] ForeignKey ke Order dan ke User (aktor).
 class AuditLog(models.Model):
     class Action(models.TextChoices):
         CREATED="ORDER_CREATED","Order created"; MODIFIED="ORDER_MODIFIED","Order modified"; ITEM_ADDED="ITEM_ADDED","Item added"; ITEM_REMOVED="ITEM_REMOVED","Item removed"; QUANTITY_CHANGED="QUANTITY_CHANGED","Quantity changed"; CUSTOMER_CHANGED="CUSTOMER_INFO_CHANGED","Customer info changed"; CANCELLED="ORDER_CANCELLED","Order cancelled"; PAID="ORDER_PAID","Order paid"; EXPIRED="ORDER_EXPIRED","Order expired"; REFUNDED="ORDER_REFUNDED","Order refunded"

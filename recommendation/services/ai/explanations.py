@@ -21,12 +21,23 @@ UNSUPPORTED_CLAIMS = re.compile(
     re.IGNORECASE,
 )
 
-
+# [OOP: Abstraction] Class ini menyembunyikan seluruh proses membuat penjelasan rekomendasi
+# (menyusun prompt, memanggil Gemini, memvalidasi jawaban). Pemanggil cukup memanggil
+# explain() atau explain_with_intro().
+# [OOP: Encapsulation] Data dan aturan validasi (klaim terlarang, batas panjang, pengecekan
+# tag) dibungkus dalam satu class; method berawalan _ adalah bagian internal.
+# [OOP: Composition] Class ini memiliki GeminiClient dan TagExtractor (has-a) dan
+# mendelegasikan pekerjaan ke keduanya.
 class RecommendationExplanationService:
+    # [OOP: Polymorphism] gemini_client boleh objek apa pun yang punya method generate()
+    # (duck typing), mis. client palsu saat testing. Ini juga contoh Dependency Injection.
+    # [OOP: Encapsulation] State internal (gemini_client, tag_extractor) disimpan sebagai atribut instance.
     def __init__(self, gemini_client=None):
         self.gemini_client = gemini_client or GeminiClient()
         self.tag_extractor = TagExtractor()
 
+    # [OOP: Static method] fallback() tidak memakai self; ia milik class tetapi tidak butuh state objek.
+    # [OOP: Abstraction] Membuat teks penjelasan cadangan dari match_reasons bila Gemini gagal.
     @staticmethod
     def fallback(match):
         reasons = [
@@ -38,9 +49,13 @@ class RecommendationExplanationService:
             return "Menu ini termasuk pilihan yang sesuai dengan preferensimu."
         return "Dipilih karena cocok dengan: " + ", ".join(reasons) + "."
 
+    # [OOP: Abstraction] Antarmuka publik yang sederhana: hanya mengembalikan penjelasan per menu;
+    # detail pemanggilan AI disembunyikan di _generate().
     def explain(self, matches, preferences):
         return self._generate(matches, preferences)[1]
 
+    # [OOP: Abstraction] Sama seperti explain(), ditambah kalimat pembuka percakapan; konteks
+    # dibentuk di sini lalu diserahkan ke _generate().
     def explain_with_intro(
         self,
         matches,
@@ -58,6 +73,9 @@ class RecommendationExplanationService:
         }
         return self._generate(matches, preferences, context)
 
+    # [OOP: Encapsulation] Method internal (awalan _): menyusun prompt, memanggil Gemini, lalu
+    # menyaring hasilnya. Tidak untuk dipanggil dari luar class.
+    # [OOP: Abstraction] Kerumitan validasi jawaban AI tersembunyi di balik explain()/explain_with_intro().
     def _generate(self, matches, preferences, conversational_context=None):
         if not matches:
             return None, {}
@@ -235,6 +253,8 @@ Aturan untuk intro:
 
         return intro, accepted
 
+    # [OOP: Static method + Encapsulation] Validasi intro tidak butuh state objek, jadi dibuat
+    # static; awalan _ menandakan hanya dipakai di dalam class.
     @staticmethod
     def _validate_intro(value, allowed_tags):
         if (

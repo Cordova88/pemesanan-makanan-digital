@@ -1,9 +1,16 @@
 from django import forms
-
 from menu.models import AddOn, Category, MenuItem, MenuTag, VariantGroup, VariantOption
 from orders.models import Table
 
 
+# [OOP: Inheritance] BootstrapModelForm mewarisi forms.ModelForm, sehingga otomatis
+# punya pembuatan field dari model, validasi, dan method save() tanpa ditulis ulang.
+# [OOP: Polymorphism] __init__ di-override (method overriding) lalu memanggil
+# super().__init__() agar perilaku asli ModelForm tetap jalan, ditambah styling Bootstrap.
+# [OOP: Encapsulation] Logika pemberian class CSS dibungkus di satu class dasar,
+# sehingga semua form turunan konsisten tanpa mengulang kode.
+# [OOP: Abstraction] Form turunan cukup mendefinisikan Meta; cara tiap field
+# di-style disembunyikan di class dasar ini.
 class BootstrapModelForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -16,8 +23,15 @@ class BootstrapModelForm(forms.ModelForm):
                 field.widget.attrs['class'] = 'form-control'
 
 
+# [OOP: Inheritance] Multilevel inheritance: CategoryForm -> BootstrapModelForm -> ModelForm.
+# [OOP: Encapsulation] Nested class Meta mengikat form ke model Category dan
+# membatasi field yang boleh diisi (name, is_active).
 class CategoryForm(BootstrapModelForm):
     class Meta: model = Category; fields = ('name', 'is_active')
+
+
+# [OOP: Inheritance] MenuTagForm mewarisi BootstrapModelForm (styling otomatis).
+# [OOP: Encapsulation] Label dan help_texts dibungkus di Meta, terpisah dari logika form.
 class MenuTagForm(BootstrapModelForm):
     class Meta:
         model = MenuTag
@@ -27,6 +41,7 @@ class MenuTagForm(BootstrapModelForm):
             'name': 'Kode unik tanpa spasi, misalnya spicy atau chicken. Tag baru dapat dikenali dari kode atau nama tampilannya setelah dipasang pada menu aktif dalam kategori aktif.',
             'display_name': 'Nama yang ditampilkan, misalnya Pedas atau Ayam. Jika kosong, kode tag akan ditampilkan.',
         }
+
 class MenuTagEditForm(MenuTagForm):
     menus = forms.ModelMultipleChoiceField(
         queryset=MenuItem.objects.none(), required=False,
@@ -60,11 +75,27 @@ class MenuItemForm(BootstrapModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['tags'].queryset = MenuTag.objects.order_by('display_name', 'name', 'pk')
+
+# [OOP: Inheritance] VariantGroupForm mewarisi BootstrapModelForm.
+# [OOP: Encapsulation] Meta mengikat form ke model VariantGroup.
 class VariantGroupForm(BootstrapModelForm):
     class Meta: model = VariantGroup; fields = ('menu_item', 'name', 'is_required', 'is_active', 'display_order')
+
+
+# [OOP: Inheritance] VariantOptionForm mewarisi BootstrapModelForm.
+# [OOP: Encapsulation] Meta mengikat form ke model VariantOption.
 class VariantOptionForm(BootstrapModelForm):
     class Meta: model = VariantOption; fields = ('group', 'name', 'price_adjustment', 'is_active', 'display_order')
+
+
+# [OOP: Inheritance] AddOnForm mewarisi BootstrapModelForm.
+# [OOP: Encapsulation] Meta mengikat form ke model AddOn, termasuk relasi many-to-many menu_items.
 class AddOnForm(BootstrapModelForm):
     class Meta: model = AddOn; fields = ('name', 'price', 'menu_items', 'is_available', 'is_active')
+
+
+# [OOP: Inheritance] TableForm mewarisi BootstrapModelForm.
+# [OOP: Encapsulation] Meta mengikat form ke model Table (hanya number dan is_active
+# yang bisa diubah; token QR tidak ikut karena editable=False di model).
 class TableForm(BootstrapModelForm):
     class Meta: model = Table; fields = ('number', 'is_active')

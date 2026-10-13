@@ -4,6 +4,10 @@ from dataclasses import dataclass, field
 from .language import IndonesianPriceParser, normalize_text
 
 
+# [OOP: Encapsulation] Preferences membungkus seluruh preferensi pengguna (tag, harga, mood, tag
+# dikecualikan, dll.) dalam satu objek.
+# [OOP: Abstraction] @dataclass membuat __init__/__repr__/__eq__ otomatis; field(default_factory=set)
+# memberi nilai awal yang aman untuk tiap objek.
 @dataclass
 class Preferences:
     tags: set = field(default_factory=set)
@@ -15,10 +19,13 @@ class Preferences:
     prefer_affordable: bool = False
     moods: set = field(default_factory=set)
 
+    # [OOP: Encapsulation] @property: atribut turunan (tags | mood_tags) dihitung saat dibaca dan
+    # diakses seperti atribut biasa.
     @property
     def all_positive_tags(self):
         return self.tags | self.mood_tags
 
+    # [OOP: Abstraction] Mengubah objek menjadi dict sederhana untuk disimpan di session.
     def to_dict(self, state="COLLECTING_PREFERENCES", follow_up=None):
         return {
             "tags": sorted(self.tags),
@@ -33,6 +40,7 @@ class Preferences:
             "follow_up": follow_up,
         }
 
+    # [OOP: Class method / Factory] Constructor alternatif: membuat Preferences dari dict session.
     @classmethod
     def from_dict(cls, data):
         return cls(
@@ -47,9 +55,16 @@ class Preferences:
         )
 
 
+# [OOP: Abstraction] extract() menerima teks bebas dan menghasilkan objek Preferences; detail
+# alias, negasi, dan regex disembunyikan.
+# [OOP: Encapsulation] Kamus ALIASES, kata negasi, dan state _aliases dibungkus di dalam class.
+# [OOP: Composition] Memiliki IndonesianPriceParser (has-a) untuk membaca anggaran.
+# [OOP: Association] extract() mengembalikan objek Preferences.
 class TagExtractor:
     """Extract direct food preferences and explicit dislikes from Indonesian text."""
 
+    # [OOP: Class attribute] ALIASES, STRONG_NEGATION, SOFT_NEGATION, dan CATEGORY_RULES milik
+    # class dan dipakai bersama semua objek.
     ALIASES = {
         "spicy": (
             "pedas", "sambal", "sambalnya", "cabai", "cabe", "nampol", "nendang",
@@ -125,6 +140,9 @@ class TagExtractor:
         "Makanan": ("makanan", "masakan", "makan aja", "hidangan"),
     }
 
+    # [OOP: Composition] Membuat IndonesianPriceParser sebagai bagian dari objek ini (has-a).
+    # [OOP: Encapsulation] _aliases adalah state internal (konvensi _ = jangan diakses dari luar)
+    # yang disusun dari ALIASES saat objek dibuat.
     def __init__(self):
         self.price_parser = IndonesianPriceParser()
         self._aliases = {
@@ -132,6 +150,8 @@ class TagExtractor:
             for tag, aliases in self.ALIASES.items()
         }
 
+    # [OOP: Encapsulation] State internal _aliases diubah lewat method publik ini, bukan langsung
+    # dari luar class.
     def configure_catalog_tags(self, catalog_tags, catalog_aliases=()):
         """Add current database tags and CMS-managed aliases."""
         aliases_by_tag = {}
@@ -150,10 +170,12 @@ class TagExtractor:
                 sorted((alias for alias in aliases if alias), key=len, reverse=True)
             )
 
+    # [OOP: Static method + Encapsulation] Helper internal tanpa state untuk mencocokkan frasa utuh.
     @staticmethod
     def _contains(text, phrase):
         return re.search(r"(?<!\w)" + re.escape(phrase) + r"(?!\w)", text) is not None
 
+    # [OOP: Encapsulation] Method internal untuk mendeteksi negasi kuat/lunak ("jangan pedas").
     def _negation_for(self, text, alias):
         for cue in self.STRONG_NEGATION:
             pattern = rf"(?<!\w){re.escape(cue)}\s+(?:(?:yang|terlalu|banget)\s+){{0,2}}{re.escape(alias)}(?!\w)"
@@ -165,6 +187,7 @@ class TagExtractor:
                 return "soft"
         return None
 
+    # [OOP: Abstraction] Satu pintu publik: teks pengguna masuk, Preferences keluar.
     def extract(self, text):
         normalized = normalize_text(text)
         normalized = re.sub(r"\bada tidak\b", "ada", normalized)

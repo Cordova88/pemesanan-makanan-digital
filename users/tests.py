@@ -1,14 +1,18 @@
 from django.test import TestCase
 
-# Create your tests here.
 from django.contrib.auth.models import Group, User
 from django.test import TestCase
 from django.urls import reverse
 
 from orders.models import Order
 
-
+# [OOP: Inheritance] CashierAreaTests mewarisi django.test.TestCase, sehingga mendapat
+# test client, database uji yang diisolasi, dan berbagai assertion siap pakai.
+# [OOP: Encapsulation] Data uji bersama (cashier, admin, other, order) dibungkus sebagai
+# atribut class, dan tiap skenario dibungkus sebagai method test terpisah.
 class CashierAreaTests(TestCase):
+    # [OOP: Polymorphism] setUpTestData meng-override hook bawaan TestCase (method
+    # overriding); framework memanggilnya otomatis sekali sebelum test class ini jalan.
     @classmethod
     def setUpTestData(cls):
         group, _ = Group.objects.get_or_create(name="Cashier")
