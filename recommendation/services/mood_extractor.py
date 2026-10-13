@@ -1,8 +1,11 @@
 from .language import normalize_text
 import re
 
-
+# [OOP: Encapsulation] Daftar frasa tiap suasana hati (PHRASES) dan cara mencocokkannya
+# dibungkus dalam satu class.
+# [OOP: Abstraction] Pemanggil cukup memanggil extract(); detail normalisasi dan pencocokan tersembunyi.
 class MoodExtractor:
+    # [OOP: Class attribute] Kamus frasa milik class, dipakai bersama semua objek MoodExtractor.
     PHRASES = {
         "tired": (
             "capek", "cape", "lelah", "kecapekan", "habis kerja",
@@ -33,6 +36,7 @@ class MoodExtractor:
         ),
     }
 
+    # [OOP: Abstraction] Mengembalikan himpunan mood (mis. tired, quick) dari teks pengguna.
     def extract(self, text):
         normalized = normalize_text(text)
         moods = set()
@@ -41,6 +45,7 @@ class MoodExtractor:
                 moods.add(mood)
         return moods
 
+    # [OOP: Static method + Encapsulation] Helper internal tanpa state untuk mencocokkan frasa utuh.
     @staticmethod
     def _contains(text, phrase):
         return re.search(r"(?<!\w)" + re.escape(phrase) + r"(?!\w)", text) is not None

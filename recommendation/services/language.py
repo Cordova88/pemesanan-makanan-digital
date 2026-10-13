@@ -92,10 +92,15 @@ def normalize_text(text):
         normalized = re.sub(pattern, replacement, normalized)
     return re.sub(r"\s+", " ", normalized)
 
-
+# [OOP: Encapsulation] Logika membaca nominal rupiah (pola regex, kata kunci anggaran)
+# dibungkus dalam satu class agar tidak tersebar.
+# [OOP: Abstraction] Pemanggil cukup memakai parse_maximum() dan prefers_affordable();
+# detail regex disembunyikan.
 class IndonesianPriceParser:
     """Parse explicit Indonesian rupiah expressions into a maximum price."""
 
+    # [OOP: Class attribute] AMOUNT_PATTERN dan BUDGET_CUES milik class (dipakai bersama oleh
+    # semua objek), bukan milik satu instance.
     AMOUNT_PATTERN = re.compile(
         r"(?:rp\.?\s*)?"
         r"(?P<amount>\d{1,3}(?:[.,]\d{3})+|\d{1,6})"
@@ -123,6 +128,7 @@ class IndonesianPriceParser:
         "mahal",
     )
 
+    # [OOP: Abstraction] Mengubah teks seperti "20 ribu" atau "15k" menjadi angka batas harga.
     def parse_maximum(self, text):
         normalized = normalize_text(text)
         for match in self.AMOUNT_PATTERN.finditer(normalized):
@@ -138,6 +144,7 @@ class IndonesianPriceParser:
                 return amount
         return None
 
+    # [OOP: Static method] Tidak memakai self/state; fungsi pendukung yang dikelompokkan di dalam class.
     @staticmethod
     def prefers_affordable(text):
         normalized = normalize_text(text)

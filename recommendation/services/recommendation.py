@@ -5,7 +5,11 @@ from menu.models import MenuItem
 
 from .language import TAG_LABELS, tag_label
 
-
+# [OOP: Encapsulation] RecommendationMatch adalah value object yang membungkus hasil satu
+# rekomendasi (item, skor, alasan, label). frozen=True membuatnya immutable (tidak bisa diubah
+# setelah dibuat).
+# [OOP: Abstraction] @dataclass membuat __init__, __repr__, dan __eq__ secara otomatis.
+# [OOP: Association] Memegang referensi ke model MenuItem (item: MenuItem).
 @dataclass(frozen=True)
 class RecommendationMatch:
     item: MenuItem
@@ -13,7 +17,8 @@ class RecommendationMatch:
     match_reasons: tuple[str, ...]
     labels: tuple[str, ...]
 
-
+# [OOP: Encapsulation] SearchConstraints membungkus batasan pencarian (tag wajib/dilarang,
+# kategori, harga, mood) sebagai objek yang tidak bisa diubah (frozen).
 @dataclass(frozen=True)
 class SearchConstraints:
     required_tags: frozenset[str] = field(default_factory=frozenset)
@@ -22,6 +27,7 @@ class SearchConstraints:
     max_price: int | None = None
     moods: frozenset[str] = field(default_factory=frozenset)
 
+    # [OOP: Abstraction] Mengubah objek menjadi dict sederhana (mis. untuk disimpan di session).
     def to_dict(self):
         return {
             "required_tags": sorted(self.required_tags),
@@ -31,6 +37,7 @@ class SearchConstraints:
             "moods": sorted(self.moods),
         }
 
+    # [OOP: Class method / Factory] Constructor alternatif: membuat SearchConstraints dari dict.
     @classmethod
     def from_dict(cls, data):
         return cls(
@@ -42,7 +49,13 @@ class SearchConstraints:
         )
 
 
+# [OOP: Abstraction] Menyediakan antarmuka sederhana (rank, recommend, find_catalog_matches,
+# get_available_match) untuk mencari menu; query database dan perhitungan skor disembunyikan.
+# [OOP: Encapsulation] Bobot skor (DIRECT_TAG_WEIGHT, dst.) dan himpunan PROTEIN_TAGS
+# dibungkus sebagai konstanta class.
+# [OOP: Association] Memakai model MenuItem dan mengembalikan objek RecommendationMatch.
 class RecommendationService:
+    # [OOP: Class attribute] Konstanta konfigurasi ranking milik class, bukan milik tiap objek.
     DIRECT_TAG_WEIGHT = 4
     MOOD_TAG_WEIGHT = 2
     CATEGORY_WEIGHT = 3
@@ -60,6 +73,8 @@ class RecommendationService:
         "tempeh",
     }
 
+    # [OOP: Abstraction] Satu method yang menyaring dan menghitung skor menu (tag, mood, harga,
+    # kategori, pantangan); pemanggil hanya menerima daftar hasil terurut.
     def rank(
         self,
         preferences,
@@ -156,6 +171,8 @@ class RecommendationService:
         )
         return ranked[: max(0, limit)]
 
+    # [OOP: Abstraction] Pembungkus (wrapper) tipis di atas rank() yang hanya mengembalikan
+    # MenuItem, untuk pemanggil yang tidak butuh metadata alasan.
     def recommend(self, preferences, limit=3, exclude_ids=None):
         """Return MenuItems for callers that do not need explanation metadata."""
         return [
@@ -163,6 +180,8 @@ class RecommendationService:
             for match in self.rank(preferences, limit=limit, exclude_ids=exclude_ids)
         ]
 
+    # [OOP: Abstraction] Mencari menu yang cocok dengan tag tertentu, tanpa pemanggil perlu tahu
+    # query ORM-nya.
     def find_catalog_matches(
         self,
         tags,
@@ -220,6 +239,7 @@ class RecommendationService:
             key=lambda match: (match.item.price, match.item.name.casefold()),
         )
 
+    # [OOP: Abstraction] Mengambil satu menu yang masih tersedia sebagai RecommendationMatch.
     def get_available_match(self, item_id):
         item = (
             MenuItem.objects.filter(
