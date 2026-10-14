@@ -31,7 +31,13 @@ from .services.ai.explanations import RecommendationExplanationService
 from .services.gemini import GeminiClient
 
 
+# [OOP: Inheritance] Mewarisi SimpleTestCase (versi ringan TestCase tanpa akses database).
+# [OOP: Encapsulation] Objek yang diuji (extractor, parser harga) dibungkus sebagai atribut instance;
+# tiap skenario dibungkus sebagai method test terpisah.
 class LanguageRuleTests(SimpleTestCase):
+    # [OOP: Polymorphism] setUp meng-override hook bawaan TestCase (method overriding); dipanggil
+    # otomatis sebelum setiap test.
+    # [OOP: Composition] Class tes memiliki TagExtractor, MoodExtractor, dan IndonesianPriceParser (has-a).
     def setUp(self):
         self.extractor = TagExtractor()
         self.moods = MoodExtractor()
@@ -149,7 +155,10 @@ class LanguageRuleTests(SimpleTestCase):
                 self.assertIn("sweet", preferences.tags)
 
 
+# [OOP: Inheritance] Mewarisi SimpleTestCase.
+# [OOP: Encapsulation] Menguji ConversationInterpreter lewat antarmuka publiknya, interpret().
 class ConversationInterpreterTests(SimpleTestCase):
+    # [OOP: Polymorphism] Meng-override setUp bawaan TestCase untuk membuat objek ConversationInterpreter.
     def setUp(self):
         self.interpreter = ConversationInterpreter()
 
@@ -260,7 +269,10 @@ class ConversationInterpreterTests(SimpleTestCase):
         self.assertIn("refreshing", result.tags)
 
 
+# [OOP: Inheritance] Mewarisi SimpleTestCase.
+# [OOP: Encapsulation] Menguji GeminiInterpreter dan GeminiClient dengan validasi keluaran penyedia.
 class GeminiInterpreterTests(SimpleTestCase):
+    # [OOP: Polymorphism] Meng-override setUp bawaan TestCase untuk menyiapkan objek yang diuji.
     def setUp(self):
         self.client = type(
             "FakeGeminiClient",
@@ -384,6 +396,8 @@ class GeminiInterpreterTests(SimpleTestCase):
                 )
 
 
+# [OOP: Inheritance] Mewarisi TestCase (database uji terisolasi).
+# [OOP: Abstraction] Menguji RecommendationExplanationService lewat explain() dan explain_with_intro().
 class RecommendationExplanationServiceTests(TestCase):
     def test_intro_and_explanations_share_one_grounded_gemini_call(self):
         food = Category.objects.create(name="Makanan")
@@ -582,7 +596,11 @@ class RecommendationExplanationServiceTests(TestCase):
         self.assertIn("Pedas", service.fallback(matches[0]))
 
 
+# [OOP: Inheritance] Mewarisi TestCase.
+# [OOP: Association] Data uji (Category, MenuTag, MenuItem) saling berelasi di database uji.
 class RecommendationTests(TestCase):
+    # [OOP: Polymorphism] Meng-override setUp bawaan TestCase untuk membuat kategori, tag, dan menu uji.
+    # [OOP: Composition] Memiliki RecommendationService sebagai objek yang diuji.
     def setUp(self):
         self.food = Category.objects.create(name="Makanan")
         self.drinks = Category.objects.create(name="Minuman")
@@ -751,6 +769,8 @@ class RecommendationTests(TestCase):
         )
 
 
+# [OOP: Inheritance] Mewarisi TestCase.
+# [OOP: Abstraction] Menjalankan seluruh proses seed lewat satu perintah, call_command("seed_demo").
 class DemoSeedTests(TestCase):
     def test_seed_demo_assigns_distinct_believable_tag_combinations(self):
         call_command("seed_demo", stdout=StringIO())
@@ -793,7 +813,10 @@ class DemoSeedTests(TestCase):
         self.assertTrue(MenuItem.objects.filter(name="Jus Mangga").exists())
 
 
+# [OOP: Inheritance] Mewarisi TestCase dan memakai self.client untuk menguji alur dari HTTP sampai database.
+# [OOP: Encapsulation] Helper post_chat membungkus detail pengiriman JSON ke endpoint chat.
 class ChatbotIntegrationTests(TestCase):
+    # [OOP: Polymorphism] Meng-override setUp bawaan TestCase untuk menyiapkan menu, tag, varian, dan add-on.
     def setUp(self):
         self.gemini_patch = patch(
             "recommendation.services.gemini.GeminiClient.generate",
@@ -833,6 +856,8 @@ class ChatbotIntegrationTests(TestCase):
         self.addon = AddOn.objects.create(name="Extra Sambal", price=Decimal("3000"))
         self.addon.menu_items.add(self.best)
 
+    # [OOP: Encapsulation] Helper yang dipakai ulang oleh banyak test agar tidak mengulang
+    # kode pemanggilan endpoint.
     def post_chat(self, message, action=None):
         import json
 

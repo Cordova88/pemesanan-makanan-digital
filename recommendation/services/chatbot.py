@@ -12,7 +12,16 @@ from .ai.explanations import RecommendationExplanationService
 from .gemini import GeminiClient
 
 
+# [OOP: Abstraction] ChatbotService berperan sebagai fasad: view cukup memanggil reply();
+# seluruh alur (normalisasi, ekstraksi tag/mood, ranking, penjelasan AI) disembunyikan di baliknya.
+# [OOP: Composition] Memiliki (has-a) TagExtractor, MoodExtractor, MoodResolver,
+# RecommendationService, ConversationInterpreter, GeminiClient, GeminiInterpreter, dan
+# RecommendationExplanationService; semuanya dibuat di __init__ dan tugasnya didelegasikan.
+# [OOP: Encapsulation] State percakapan disimpan di session lewat konstanta kunci
+# (SESSION_KEY, SHOWN_KEY, dst.); method berawalan _ adalah bagian internal class.
 class ChatbotService:
+    # [OOP: Class attribute] Kunci session dan daftar frasa (RESET_PHRASES, MORE_PHRASES,
+    # GEMINI_FOOD_CUES, dst.) milik class dan dipakai bersama semua objek, bukan state per instance.
     SESSION_KEY = "recommendation_state"
     SHOWN_KEY = "recommendation_shown"
     SEARCH_KEY = "recommendation_search"
@@ -64,6 +73,10 @@ class ChatbotService:
     )
     GEMINI_CALLS_KEY = "gemini_calls"
 
+    # [OOP: Composition] Semua komponen dibuat di sini sebagai atribut instance (has-a).
+    # [OOP: Dependency Injection] Satu GeminiClient dibagikan ke GeminiInterpreter dan
+    # RecommendationExplanationService lewat parameter konstruktor.
+    # [OOP: Association] session disuntikkan dari luar (request.session); class tidak membuatnya sendiri.
     def __init__(self, session):
         self.session = session
         self.tag_extractor = TagExtractor()
@@ -88,6 +101,7 @@ class ChatbotService:
         )
         self.explanation_service = RecommendationExplanationService(self.gemini_client)
 
+    # [OOP: Abstraction] Menghapus state percakapan di session dengan satu panggilan.
     def reset(self):
         self.session.pop(self.SESSION_KEY, None)
         self.session.pop(self.SHOWN_KEY, None)
@@ -101,6 +115,7 @@ class ChatbotService:
         self.session.pop(self.LAST_RESULT_EMPTY_KEY, None)
         self.session.modified = True
 
+    # [OOP: Encapsulation] Mengelola jatah pemanggilan Gemini (lewat GEMINI_CALLS_KEY) di dalam class.
     def _consume_gemini_call(self):
         maximum = max(0, int(settings.GEMINI_MAX_CALLS_PER_SESSION))
         calls = int(self.session.get(self.GEMINI_CALLS_KEY, 0))
@@ -110,6 +125,8 @@ class ChatbotService:
         self.session.modified = True
         return True
 
+    # [OOP: Class method] Hanya memakai atribut class (GEMINI_FOOD_CUES, GEMINI_UNCERTAIN_CUES),
+    # tanpa state instance; menentukan apakah pesan layak diteruskan ke Gemini.
     @classmethod
     def _eligible_for_gemini(cls, message, interpretation):
         if len(message) > 500:
@@ -128,9 +145,11 @@ class ChatbotService:
             return False
         return any(cue in normalized for cue in cls.GEMINI_FOOD_CUES)
 
+    # [OOP: Encapsulation] Jalur tunggal membaca Preferences dari session; detail penyimpanan tersembunyi.
     def _preferences(self):
         return Preferences.from_dict(self.session.get(self.SESSION_KEY, {}))
 
+    # [OOP: Encapsulation] Jalur tunggal membaca SearchConstraints dari session.
     def _search_constraints(self):
         stored = self.session.get(self.SEARCH_KEY)
         if isinstance(stored, dict):
@@ -145,6 +164,7 @@ class ChatbotService:
             moods=frozenset(preferences.moods),
         )
 
+    # [OOP: Abstraction] Menerjemahkan hasil interpretasi pesan menjadi SearchConstraints.
     def _constraints_for_interpretation(self, interpretation, old_follow_up=None):
         previous = self._search_constraints()
         has_previous = bool(
@@ -212,6 +232,7 @@ class ChatbotService:
             moods=frozenset(moods),
         )
 
+    # [OOP: Encapsulation] Jalur tunggal menyimpan preferensi, state dialog, dan follow-up ke session.
     def _save(self, preferences, state, follow_up=None):
         payload = preferences.to_dict(state=state, follow_up=follow_up)
         payload["max_price"] = None
@@ -222,6 +243,7 @@ class ChatbotService:
         self.session[self.SESSION_KEY] = payload
         self.session.modified = True
 
+    # [OOP: Static method] Tidak memakai self; hanya memeriksa objek Preferences yang diberikan.
     @staticmethod
     def _has_preferences(preferences):
         return bool(
@@ -234,6 +256,7 @@ class ChatbotService:
             or preferences.prefer_affordable
         )
 
+    # [OOP: Encapsulation] Memeriksa state pencarian aktif di session tanpa membuka detailnya ke luar.
     def _has_active_search(self):
         constraints = self._search_constraints()
         return bool(
@@ -244,6 +267,7 @@ class ChatbotService:
             or constraints.moods
         )
 
+    # [OOP: Static method] Pembuat satu tombol balasan cepat; tidak butuh state objek.
     @staticmethod
     def _quick_reply(label, value, action=None):
         reply = {"label": label, "value": value}
@@ -251,6 +275,7 @@ class ChatbotService:
             reply["action"] = action
         return reply
 
+    # [OOP: Abstraction] Menyusun pertanyaan lanjutan untuk pengguna.
     def _question(self, confused=False):
         if confused:
             message = "Tenang, nggak perlu mikir 😄 Aku bantu pilih. Kamu lagi lebih ke..."
@@ -281,6 +306,7 @@ class ChatbotService:
             "quick_replies": replies,
         }
 
+    # [OOP: Abstraction] Menyusun daftar balasan cepat untuk pertanyaan katalog.
     def _catalog_quick_replies(self, replies):
         existing_values = {reply["value"] for reply in replies}
         catalog_tags = (
@@ -300,6 +326,7 @@ class ChatbotService:
             replies.append(self._quick_reply(label, value))
         return replies
 
+    # [OOP: Static method + Abstraction] Mengubah Preferences menjadi bentuk yang aman untuk respons API.
     @staticmethod
     def _response_preferences(preferences, state, follow_up=None):
         response = preferences.to_dict(state=state, follow_up=follow_up)
@@ -307,6 +334,7 @@ class ChatbotService:
         response["category"] = None
         return response
 
+    # [OOP: Abstraction] Menyiapkan preferensi yang dikirim ke layanan penjelasan.
     def _explanation_preferences(self, preferences, constraints):
         return Preferences(
             tags=set(constraints.required_tags),
@@ -318,6 +346,7 @@ class ChatbotService:
             moods=set(constraints.moods),
         )
 
+    # [OOP: Abstraction] Menyusun respons pertanyaan jenis makanan.
     def _ask_meal_type(self, preferences):
         self.session["last_question"] = "meal_type"
         self._save(preferences, "ASKING_FOLLOWUP", follow_up="meal_type")
@@ -336,6 +365,7 @@ class ChatbotService:
             ],
         }
 
+    # [OOP: Abstraction] Menyusun respons pertanyaan dasar makanan (nasi atau mie).
     def _ask_base(self, preferences):
         self.session["last_question"] = "base"
         self._save(preferences, "ASKING_FOLLOWUP", follow_up="base")
@@ -355,6 +385,7 @@ class ChatbotService:
             ],
         }
 
+    # [OOP: Static method] Membentuk teks balasan chatbot dari data yang diberikan, tanpa state objek.
     @staticmethod
     def _response_message(
         preferences,
@@ -423,6 +454,7 @@ class ChatbotService:
         variant_index = sum(ord(character) for character in text) % len(variants)
         return f"{context}\n{summary}{variants[variant_index]}"
 
+    # [OOP: Static method] Balasan standar bila pesan tidak dipahami.
     @staticmethod
     def _unknown_response(source_text):
         variants = (
@@ -436,6 +468,8 @@ class ChatbotService:
             f"{variants[index]}\nCoba kasih tahu misalnya kamu mau yang pedas, ayam, nasi, atau yang murah."
         )
 
+    # [OOP: Abstraction] Menjalankan ranking lewat RecommendationService, lalu membentuk respons.
+    # [OOP: Composition] Mendelegasikan pekerjaan ke komponen yang dimiliki (recommender, explanation_service).
     def _recommend(
         self,
         preferences,
@@ -528,6 +562,7 @@ class ChatbotService:
             ],
         }
 
+    # [OOP: Abstraction] Menjawab pertanyaan katalog tanpa mengubah preferensi yang tersimpan.
     def _answer_catalog_question(self, preferences, interpretation, source_text):
         tags = interpretation.catalog_tags
         constraints = SearchConstraints(
@@ -613,11 +648,13 @@ class ChatbotService:
             ],
         }
 
+    # [OOP: Static method] Memilih salah satu varian kalimat secara deterministik dari teks; tanpa state objek.
     @staticmethod
     def _deterministic_variant(text, variants):
         index = sum(ord(character) for character in normalize_text(text)) % len(variants)
         return variants[index]
 
+    # [OOP: Abstraction] Menerapkan hasil interpretasi (tambah, hapus, ganti) ke Preferences.
     def _apply_interpretation(self, preferences, interpretation):
         current = Preferences.from_dict(self.session.get(self.SESSION_KEY, {})) if self.session.get(self.SESSION_KEY) else preferences
         if interpretation.intent == ConversationIntent.RESET:
@@ -674,6 +711,7 @@ class ChatbotService:
             current.prefer_affordable = False
         return current
 
+    # [OOP: Abstraction] Menerjemahkan rujukan seperti "yang pertama" menjadi menu dari rekomendasi sebelumnya.
     def _select_previous_recommendation(self, interpretation, session_state):
         previous = session_state.get("last_recommendations", [])
         index = {
@@ -686,6 +724,9 @@ class ChatbotService:
         match = self.recommender.get_available_match(previous[index])
         return match
 
+    # [OOP: Abstraction] Satu-satunya pintu masuk publik class ini (pola Facade): pesan masuk,
+    # balasan lengkap keluar.
+    # [OOP: Encapsulation] Seluruh method lain berawalan _ sehingga menjadi detail internal.
     def reply(self, message, more=False, action=None):
         normalized = normalize_text(message)
         action = action or ""
