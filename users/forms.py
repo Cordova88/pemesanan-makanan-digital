@@ -42,6 +42,11 @@ class MenuTagForm(BootstrapModelForm):
             'display_name': 'Nama yang ditampilkan, misalnya Pedas atau Ayam. Jika kosong, kode tag akan ditampilkan.',
         }
 
+# [OOP: Inheritance] MenuTagEditForm mewarisi MenuTagForm, yang mewarisi BootstrapModelForm,
+# lalu ModelForm (multilevel inheritance). Field name/display_name dan styling Bootstrap
+# didapat otomatis tanpa ditulis ulang.
+# [OOP: Encapsulation] Field tambahan `menus` (pilihan menu yang tetap memakai tag) dibungkus
+# di dalam form ini sebagai atribut class, terpisah dari form pembuatan tag biasa.
 class MenuTagEditForm(MenuTagForm):
     menus = forms.ModelMultipleChoiceField(
         queryset=MenuItem.objects.none(), required=False,
@@ -50,12 +55,19 @@ class MenuTagEditForm(MenuTagForm):
         help_text='Hilangkan centang untuk melepas tag dari menu tersebut. Menu tidak dihapus.',
     )
 
+    # [OOP: Polymorphism] __init__ di-override (method overriding), lalu memanggil
+    # super().__init__() agar perilaku form induk tetap jalan.
+    # [OOP: Encapsulation] Daftar menu dan nilai awal centang dihitung dari self.instance di
+    # dalam form, jadi pemanggil (view) tidak perlu menyiapkannya.
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['menus'].queryset = self.instance.menu_items.order_by('name', 'pk')
         self.initial['menus'] = list(self.instance.menu_items.values_list('pk', flat=True))
 
 
+# [OOP: Inheritance] MenuItemForm mewarisi BootstrapModelForm (styling Bootstrap otomatis).
+# [OOP: Encapsulation] Field, widget (Textarea, CheckboxSelectMultiple, ClearableFileInput),
+# label, dan help_texts untuk MenuItem dikonfigurasi di dalam Meta, bukan tersebar di view.
 class MenuItemForm(BootstrapModelForm):
     class Meta:
         model = MenuItem; fields = ('category', 'name', 'description', 'price', 'image', 'tags', 'is_available', 'is_active', 'stock_estimate')
@@ -72,6 +84,10 @@ class MenuItemForm(BootstrapModelForm):
         }
         help_texts = {'tags': 'Centang semua tag yang sesuai. Kelola pilihan tag di halaman Tag Menu.'}
 
+    # [OOP: Polymorphism] __init__ di-override (method overriding), lalu memanggil super().__init__()
+    # agar inisialisasi BootstrapModelForm (styling) tetap berjalan.
+    # [OOP: Encapsulation] Urutan pilihan tag (display_name, name, pk) diatur di dalam form,
+    # bukan oleh pemanggil.
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['tags'].queryset = MenuTag.objects.order_by('display_name', 'name', 'pk')
