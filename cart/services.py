@@ -81,7 +81,7 @@ class CartService:
             options = list(VariantOption.objects.select_related("group").filter(pk__in=line["variant_ids"]))
             addons = list(AddOn.objects.filter(pk__in=line["addon_ids"]))
             valid = (item.is_active and item.is_available and item.category.is_active and len(options) == len(line["variant_ids"]) and len(addons) == len(line["addon_ids"]))
-            unit_price = item.price + sum((option.price_adjustment for option in options), Decimal("0")) + sum((addon.price for addon in addons), Decimal("0"))
+            unit_price = item.calculate_price(options, addons)
             rendered.append({**line, "name": item.name, "valid": valid, "unit_price": format(unit_price, ".2f"), "line_total": format(unit_price * line["quantity"], ".2f"), "variants": [{"id": option.id, "name": option.name} for option in options], "addons": [{"id": addon.id, "name": addon.name} for addon in addons]})
         return rendered
 
