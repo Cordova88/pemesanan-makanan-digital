@@ -420,7 +420,7 @@ POST /api/recommendation/chat/
       ├─ Django memvalidasi argumen dan menjalankan tool
       ├─ hasil katalog tepercaya dikirim kembali ke Gemini
       └─ Gemini menghasilkan respons final
-  → view menerjemahkan tag ke label Indonesia + serialize pilihan item
+  → view men-serialize item yang sama dari hasil tool menjadi kartu
   → chatbot.html menampilkan respons dan kartu
   → pilih item → POST /api/recommendation/add/
   → CartService (cart sesi biasa)
@@ -437,7 +437,7 @@ POST /api/recommendation/chat/
 | `services/recommendation.py` | Filter item, hitung skor, alasan cocok, ranking deterministik. |
 | `services/chatbot.py` | Facade HTTP, state sesi, konteks percakapan terbatas, budget request, dan serialisasi hasil tool menjadi kartu menu. |
 | `services/gemini.py` | Client Gemini bersama, native function calling, continuation loop, timeout, error logging, dan callback budget. |
-| `services/ai/assistant.py` | Orkestrator Gemini-first dan batas tool Django; memvalidasi `search_menu` serta `get_menu_details`. |
+| `services/ai/assistant.py` | Orkestrator Gemini-first dan batas tool Django; memvalidasi `search_menu` serta `get_menu_details`, termasuk status `matches`/`no_matches`. |
 | `services/ai/GeminiInterpreter.py` | Interpretasi AI berbentuk JSON, validasi intent/tag/mood/delta sebelum dibuat menjadi operasi preferensi. |
 | `services/ai/conversation.py` | `ConversationDirector` untuk wording dan pilihan follow-up yang divalidasi terhadap opsi yang dibuat Django. |
 | `services/ai/responses.py` | `ConversationResponseService` untuk menghasilkan balasan utama berbasis preferensi tervalidasi dan hasil katalog Django. |
@@ -450,8 +450,9 @@ POST /api/recommendation/chat/
 | Fitur | Status | Implementasi dan batasan |
 |---|---|---|
 | Percakapan Gemini-first | **Diimplementasikan** | Setiap pesan biasa dikirim ke Gemini saat provider tersedia. Prompt mengizinkan salam, candaan, klarifikasi, rekomendasi proaktif, dan percakapan kontekstual tanpa memaksa semua pesan menjadi rekomendasi. Pertanyaan di luar pemesanan diarahkan kembali secara sopan oleh Gemini. |
-| Tool katalog | **Diimplementasikan** | `search_menu` memakai `RecommendationService`, sedangkan `get_menu_details` memakai query ORM terbatas. Django memvalidasi tag, kategori, harga, ID, duplikasi, dan jumlah hasil. Gemini tidak pernah mendapat akses ORM atau eksekusi arbitrer. |
-| Respons dan fakta katalog | **Diimplementasikan dengan guardrail** | Gemini menerima hasil tool sebelum membuat klaim tentang item. Kartu, harga, ketersediaan, dan ranking tetap diserialisasi Django. Respons kosong, terlalu panjang, mengandung HTML/URL, atau provider gagal ditolak dan menghasilkan pesan AI tidak tersedia, bukan jawaban palsu. |
+| Tool katalog | **Diimplementasikan** | `search_menu` memakai `RecommendationService`, sedangkan `get_menu_details` memakai query ORM terbatas. Django memvalidasi tag, kategori, harga, ID, duplikasi, dan jumlah hasil. Pencarian tag-only dan tanpa filter tetap mengembalikan katalog aktif yang relevan; Gemini tidak pernah mendapat akses ORM atau eksekusi arbitrer. |
+| Respons dan fakta katalog | **Diimplementasikan dengan guardrail** | Gemini menerima hasil tool sebelum membuat klaim tentang item. Kartu, harga, ketersediaan, dan ranking diserialisasi dari hasil pencarian yang sama. Tool membedakan `matches` dan `no_matches`; hasil kosong berarti filter itu tidak cocok, bukan seluruh katalog kosong. Kegagalan database dikirim sebagai error tool dan tidak diterjemahkan menjadi katalog kosong. |
+| Konsistensi kartu frontend | **Diimplementasikan** | Setiap respons menghapus kartu rekomendasi lama sebelum menambahkan kartu baru. Respons percakapan tanpa pencarian tidak menampilkan kartu lama seolah-olah menjadi jawaban baru. |
 | Render keluaran AI | **Diimplementasikan** | Pesan dan penjelasan ditampilkan melalui `textContent`, bukan HTML. Ranking, harga dan data untuk cart tetap berasal dari Django/katalog. |
 | Konfigurasi dan batas panggilan | **Diimplementasikan** | `GEMINI_MAX_CALLS_PER_SESSION` default `100`, dihitung per request provider termasuk request gagal dan continuation tool. Counter tersimpan di session dan hanya direset oleh alur `Mulai Lagi`. `GEMINI_MAX_TOOL_ITERATIONS` default `4` membatasi putaran tool per pesan. |
 | Pertanyaan katalog berbasis fakta | **Diimplementasikan** | Pertanyaan detail/perbandingan dapat memakai `get_menu_details`; bahan, alergi, nutrisi, dan fakta yang tidak ada di katalog tetap harus dinyatakan tidak tersedia. |

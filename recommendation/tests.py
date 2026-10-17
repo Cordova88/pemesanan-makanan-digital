@@ -553,6 +553,63 @@ class GeminiAssistantToolTests(TestCase):
         )
         self.assertFalse(invalid["ok"])
 
+    def test_search_tool_returns_tag_only_and_unconstrained_catalog_results(self):
+        class FakeClient:
+            available = True
+
+        assistant = GeminiAssistant(
+            FakeClient(),
+            RecommendationService(),
+            TagExtractor(),
+        )
+        tag_only = assistant._search_menu(
+            {
+                "required_tags": ["spicy"],
+                "excluded_tags": [],
+                "category": None,
+                "max_price": None,
+                "exclude_shown": False,
+            },
+            {"preferences": Preferences().to_dict(), "shown_ids": []},
+        )
+        self.assertEqual([item["id"] for item in tag_only["items"]], [self.item.id])
+        self.assertEqual(tag_only["search_status"], "matches")
+
+        browse = assistant._search_menu(
+            {
+                "required_tags": [],
+                "excluded_tags": [],
+                "category": None,
+                "max_price": None,
+                "exclude_shown": False,
+            },
+            {"preferences": Preferences().to_dict(), "shown_ids": []},
+        )
+        self.assertEqual([item["id"] for item in browse["items"]], [self.item.id])
+
+    def test_empty_search_is_not_reported_as_empty_catalog(self):
+        class FakeClient:
+            available = True
+
+        assistant = GeminiAssistant(
+            FakeClient(),
+            RecommendationService(),
+            TagExtractor(),
+        )
+        result = assistant._search_menu(
+            {
+                "required_tags": ["sweet"],
+                "excluded_tags": [],
+                "category": None,
+                "max_price": None,
+                "exclude_shown": False,
+            },
+            {"preferences": Preferences().to_dict(), "shown_ids": []},
+        )
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["search_status"], "no_matches")
+        self.assertIn("does not prove", result["catalog_statement"])
+
     def test_get_details_returns_only_requested_database_items(self):
         class FakeClient:
             available = True
@@ -1065,6 +1122,48 @@ class ChatbotIntegrationTests(TestCase):
             {"spicy", "filling", "heavy_meal", "rice"},
         )
         self.assertTrue(rice.json()["recommendations"])
+
+    def test_gemini_tool_results_and_api_cards_share_the_same_items(self):
+        def fake_converse(
+            message,
+            system_instruction,
+            tool_declarations,
+            tool_handler,
+            before_request,
+            max_iterations,
+        ):
+            result = tool_handler(
+                "search_menu",
+                {
+                    "required_tags": ["spicy"],
+                    "excluded_tags": [],
+                    "category": None,
+                    "max_price": None,
+                    "exclude_shown": False,
+                },
+            )
+            return (
+                "Aku menemukan pilihan pedas yang cocok.",
+                [{"name": "search_menu", "result": result}],
+            )
+
+        with patch(
+            "recommendation.services.gemini.GeminiClient.available",
+            new_callable=PropertyMock,
+            return_value=True,
+        ), patch(
+            "recommendation.services.gemini.GeminiClient.converse",
+            side_effect=fake_converse,
+        ):
+            response = self.post_chat("Rekomendasi makanan pedas")
+
+        payload = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item["name"] for item in payload["recommendations"]],
+            ["Mie Pedas", "Ayam Geprek"],
+        )
+        self.assertIn("pedas", payload["message"])
 
     def test_cms_tag_alias_is_used_by_chatbot(self):
         smoky = MenuTag.objects.create(name="smoky", display_name="Berasap")

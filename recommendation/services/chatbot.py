@@ -720,7 +720,7 @@ class ChatbotService:
         self.session["last_recommendations"] = [match.item.id for match in matches]
         self.session[self.SHOWN_KEY] = [match.item.id for match in matches]
         self.session["shown_recommendation_ids"] = [match.item.id for match in matches]
-        self.session[self.LAST_RESULT_EMPTY_KEY] = False
+        self.session[self.LAST_RESULT_EMPTY_KEY] = not bool(matches)
         self.session.modified = True
         return {
             "message": generated_intro

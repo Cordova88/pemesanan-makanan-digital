@@ -108,6 +108,16 @@ class RecommendationService:
             category = preferences.category
             excluded_tags = preferences.excluded_tags
         ranked = []
+        has_criteria = bool(
+            required_tags
+            or excluded_tags
+            or category
+            or max_price is not None
+            or preferences.tags
+            or preferences.mood_tags
+            or preferences.soft_excluded_tags
+            or preferences.prefer_affordable
+        )
 
         for item in items:
             if item.id in excluded_ids:
@@ -130,7 +140,10 @@ class RecommendationService:
                 "✅ Tanpa " + tag_label(tag)
                 for tag in sorted(excluded_tags & set(TAG_LABELS))
             )
-            for tag in sorted(item_tags & preferences.tags):
+            scoring_tags = item_tags & preferences.tags
+            if constraints is not None:
+                scoring_tags |= item_tags & set(constraints.required_tags)
+            for tag in sorted(scoring_tags):
                 score += self.DIRECT_TAG_WEIGHT
                 if constraints is None or tag in constraints.required_tags:
                     reasons.append(tag_label(tag))
@@ -152,7 +165,7 @@ class RecommendationService:
                 score += self.BUDGET_WEIGHT
                 reasons.append("💰 Ramah di kantong")
 
-            if score > 0:
+            if score > 0 or not has_criteria:
                 labels = tuple(
                     tag_label(tag)
                     for tag in sorted(item_tags)
