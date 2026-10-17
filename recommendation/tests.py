@@ -27,6 +27,8 @@ from .services.conversation_interpreter import (
 )
 from .services.chatbot import ChatbotService
 from .services.ai.GeminiInterpreter import GeminiInterpreter, validate
+from .services.ai.conversation import ConversationDirector
+from .services.ai.responses import ConversationResponseService
 from .services.ai.explanations import RecommendationExplanationService
 from .services.gemini import GeminiClient
 
@@ -394,6 +396,113 @@ class GeminiInterpreterTests(SimpleTestCase):
                 self.assertFalse(
                     ChatbotService._eligible_for_gemini(message, interpretation)
                 )
+
+
+class ConversationDirectorTests(SimpleTestCase):
+    def test_validated_followup_can_only_use_django_options(self):
+        class FakeGeminiClient:
+            available = True
+
+            def generate(self, _prompt):
+                return json.dumps(
+                    {
+                        "should_ask_follow_up": True,
+                        "message": "Kamu lebih ingin makanan berat atau camilan?",
+                        "quick_replies": [
+                            {
+                                "label": "Makanan berat",
+                                "value": "Makanan berat",
+                            },
+                            {"label": "Camilan", "value": "Camilan"},
+                        ],
+                    }
+                )
+
+        decision = ConversationDirector(FakeGeminiClient()).decide(
+            "Aku mau yang pedas",
+            "meal_type",
+            {
+                "allowed_options": [
+                    {"label": "Makanan berat", "value": "Makanan berat"},
+                    {"label": "Camilan", "value": "Camilan"},
+                ]
+            },
+        )
+
+        self.assertIsNotNone(decision)
+        self.assertEqual(len(decision.quick_replies), 2)
+
+    def test_unsafe_or_unknown_followup_option_is_rejected(self):
+        class FakeGeminiClient:
+            available = True
+
+            def generate(self, _prompt):
+                return json.dumps(
+                    {
+                        "should_ask_follow_up": True,
+                        "message": "<script>alert(1)</script>",
+                        "quick_replies": [
+                            {"label": "Bebas", "value": "Menu rahasia"},
+                        ],
+                    }
+                )
+
+        decision = ConversationDirector(FakeGeminiClient()).decide(
+            "Aku bingung",
+            "confusion",
+            {
+                "allowed_options": [
+                    {"label": "Pedas", "value": "Pengen yang pedas"},
+                ]
+            },
+        )
+
+        self.assertIsNone(decision)
+
+
+class ConversationResponseServiceTests(SimpleTestCase):
+    def test_response_is_grounded_in_django_result_facts(self):
+        class FakeGeminiClient:
+            available = True
+
+            def generate(self, _prompt):
+                return json.dumps(
+                    {"message": "Ayam Geprek cocok karena pilihanmu pedas."}
+                )
+
+        service = ConversationResponseService(FakeGeminiClient())
+        message = service._valid_message(
+            "Ayam Geprek cocok karena pilihanmu pedas.",
+            {
+                "results": [
+                    {
+                        "name": "Ayam Geprek",
+                        "category": "Makanan",
+                        "tags": ["spicy"],
+                        "match_reasons": ["🌶️ Pedas"],
+                    }
+                ]
+            },
+        )
+        self.assertTrue(message)
+
+    def test_response_rejects_unsupported_claims_and_unknown_menu_facts(self):
+        facts = {
+            "results": [
+                {
+                    "name": "Ayam Geprek",
+                    "category": "Makanan",
+                    "tags": ["spicy"],
+                    "match_reasons": ["🌶️ Pedas"],
+                }
+            ]
+        }
+        self.assertFalse(
+            ConversationResponseService._valid_message(
+                "Nasi Padang sehat dan tersedia.",
+                facts,
+            )
+        )
 
 
 # [OOP: Inheritance] Mewarisi TestCase (database uji terisolasi).
@@ -910,13 +1019,20 @@ class ChatbotIntegrationTests(TestCase):
             {item["name"] for item in response.json()["recommendations"]},
         )
 
-    def test_deterministic_followups_do_not_call_gemini_to_rephrase_questions(self):
+    def test_followups_keep_server_options_while_allowing_gemini_wording(self):
         first = self.post_chat("Pengen pedas")
         self.assertEqual(first.json()["state"], "ASKING_FOLLOWUP")
         second = self.post_chat("Makanan berat")
         self.assertEqual(second.json()["state"], "ASKING_FOLLOWUP")
         self.assertIn("nasi atau mie", second.json()["message"])
-        self.gemini_generate.assert_not_called()
+        self.assertEqual(self.gemini_generate.call_count, 2)
+        self.assertEqual(
+            {
+                reply["value"]
+                for reply in second.json()["quick_replies"]
+            },
+            {"Pengen nasi", "Pengen mie", "Bebas aja"},
+        )
 
     def test_sufficient_food_context_recommends_without_extra_followup(self):
         response = self.post_chat("Aku mau ayam pedas pakai nasi")

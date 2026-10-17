@@ -23,6 +23,10 @@ class GeminiClient:
                 http_options=types.HttpOptions(timeout=15000),
             )
 
+    @property
+    def available(self):
+        return self.client is not None
+
     def generate(self, prompt):
         if self.client is None:
             return None

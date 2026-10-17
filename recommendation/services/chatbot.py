@@ -8,7 +8,9 @@ from .mood_resolver import MoodResolver
 from .recommendation import RecommendationService, SearchConstraints
 from .tag_extractor import Preferences, TagExtractor
 from .ai.GeminiInterpreter import GeminiInterpreter
+from .ai.conversation import ConversationDirector
 from .ai.explanations import RecommendationExplanationService
+from .ai.responses import ConversationResponseService
 from .gemini import GeminiClient
 
 
@@ -99,6 +101,8 @@ class ChatbotService:
             self.gemini_client,
             allowed_tags=self.tag_extractor._aliases,
         )
+        self.conversation_director = ConversationDirector(self.gemini_client)
+        self.response_service = ConversationResponseService(self.gemini_client)
         self.explanation_service = RecommendationExplanationService(self.gemini_client)
 
     # [OOP: Abstraction] Menghapus state percakapan di session dengan satu panggilan.
@@ -134,6 +138,13 @@ class ChatbotService:
         if interpretation.contextual_revision:
             return True
         normalized = normalize_text(message)
+        if any(
+            cue in normalized
+            for cue in ConversationInterpreter.PREFERENCE_CORRECTION_CUES
+        ):
+            return True
+        if "mood naik" in normalized or "bikin mood" in normalized:
+            return True
         if interpretation.intent in {
             ConversationIntent.RECOMMEND,
             ConversationIntent.UPDATE_PREFERENCES,
@@ -276,7 +287,7 @@ class ChatbotService:
         return reply
 
     # [OOP: Abstraction] Menyusun pertanyaan lanjutan untuk pengguna.
-    def _question(self, confused=False):
+    def _question(self, confused=False, source_message=""):
         if confused:
             message = "Tenang, nggak perlu mikir 😄 Aku bantu pilih. Kamu lagi lebih ke..."
             replies = [
@@ -297,6 +308,14 @@ class ChatbotService:
                 self._quick_reply("💸 Lagi hemat", "Lagi hemat"),
             ]
         replies = self._catalog_quick_replies(replies)
+        ai_followup = self._ai_followup(
+            source_message,
+            "confusion" if confused else "general",
+            replies,
+        )
+        if ai_followup:
+            message = ai_followup["message"]
+            replies = ai_followup["quick_replies"]
         self.session["last_question"] = "menu_choice"
         return {
             "message": message,
@@ -304,6 +323,33 @@ class ChatbotService:
             "preferences": Preferences().to_dict(),
             "recommendations": [],
             "quick_replies": replies,
+        }
+
+    def _ai_followup(self, source_message, mode, options, context=None):
+        if not source_message or not self.conversation_director.available:
+            return None
+        if not self._consume_gemini_call():
+            return None
+        decision = self.conversation_director.decide(
+            source_message,
+            mode,
+            {
+                **(context or {}),
+                "allowed_options": options,
+            },
+        )
+        if decision is None:
+            return None
+        allowed_values = {option["value"] for option in options}
+        if not all(
+            reply["value"] in allowed_values
+            for reply in decision.quick_replies
+        ):
+            return None
+        return {
+            "should_ask_follow_up": decision.should_ask_follow_up,
+            "message": decision.message,
+            "quick_replies": list(decision.quick_replies),
         }
 
     # [OOP: Abstraction] Menyusun daftar balasan cepat untuk pertanyaan katalog.
@@ -347,11 +393,28 @@ class ChatbotService:
         )
 
     # [OOP: Abstraction] Menyusun respons pertanyaan jenis makanan.
-    def _ask_meal_type(self, preferences):
+    def _ask_meal_type(self, preferences, source_message=""):
+        replies = [
+            self._quick_reply("🍚 Makanan berat", "Makanan berat"),
+            self._quick_reply("🍟 Camilan", "Camilan"),
+        ]
+        ai_followup = self._ai_followup(
+            source_message,
+            "meal_type",
+            replies,
+            {"preferences": sorted(preferences.all_positive_tags)},
+        )
+        if ai_followup and not ai_followup["should_ask_follow_up"]:
+            self.session["last_question"] = None
+            return self._recommend(preferences, source_message)
         self.session["last_question"] = "meal_type"
         self._save(preferences, "ASKING_FOLLOWUP", follow_up="meal_type")
         return {
-            "message": "Wah, tim pedas nih 🌶️ Kamu lebih pengen makanan berat atau cuma mau ngemil?",
+            "message": (
+                ai_followup["message"]
+                if ai_followup
+                else "Wah, tim pedas nih 🌶️ Kamu lebih pengen makanan berat atau cuma mau ngemil?"
+            ),
             "state": "ASKING_FOLLOWUP",
             "preferences": self._response_preferences(
                 preferences,
@@ -359,18 +422,33 @@ class ChatbotService:
                 follow_up="meal_type",
             ),
             "recommendations": [],
-            "quick_replies": [
-                self._quick_reply("🍚 Makanan berat", "Makanan berat"),
-                self._quick_reply("🍟 Camilan", "Camilan"),
-            ],
+            "quick_replies": ai_followup["quick_replies"] if ai_followup else replies,
         }
 
     # [OOP: Abstraction] Menyusun respons pertanyaan dasar makanan (nasi atau mie).
-    def _ask_base(self, preferences):
+    def _ask_base(self, preferences, source_message=""):
+        replies = [
+            self._quick_reply("🍚 Nasi", "Pengen nasi"),
+            self._quick_reply("🍜 Mie", "Pengen mie"),
+            self._quick_reply("🤷 Bebas", "Bebas aja"),
+        ]
+        ai_followup = self._ai_followup(
+            source_message,
+            "base",
+            replies,
+            {"preferences": sorted(preferences.all_positive_tags)},
+        )
+        if ai_followup and not ai_followup["should_ask_follow_up"]:
+            self.session["last_question"] = None
+            return self._recommend(preferences, source_message)
         self.session["last_question"] = "base"
         self._save(preferences, "ASKING_FOLLOWUP", follow_up="base")
         return {
-            "message": "Sip! Kamu lebih pengen nasi atau mie? Kalau bebas, bilang aja ya 😄",
+            "message": (
+                ai_followup["message"]
+                if ai_followup
+                else "Sip! Kamu lebih pengen nasi atau mie? Kalau bebas, bilang aja ya 😄"
+            ),
             "state": "ASKING_FOLLOWUP",
             "preferences": self._response_preferences(
                 preferences,
@@ -378,11 +456,7 @@ class ChatbotService:
                 follow_up="base",
             ),
             "recommendations": [],
-            "quick_replies": [
-                self._quick_reply("🍚 Nasi", "Pengen nasi"),
-                self._quick_reply("🍜 Mie", "Pengen mie"),
-                self._quick_reply("🤷 Bebas", "Bebas aja"),
-            ],
+            "quick_replies": ai_followup["quick_replies"] if ai_followup else replies,
         }
 
     # [OOP: Static method] Membentuk teks balasan chatbot dari data yang diberikan, tanpa state objek.
@@ -515,6 +589,15 @@ class ChatbotService:
             match.item.id: self.explanation_service.fallback(match)
             for match in matches
         }
+        generated_response = None
+        if self.response_service.available and self._consume_gemini_call():
+            generated_response = self.response_service.respond(
+                source_text,
+                preferences,
+                constraints,
+                matches,
+                response_kind=response_kind,
+            )
         generated_intro = None
         if matches and self._consume_gemini_call():
             generated_intro, generated_explanations = (
@@ -538,7 +621,8 @@ class ChatbotService:
         self._save(preferences, "RECOMMENDING")
         return {
             "message": (
-                generated_intro
+                generated_response
+                or generated_intro
                 or self._response_message(
                     preferences,
                     source_text,
@@ -546,7 +630,8 @@ class ChatbotService:
                     constraints=constraints,
                 )
                 if matches
-                else "Aku belum menemukan yang pas. Coba ubah pilihan atau batas harganya, ya."
+                else generated_response
+                or "Aku belum menemukan yang pas. Coba ubah pilihan atau batas harganya, ya."
             ),
             "state": "RECOMMENDING",
             "preferences": self._response_preferences(
@@ -764,7 +849,10 @@ class ChatbotService:
                 preferences = self._preferences()
                 if not self._has_preferences(preferences):
                     state = "COLLECTING_PREFERENCES"
-                response = self._question(confused=True)
+                response = self._question(
+                    confused=True,
+                    source_message=normalized,
+                )
                 return {
                     "message": response["message"],
                     "state": state,
@@ -969,7 +1057,7 @@ class ChatbotService:
             self.session[self.SEARCH_KEY] = constraints.to_dict()
             updated.mood_tags = self.mood_resolver.resolve(updated.moods)
             if old_follow_up == "meal_type" and "heavy_meal" in updated.tags and not updated.tags.intersection({"rice", "noodle", "snack"}):
-                return self._ask_base(updated)
+                return self._ask_base(updated, source_message=normalized)
 
             only_spicy = (
                 updated.tags.intersection({"spicy"}) == {"spicy"}
@@ -982,7 +1070,7 @@ class ChatbotService:
                 and not updated.category
             )
             if only_spicy and old_follow_up is None:
-                return self._ask_meal_type(updated)
+                return self._ask_meal_type(updated, source_message=normalized)
 
             if not self._has_preferences(updated):
                 if interpretation.clear_moods:
