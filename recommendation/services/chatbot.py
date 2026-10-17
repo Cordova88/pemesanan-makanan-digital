@@ -8,6 +8,7 @@ from .mood_resolver import MoodResolver
 from .recommendation import RecommendationService, SearchConstraints
 from .tag_extractor import Preferences, TagExtractor
 from .ai.GeminiInterpreter import GeminiInterpreter
+from .ai.assistant import GeminiAssistant
 from .ai.conversation import ConversationDirector
 from .ai.explanations import RecommendationExplanationService
 from .ai.responses import ConversationResponseService
@@ -103,6 +104,11 @@ class ChatbotService:
         )
         self.conversation_director = ConversationDirector(self.gemini_client)
         self.response_service = ConversationResponseService(self.gemini_client)
+        self.assistant = GeminiAssistant(
+            self.gemini_client,
+            self.recommender,
+            self.tag_extractor,
+        )
         self.explanation_service = RecommendationExplanationService(self.gemini_client)
 
     # [OOP: Abstraction] Menghapus state percakapan di session dengan satu panggilan.
@@ -809,6 +815,128 @@ class ChatbotService:
         match = self.recommender.get_available_match(previous[index])
         return match
 
+    def _gemini_context(self):
+        state = self.session.get(self.SESSION_KEY, {})
+        return {
+            "preferences": {
+                "tags": sorted(state.get("tags", [])),
+                "mood_tags": sorted(state.get("mood_tags", [])),
+                "excluded_tags": sorted(state.get("excluded_tags", [])),
+                "soft_excluded_tags": sorted(state.get("soft_excluded_tags", [])),
+                "moods": sorted(state.get("moods", [])),
+                "prefer_affordable": state.get("prefer_affordable", False),
+            },
+            "active_search": self._search_constraints().to_dict(),
+            "shown_ids": list(self.session.get(self.SHOWN_KEY, [])),
+            "last_recommendation_ids": list(
+                state.get("last_recommendations", [])
+            ),
+            "last_question": state.get(
+                "last_question",
+                self.session.get("last_question"),
+            ),
+            "recent_turn": {
+                "customer": self.session.get("recommendation_last_message", ""),
+                "assistant": self.session.get("recommendation_last_response", ""),
+            },
+        }
+
+    def _gemini_first_reply(self, message):
+        context = self._gemini_context()
+        response, _tool_results = self.assistant.respond(
+            message or "Mulai percakapan dan bantu pelanggan memilih menu.",
+            context,
+            self._consume_gemini_call,
+        )
+        if response is None:
+            return {
+                "message": (
+                    "Maaf, asisten AI sedang tidak tersedia. "
+                    "Silakan coba lagi sebentar."
+                ),
+                "state": self.session.get(self.SESSION_KEY, {}).get(
+                    "state",
+                    "COLLECTING_PREFERENCES",
+                ),
+                "preferences": self._response_preferences(
+                    self._preferences(),
+                    self.session.get(self.SESSION_KEY, {}).get(
+                        "state",
+                        "COLLECTING_PREFERENCES",
+                    ),
+                ),
+                "recommendations": [],
+                "quick_replies": [],
+            }
+
+        matches = context.get("last_tool_matches", [])
+        constraints_data = context.get("last_tool_constraints")
+        if constraints_data:
+            constraints = SearchConstraints.from_dict(constraints_data)
+            preferences = self._preferences()
+            preferences.tags.update(constraints.required_tags)
+            preferences.tags.difference_update(constraints.excluded_tags)
+            preferences.excluded_tags.update(constraints.excluded_tags)
+            preferences.max_price = constraints.max_price
+            preferences.category = constraints.category
+            self.session[self.SEARCH_KEY] = constraints.to_dict()
+            self.session["recommendation_required_tags"] = sorted(
+                constraints.required_tags
+            )
+            ids = [match.item.id for match in matches]
+            self.session[self.SHOWN_KEY] = ids
+            self.session["last_recommendations"] = ids
+            self.session["shown_recommendation_ids"] = ids
+            self.session[self.LAST_RESULT_EMPTY_KEY] = False
+            self.session["recommendation_last_message"] = message[:500]
+            self.session["recommendation_last_response"] = response[:1200]
+            self.session.modified = True
+            self._save(preferences, "RECOMMENDING")
+            return {
+                "message": response,
+                "state": "RECOMMENDING",
+                "preferences": self._response_preferences(
+                    preferences,
+                    "RECOMMENDING",
+                ),
+                "active_search": constraints.to_dict(),
+                "recommendations": matches,
+                "explanations": {
+                    match.item.id: self.explanation_service.fallback(match)
+                    for match in matches
+                },
+                "quick_replies": [
+                    self._quick_reply(
+                        "🔄 Cari Menu Lain",
+                        "Cari menu lain",
+                        action="more",
+                    ),
+                    self._quick_reply(
+                        "🔄 Mulai Lagi",
+                        "mulai lagi",
+                        action="reset",
+                    ),
+                ],
+            }
+
+        state = self.session.get(self.SESSION_KEY, {}).get(
+            "state",
+            "COLLECTING_PREFERENCES",
+        )
+        self.session["recommendation_last_message"] = message[:500]
+        self.session["recommendation_last_response"] = response[:1200]
+        self.session.modified = True
+        return {
+            "message": response,
+            "state": state,
+            "preferences": self._response_preferences(
+                self._preferences(),
+                state,
+            ),
+            "recommendations": [],
+            "quick_replies": [],
+        }
+
     # [OOP: Abstraction] Satu-satunya pintu masuk publik class ini (pola Facade): pesan masuk,
     # balasan lengkap keluar.
     # [OOP: Encapsulation] Seluruh method lain berawalan _ sehingga menjadi detail internal.
@@ -817,7 +945,12 @@ class ChatbotService:
         action = action or ""
         if action == "reset" or normalized in self.RESET_PHRASES:
             self.reset()
+            if self.assistant.available:
+                return self._gemini_first_reply("")
             return self._question()
+
+        if self.assistant.available:
+            return self._gemini_first_reply(message)
 
         if not normalized and not self._has_preferences(self._preferences()):
             return self._question()

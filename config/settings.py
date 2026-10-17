@@ -138,7 +138,10 @@ MAILERS = {
 }
 
 GEMINI_MAX_CALLS_PER_SESSION = int(
-    os.environ.get("GEMINI_MAX_CALLS_PER_SESSION", "50")
+    os.environ.get("GEMINI_MAX_CALLS_PER_SESSION", "100")
+)
+GEMINI_MAX_TOOL_ITERATIONS = int(
+    os.environ.get("GEMINI_MAX_TOOL_ITERATIONS", "4")
 )
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
 

@@ -1,7 +1,7 @@
 from decimal import Decimal
 from io import StringIO
 import json
-from unittest.mock import patch
+from unittest.mock import PropertyMock, patch
 
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase, override_settings
@@ -27,6 +27,7 @@ from .services.conversation_interpreter import (
 )
 from .services.chatbot import ChatbotService
 from .services.ai.GeminiInterpreter import GeminiInterpreter, validate
+from .services.ai.assistant import GeminiAssistant
 from .services.ai.conversation import ConversationDirector
 from .services.ai.responses import ConversationResponseService
 from .services.ai.explanations import RecommendationExplanationService
@@ -505,6 +506,67 @@ class ConversationResponseServiceTests(SimpleTestCase):
         )
 
 
+class GeminiAssistantToolTests(TestCase):
+    def setUp(self):
+        food = Category.objects.create(name="Makanan")
+        self.spicy = MenuTag.objects.create(
+            name="spicy",
+            display_name=TAG_LABELS["spicy"],
+        )
+        self.item = MenuItem.objects.create(
+            category=food,
+            name="Ayam Geprek",
+            price=Decimal("15000"),
+        )
+        self.item.tags.add(self.spicy)
+
+    def test_search_tool_returns_real_catalog_data_and_rejects_unknown_tags(self):
+        class FakeClient:
+            available = True
+
+        assistant = GeminiAssistant(
+            FakeClient(),
+            RecommendationService(),
+            TagExtractor(),
+        )
+        result = assistant._search_menu(
+            {
+                "required_tags": ["spicy"],
+                "excluded_tags": [],
+                "category": "Makanan",
+                "max_price": 20000,
+                "exclude_shown": False,
+            },
+            {"preferences": Preferences().to_dict(), "shown_ids": []},
+        )
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["items"][0]["id"], self.item.id)
+        invalid = assistant._search_menu(
+            {
+                "required_tags": ["not-a-real-tag"],
+                "excluded_tags": [],
+                "category": None,
+                "max_price": None,
+                "exclude_shown": False,
+            },
+            {"preferences": Preferences().to_dict(), "shown_ids": []},
+        )
+        self.assertFalse(invalid["ok"])
+
+    def test_get_details_returns_only_requested_database_items(self):
+        class FakeClient:
+            available = True
+
+        assistant = GeminiAssistant(
+            FakeClient(),
+            RecommendationService(),
+            TagExtractor(),
+        )
+        result = assistant._get_menu_details({"item_ids": [self.item.id, 999999]})
+        self.assertTrue(result["ok"])
+        self.assertEqual([item["id"] for item in result["items"]], [self.item.id])
+
+
 # [OOP: Inheritance] Mewarisi TestCase (database uji terisolasi).
 # [OOP: Abstraction] Menguji RecommendationExplanationService lewat explain() dan explain_with_intro().
 class RecommendationExplanationServiceTests(TestCase):
@@ -927,6 +989,13 @@ class DemoSeedTests(TestCase):
 class ChatbotIntegrationTests(TestCase):
     # [OOP: Polymorphism] Meng-override setUp bawaan TestCase untuk menyiapkan menu, tag, varian, dan add-on.
     def setUp(self):
+        self.gemini_available_patch = patch(
+            "recommendation.services.gemini.GeminiClient.available",
+            new_callable=PropertyMock,
+            return_value=False,
+        )
+        self.gemini_available_patch.start()
+        self.addCleanup(self.gemini_available_patch.stop)
         self.gemini_patch = patch(
             "recommendation.services.gemini.GeminiClient.generate",
             return_value=None,
@@ -1025,7 +1094,7 @@ class ChatbotIntegrationTests(TestCase):
         second = self.post_chat("Makanan berat")
         self.assertEqual(second.json()["state"], "ASKING_FOLLOWUP")
         self.assertIn("nasi atau mie", second.json()["message"])
-        self.assertEqual(self.gemini_generate.call_count, 2)
+        self.assertEqual(self.gemini_generate.call_count, 0)
         self.assertEqual(
             {
                 reply["value"]

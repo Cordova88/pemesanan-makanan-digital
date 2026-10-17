@@ -404,22 +404,22 @@ Tombol Hapus tag membuka halaman konfirmasi (`users/tag_confirm_delete.html`); G
 
 ## 11. Chatbot rekomendasi
 
-Implementasinya berada di `recommendation/`. Pemahaman lokal tetap menjadi jalur utama; Gemini hanya dipanggil untuk pesan makanan `UNKNOWN` yang memenuhi penanda kelayakan atau pesan revisi kontekstual tertentu. AI tidak mengambil alih ranking, item katalog, keranjang, atau pesanan.
+Implementasinya berada di `recommendation/`. Jika `GEMINI_API_KEY` tersedia,
+Gemini menjadi jalur utama untuk setiap pesan percakapan biasa. Gemini
+menentukan apakah pelanggan sedang mengobrol, meminta rekomendasi, menanyakan
+detail menu, merevisi pencarian, atau perlu diarahkan kembali ke ruang lingkup
+pemesanan makanan. Django tetap menjadi sumber kebenaran untuk katalog, ranking,
+session, keranjang, dan pesanan.
 
 ```text
 POST /api/recommendation/chat/
   → recommendation/views.py
   → ChatbotService.reply()
-      ├─ normalize_text()
-      ├─ TagExtractor.extract()
-      ├─ MoodExtractor.extract()
-      ├─ MoodResolver.resolve()
-      ├─ Preferences digabung dengan state sesi
-      ├─ GeminiInterpreter + ConversationDirector (bila provider tersedia)
-      ├─ Django memvalidasi delta, opsi follow-up, dan menjalankan aksi
-      └─ RecommendationService.rank()
-  → ConversationResponseService membuat respons utama dari fakta hasil Django
-  → RecommendationExplanationService dapat membuat penjelasan batch untuk item hasil ranking
+      ├─ GeminiAssistant mengirim pesan + konteks sesi terbatas ke Gemini
+      ├─ Gemini memilih respons biasa atau memanggil search_menu/get_menu_details
+      ├─ Django memvalidasi argumen dan menjalankan tool
+      ├─ hasil katalog tepercaya dikirim kembali ke Gemini
+      └─ Gemini menghasilkan respons final
   → view menerjemahkan tag ke label Indonesia + serialize pilihan item
   → chatbot.html menampilkan respons dan kartu
   → pilih item → POST /api/recommendation/add/
@@ -435,8 +435,9 @@ POST /api/recommendation/chat/
 | `services/mood_extractor.py` | Deteksi situasi lelah, low mood, sangat lapar, gerah/haus, buru-buru, bingung. |
 | `services/mood_resolver.py` | Menerjemahkan mood ke tag karakteristik dengan bobot tidak langsung. |
 | `services/recommendation.py` | Filter item, hitung skor, alasan cocok, ranking deterministik. |
-| `services/chatbot.py` | State dialog, keputusan follow-up deterministik, routing pertanyaan katalog, jawaban kontekstual, reset, penjelasan fallback, dan rekomendasi berikutnya. |
-| `services/gemini.py` | Komunikasi opsional dengan provider Gemini; timeout dan kegagalan provider menghasilkan fallback lokal. |
+| `services/chatbot.py` | Facade HTTP, state sesi, konteks percakapan terbatas, budget request, dan serialisasi hasil tool menjadi kartu menu. |
+| `services/gemini.py` | Client Gemini bersama, native function calling, continuation loop, timeout, error logging, dan callback budget. |
+| `services/ai/assistant.py` | Orkestrator Gemini-first dan batas tool Django; memvalidasi `search_menu` serta `get_menu_details`. |
 | `services/ai/GeminiInterpreter.py` | Interpretasi AI berbentuk JSON, validasi intent/tag/mood/delta sebelum dibuat menjadi operasi preferensi. |
 | `services/ai/conversation.py` | `ConversationDirector` untuk wording dan pilihan follow-up yang divalidasi terhadap opsi yang dibuat Django. |
 | `services/ai/responses.py` | `ConversationResponseService` untuk menghasilkan balasan utama berbasis preferensi tervalidasi dan hasil katalog Django. |
@@ -448,16 +449,12 @@ POST /api/recommendation/chat/
 
 | Fitur | Status | Implementasi dan batasan |
 |---|---|---|
-| Interpretasi lokal-first | **Diimplementasikan** | Reset, salam, bantuan, pesan di luar topik, referensi biasa seperti “yang pertama”, serta preferensi yang dikenali diproses lokal. Koreksi eksplisit seperti “gajadi, aku mau pedas” atau “salah, maksudku manis aja” mengganti kumpulan preferensi sebelumnya dengan preferensi baru yang dikenali, bukan menumpuknya. |
-| Interpretasi Gemini kontekstual | **Sebagian diimplementasikan** | Gemini hanya eligible untuk pesan `UNKNOWN` yang tampak terkait makanan, revisi kontekstual tertentu, atau sejumlah cue nuansa seperti “eneg/berminyak/nagih”; panjang pesan dibatasi 500 karakter. Ini bukan pemahaman umum seluruh pesan pelanggan. Prompt hanya menerima preferensi sesi relevan, bukan seluruh riwayat. Output delta tervalidasi sebelum Django mengubahnya menjadi `PreferenceOperation`; output gagal tidak mengubah preferensi. |
-| Validasi dan batas keamanan interpretasi | **Diimplementasikan** | Schema harus memiliki tepat field yang diharapkan. Intent, tag, mood, tipe data, batas jumlah/harga, duplikasi, overlap, dan konteks penghapusan divalidasi. Respons tidak valid, kosong, timeout, atau gagal provider tidak diterapkan dan alur lokal tetap berjalan. Tidak ada akses AI ke cart, checkout, pembayaran, atau operasi ORM. |
-| Pertanyaan lanjutan kontekstual | **Diimplementasikan (AI decision, Django execution)** | Django menyediakan konteks dan opsi yang sah. Jika Gemini tersedia, `ConversationDirector` memutuskan apakah perlu follow-up, memilih wording, dan memilih subset quick reply dari opsi yang diberikan Django. Output harus JSON, tanpa HTML/URL, maksimal empat opsi, dan setiap value harus sama persis dengan opsi server. Keputusan “lanjut sekarang” langsung diranking oleh Django; jika gagal atau kuota habis, pertanyaan deterministik lama dipakai. |
-| Respons utama dan penjelasan rekomendasi | **Diimplementasikan dengan guardrail** | Setelah Django menerapkan perubahan preferensi dan meranking item, `ConversationResponseService` meminta Gemini menulis respons utama berdasarkan preferensi, batas, alasan, dan item hasil Django. Harga, ranking, ketersediaan, dan aksi kartu tetap ditentukan Django. Output yang mengandung HTML, URL, angka/harga, klaim terlarang, atau istilah di luar fakta hasil ditolak. `RecommendationExplanationService` tetap dapat membuat penjelasan kartu; bila provider/validasi gagal, respons dan penjelasan deterministik dipakai. |
-| Pertanyaan pilihan menu dari katalog | **Sebagian diimplementasikan** | Pertanyaan spesifik yang dikenali seperti “pilihan nasi apa aja?” dipisahkan dari pernyataan preferensi. Django mengambil item aktif/tersedia yang memiliki semua tag permintaan dan mempertahankan preferensi sesi. Gemini hanya boleh merangkai intro dan penjelasan untuk item hasil query; bila tidak ada hasil/provider gagal, teks fallback dipakai. Belum mencakup tanya-jawab bebas tentang bahan, komposisi, stok, atau detail menu. |
+| Percakapan Gemini-first | **Diimplementasikan** | Setiap pesan biasa dikirim ke Gemini saat provider tersedia. Prompt mengizinkan salam, candaan, klarifikasi, rekomendasi proaktif, dan percakapan kontekstual tanpa memaksa semua pesan menjadi rekomendasi. Pertanyaan di luar pemesanan diarahkan kembali secara sopan oleh Gemini. |
+| Tool katalog | **Diimplementasikan** | `search_menu` memakai `RecommendationService`, sedangkan `get_menu_details` memakai query ORM terbatas. Django memvalidasi tag, kategori, harga, ID, duplikasi, dan jumlah hasil. Gemini tidak pernah mendapat akses ORM atau eksekusi arbitrer. |
+| Respons dan fakta katalog | **Diimplementasikan dengan guardrail** | Gemini menerima hasil tool sebelum membuat klaim tentang item. Kartu, harga, ketersediaan, dan ranking tetap diserialisasi Django. Respons kosong, terlalu panjang, mengandung HTML/URL, atau provider gagal ditolak dan menghasilkan pesan AI tidak tersedia, bukan jawaban palsu. |
 | Render keluaran AI | **Diimplementasikan** | Pesan dan penjelasan ditampilkan melalui `textContent`, bukan HTML. Ranking, harga dan data untuk cart tetap berasal dari Django/katalog. |
-| Konfigurasi dan batas panggilan | **Diimplementasikan** | `GEMINI_API_KEY` bersifat opsional dan tidak boleh dimasukkan ke git. `GEMINI_MODEL` default `gemini-3.5-flash-lite`; `GEMINI_MAX_CALLS_PER_SESSION` default `50`. Jika key tidak tersedia atau batas tercapai, jalur lokal/fallback dipakai. |
-| Pertanyaan katalog bebas berbasis fakta | **Direncanakan** | Pertanyaan pilihan berdasarkan tag tersedia untuk pola terbatas; belum ada tanya-jawab bebas tentang bahan, stok, komposisi, atau detail menu. Jangan menyimpulkan fakta tersebut dari tag atau nama. |
-| Pertanyaan lanjutan buatan AI | **Diimplementasikan dengan guardrail** | Gemini mengarahkan keputusan bertanya, teks, dan urutan pilihan untuk confusion, jenis makanan, serta nasi/mie ketika provider tersedia. Django tetap memegang eksekusi karena AI tidak boleh menulis session, memilih ID database, atau mengubah ranking. |
+| Konfigurasi dan batas panggilan | **Diimplementasikan** | `GEMINI_MAX_CALLS_PER_SESSION` default `100`, dihitung per request provider termasuk request gagal dan continuation tool. Counter tersimpan di session dan hanya direset oleh alur `Mulai Lagi`. `GEMINI_MAX_TOOL_ITERATIONS` default `4` membatasi putaran tool per pesan. |
+| Pertanyaan katalog berbasis fakta | **Diimplementasikan** | Pertanyaan detail/perbandingan dapat memakai `get_menu_details`; bahan, alergi, nutrisi, dan fakta yang tidak ada di katalog tetap harus dinyatakan tidak tersedia. |
 | Monitoring penggunaan AI | **Direncanakan** | Batas panggilan sesi sudah ada, tetapi belum tersedia dashboard/analitik biaya, latensi, maupun tingkat penolakan output. |
 
 Kegagalan output penjelasan tidak mengubah menu, urutan ranking, harga, maupun status ketersediaan. Deskripsi katalog merupakan data CMS; hanya masukkan fakta yang memang tersimpan di katalog. Jangan gunakan model untuk mengarang bahan, alergen, tekstur, atau klaim kesehatan. Variabel rahasia jangan dicetak dalam log.
@@ -478,22 +475,26 @@ perhitungan harga atau filter status. Constraint database tetap menjadi
 lapisan validasi tambahan.
 
 Pada chatbot, `ChatbotService` adalah facade/orchestrator. Ia menggunakan
-composition dan dependency injection untuk `GeminiInterpreter`,
-`ConversationDirector`, `RecommendationService`, dan layanan penjelasan.
-`ConversationDecision` adalah immutable value object; `ConversationDirector`
-menyembunyikan prompt dan validasi JSON. AI hanya mengembalikan strategi teks
-yang tervalidasi, sedangkan service Django tetap memiliki authority atas
-preferensi, query, harga, ranking, session, cart, dan order.
+composition dan dependency injection untuk `GeminiAssistant`,
+`RecommendationService`, dan client Gemini. `GeminiAssistant` menyembunyikan
+prompt, validasi argumen tool, dan dispatch ke tool Django. AI mengendalikan
+interpretasi serta wording, sedangkan service Django tetap memiliki authority
+atas preferensi, query, harga, ranking, session, cart, dan order.
 
 Konfigurasi lokal opsional pada `.env` di root proyek (jangan commit nilai key):
 
 ```dotenv
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-3.5-flash-lite
-GEMINI_MAX_CALLS_PER_SESSION=50
+GEMINI_MAX_CALLS_PER_SESSION=100
+GEMINI_MAX_TOOL_ITERATIONS=4
 ```
 
-Tes AI/follow-up menggunakan fake/mock client agar tidak menghubungi provider. Jalankan `python manage.py test recommendation.tests.GeminiInterpreterTests recommendation.tests.RecommendationExplanationServiceTests recommendation.tests.ChatbotIntegrationTests` untuk interpretasi AI, penjelasan batch, fallback, ranking, dan alur follow-up. Jalankan `python manage.py check` setelah perubahan konfigurasi atau URL; `python manage.py test` menjalankan seluruh suite.
+Tes AI dan tool menggunakan fake/mock client agar tidak menghubungi provider.
+Jalankan `python manage.py test recommendation.tests.GeminiAssistantToolTests recommendation.tests.ChatbotIntegrationTests`
+untuk validasi tool, fallback, ranking, dan alur percakapan. Jalankan
+`python manage.py check` setelah perubahan konfigurasi atau URL;
+`python manage.py test` menjalankan seluruh suite.
 
 ### Mood yang dikenali
 
