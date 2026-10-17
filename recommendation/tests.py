@@ -26,6 +26,7 @@ from .services.conversation_interpreter import (
     ConversationInterpreter,
 )
 from .services.chatbot import ChatbotService
+from .services.conversation.context import ConversationContext
 from .services.ai.GeminiInterpreter import GeminiInterpreter, validate
 from .services.ai.assistant import GeminiAssistant
 from .services.ai.conversation import ConversationDirector
@@ -66,7 +67,6 @@ class LanguageRuleTests(SimpleTestCase):
         for phrase in ("ayam", "mau ayam", "daging ayam", "olahan ayam"):
             with self.subTest(phrase=phrase):
                 self.assertIn("chicken", self.extractor.extract(phrase).tags)
-
     def test_hunger_snack_and_informal_normalization(self):
         self.assertEqual(normalize_text("Gue lg laper bgt"), "aku lagi lapar banget")
         hunger = self.extractor.extract("Gue lagi laper banget, kenyangin aku")
@@ -156,6 +156,42 @@ class LanguageRuleTests(SimpleTestCase):
                 preferences = self.extractor.extract(phrase)
                 self.assertEqual(preferences.category, "Makanan")
                 self.assertIn("sweet", preferences.tags)
+
+
+# [OOP: Inheritance] Mewarisi SimpleTestCase untuk menguji state percakapan terisolasi.
+class ConversationContextTests(SimpleTestCase):
+    def test_provider_budget_is_session_scoped_and_reset_clears_it(self):
+        class Session(dict):
+            modified = False
+
+        session = Session()
+        context = ConversationContext(session)
+        with override_settings(GEMINI_MAX_CALLS_PER_SESSION=2):
+            self.assertTrue(context.consume_provider_request())
+            self.assertTrue(context.consume_provider_request())
+            self.assertFalse(context.consume_provider_request())
+        self.assertEqual(session["gemini_calls"], 2)
+        context.reset()
+        self.assertNotIn("gemini_calls", session)
+
+    def test_gemini_context_contains_bounded_session_facts(self):
+        class Session(dict):
+            modified = False
+
+        session = Session({
+            "recommendation_state": {
+                "tags": ["spicy"],
+                "last_recommendations": [3],
+            },
+            "recommendation_shown": [3],
+            "recommendation_last_message": "pedas",
+            "recommendation_last_response": "Ada pilihan pedas.",
+        })
+        context = ConversationContext(session)
+        result = context.gemini_context()
+        self.assertEqual(result["preferences"]["tags"], ["spicy"])
+        self.assertEqual(result["shown_ids"], [3])
+        self.assertEqual(result["recent_turn"]["customer"], "pedas")
 
 
 # [OOP: Inheritance] Mewarisi SimpleTestCase.
