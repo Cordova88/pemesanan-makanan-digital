@@ -415,6 +415,7 @@ session, keranjang, dan pesanan.
 POST /api/recommendation/chat/
   → recommendation/views.py
   → ChatbotService.reply()
+      ├─ ConversationContext membaca/menyimpan state sesi dan budget provider
       ├─ GeminiAssistant mengirim pesan + konteks sesi terbatas ke Gemini
       ├─ Gemini memilih respons biasa atau memanggil search_menu/get_menu_details
       ├─ Django memvalidasi argumen dan menjalankan tool
@@ -435,7 +436,9 @@ POST /api/recommendation/chat/
 | `services/mood_extractor.py` | Deteksi situasi lelah, low mood, sangat lapar, gerah/haus, buru-buru, bingung. |
 | `services/mood_resolver.py` | Menerjemahkan mood ke tag karakteristik dengan bobot tidak langsung. |
 | `services/recommendation.py` | Filter item, hitung skor, alasan cocok, ranking deterministik. |
-| `services/chatbot.py` | Facade HTTP, state sesi, konteks percakapan terbatas, budget request, dan serialisasi hasil tool menjadi kartu menu. |
+| `services/chatbot.py` | Orkestrator turn: memilih jalur Gemini-first, mempertahankan fallback kompatibilitas, menjalankan ranking Django, dan menyusun response API. |
+| `services/conversation/context.py` | Kepemilikan state sesi: reset, budget request Gemini, preferensi, active search, recent turn, dan serialisasi konteks terbatas. |
+| `services/conversation/preferences.py` | Derivasi `SearchConstraints` dari interpretasi terstruktur pada jalur fallback; tidak memilih respons percakapan atau melakukan query katalog. |
 | `services/gemini.py` | Client Gemini bersama, native function calling, continuation loop, timeout, error logging, dan callback budget. |
 | `services/ai/assistant.py` | Orkestrator Gemini-first dan batas tool Django; memvalidasi `search_menu` serta `get_menu_details`, termasuk status `matches`/`no_matches`. |
 | `services/ai/GeminiInterpreter.py` | Interpretasi AI berbentuk JSON, validasi intent/tag/mood/delta sebelum dibuat menjadi operasi preferensi. |
@@ -444,6 +447,15 @@ POST /api/recommendation/chat/
 | `services/ai/explanations.py` | Satu panggilan batch untuk intro percakapan singkat dan penjelasan display-only; validasi panjang, markup, ID, tag, dan alasan yang cocok. |
 | `views.py` | Adaptasi HTTP/JSON, serializer kartu, endpoint tambah ke cart. |
 | `templates/recommendation/chatbot.html` | UI chat, quick replies, kartu, form pilihan varian/add-on. |
+
+`ChatbotService` tetap menjadi facade yang mudah ditelusuri dari `reply()`,
+tetapi tidak lagi menjadi pemilik session serialization atau provider budget.
+`ConversationContext` menangani state yang dipakai bersama oleh jalur
+Gemini-first dan fallback kompatibilitas. `GeminiClient` hanya menangani
+transport/provider loop, sedangkan `GeminiAssistant` menangani deklarasi,
+validasi, dan eksekusi tool katalog. `ConversationInterpreter` dipertahankan
+sebagai parser terstruktur untuk jalur fallback dan pengujian regresi; ia tidak
+menjadi router percakapan ketika Gemini tersedia.
 
 ### Fitur AI: status dan batas tanggung jawab
 
