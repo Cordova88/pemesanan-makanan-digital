@@ -116,11 +116,6 @@ class GeminiClient:
             for function_call in function_calls:
                 name = function_call.name or ""
                 arguments = dict(function_call.args or {})
-                logger.info(
-                    "Gemini requested tool (name=%s, arguments=%s)",
-                    name,
-                    arguments,
-                )
                 result = tool_handler(name, arguments)
                 tool_results.append(
                     {

@@ -9,6 +9,7 @@ from menu.models import Category, MenuItem
 
 from recommendation.services.recommendation import SearchConstraints
 from recommendation.services.tag_extractor import Preferences
+from recommendation.services.language import normalize_text
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,16 @@ class GeminiAssistant:
                         "items": {"type": "string"},
                         "maxItems": 8,
                     },
+                    "excluded_item_ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "maxItems": 8,
+                    },
+                    "excluded_item_names": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "maxItems": 8,
+                    },
                     "category": {"type": ["string", "null"]},
                     "max_price": {"type": ["integer", "null"]},
                     "exclude_shown": {"type": "boolean"},
@@ -43,6 +54,8 @@ class GeminiAssistant:
                 "required": [
                     "required_tags",
                     "excluded_tags",
+                    "excluded_item_ids",
+                    "excluded_item_names",
                     "category",
                     "max_price",
                     "exclude_shown",
@@ -66,10 +79,11 @@ class GeminiAssistant:
         ),
     ]
 
-    def __init__(self, gemini_client, recommender, tag_extractor):
+    def __init__(self, gemini_client, recommender, tag_extractor, session=None):
         self.gemini_client = gemini_client
         self.recommender = recommender
         self.tag_extractor = tag_extractor
+        self.session = session
 
     @property
     def available(self):
@@ -126,7 +140,16 @@ class GeminiAssistant:
             return {"ok": False, "error": "Tool arguments must be an object."}
         allowed_tags = set(self.tag_extractor._aliases)
         required = self._validated_tags(arguments.get("required_tags"), allowed_tags)
-        excluded = self._validated_tags(arguments.get("excluded_tags"), allowed_tags)
+        excluded, legacy_excluded_names = self._validated_exclusions(
+            arguments.get("excluded_tags", []),
+            allowed_tags,
+        )
+        explicit_ids = self._validated_item_ids(
+            arguments.get("excluded_item_ids", [])
+        )
+        explicit_names = self._validated_item_names(
+            arguments.get("excluded_item_names", [])
+        )
         category = arguments.get("category")
         max_price = arguments.get("max_price")
         if category is not None:
@@ -148,8 +171,18 @@ class GeminiAssistant:
             type(max_price) is not int or max_price <= 0 or max_price > 1_000_000
         ):
             return {"ok": False, "error": "Invalid maximum price."}
-        if required is None or excluded is None:
+        if required is None or excluded is None or explicit_ids is None:
             return {"ok": False, "error": "Invalid catalog tags."}
+        resolved_ids = self._resolve_excluded_item_names(
+            list(explicit_names) + legacy_excluded_names
+        )
+        if resolved_ids is None:
+            return {"ok": False, "error": "Invalid excluded menu names."}
+        persisted_ids = set(
+            context.get("excluded_item_ids", [])
+        ) | set(explicit_ids) | resolved_ids
+        context["excluded_item_ids"] = sorted(persisted_ids)
+        self._persist_excluded_item_ids(context, persisted_ids)
 
         current = Preferences.from_dict(context.get("preferences", {}))
         if (
@@ -180,6 +213,7 @@ class GeminiAssistant:
             if arguments.get("exclude_shown") is True
             else []
         )
+        exclude_ids = set(exclude_ids) | persisted_ids
         matches = self.recommender.rank(
             current,
             limit=3,
@@ -206,6 +240,7 @@ class GeminiAssistant:
                 else "No items matched these filters; this does not prove the catalog is empty."
             ),
             "items": [self._item_data(match.item) for match in matches],
+            "excluded_item_ids": sorted(persisted_ids),
             "constraints": constraints.to_dict(),
         }
 
@@ -219,6 +254,79 @@ class GeminiAssistant:
         ):
             return None
         return value
+
+    @staticmethod
+    def _validated_exclusions(value, allowed):
+        if (
+            not isinstance(value, list)
+            or len(value) > 8
+            or any(not isinstance(item, str) or not normalize_text(item) for item in value)
+            or len({normalize_text(item) for item in value}) != len(value)
+        ):
+            return None, []
+        tags = []
+        names = []
+        for item in value:
+            if item in allowed:
+                tags.append(item)
+            else:
+                names.append(item)
+        return tags, names
+
+    @staticmethod
+    def _validated_item_ids(value):
+        if (
+            not isinstance(value, list)
+            or len(value) > 8
+            or any(type(item_id) is not int or item_id <= 0 for item_id in value)
+            or len(value) != len(set(value))
+        ):
+            return None
+        return value
+
+    @staticmethod
+    def _validated_item_names(value):
+        if (
+            not isinstance(value, list)
+            or len(value) > 8
+            or any(
+                not isinstance(name, str)
+                or not normalize_text(name)
+                or len(name) > 120
+                for name in value
+            )
+            or len({normalize_text(name) for name in value}) != len(value)
+        ):
+            return None
+        return value
+
+    @staticmethod
+    def _resolve_excluded_item_names(names):
+        normalized = {normalize_text(name) for name in names}
+        if not normalized:
+            return set()
+        items = MenuItem.objects.filter(
+            is_active=True,
+            category__is_active=True,
+        ).only("id", "name")
+        resolved = {
+            item.id
+            for item in items
+            if normalize_text(item.name) in normalized
+        }
+        known_names = {
+            normalize_text(item.name)
+            for item in items
+            if normalize_text(item.name) in normalized
+        }
+        if known_names != normalized:
+            return None
+        return resolved
+
+    def _persist_excluded_item_ids(self, context, item_ids):
+        if self.session is not None:
+            self.session["recommendation_excluded_item_ids"] = sorted(item_ids)
+            self.session.modified = True
 
     @staticmethod
     def _item_data(item):

@@ -589,6 +589,78 @@ class GeminiAssistantToolTests(TestCase):
         )
         self.assertFalse(invalid["ok"])
 
+    def test_search_tool_persists_explicit_menu_name_exclusions(self):
+        class FakeClient:
+            available = True
+
+        session = type("Session", (dict,), {"modified": False})()
+        assistant = GeminiAssistant(
+            FakeClient(),
+            RecommendationService(),
+            TagExtractor(),
+            session=session,
+        )
+        context = {
+            "preferences": Preferences().to_dict(),
+            "shown_ids": [self.item.id],
+        }
+        result = assistant._search_menu(
+            {
+                "required_tags": [],
+                "excluded_tags": ["Ayam Geprek"],
+                "excluded_item_ids": [],
+                "excluded_item_names": [],
+                "category": "Makanan",
+                "max_price": None,
+                "exclude_shown": True,
+            },
+            context,
+        )
+        self.assertTrue(result["ok"])
+        self.assertNotIn(self.item.id, [item["id"] for item in result["items"]])
+        self.assertEqual(session["recommendation_excluded_item_ids"], [self.item.id])
+
+    def test_persisted_item_exclusions_survive_a_later_unrestricted_search(self):
+        class FakeClient:
+            available = True
+
+        session = type("Session", (dict,), {"modified": False})()
+        assistant = GeminiAssistant(
+            FakeClient(),
+            RecommendationService(),
+            TagExtractor(),
+            session=session,
+        )
+        context = {
+            "preferences": Preferences().to_dict(),
+            "shown_ids": [],
+        }
+        first = assistant._search_menu(
+            {
+                "required_tags": [],
+                "excluded_tags": [],
+                "excluded_item_ids": [],
+                "excluded_item_names": ["Ayam Geprek"],
+                "category": "Makanan",
+                "max_price": None,
+                "exclude_shown": False,
+            },
+            context,
+        )
+        second = assistant._search_menu(
+            {
+                "required_tags": [],
+                "excluded_tags": [],
+                "category": "Makanan",
+                "max_price": None,
+                "exclude_shown": False,
+            },
+            context,
+        )
+        self.assertTrue(first["ok"])
+        self.assertTrue(second["ok"])
+        self.assertNotIn(self.item.id, [item["id"] for item in second["items"]])
+
     def test_search_tool_returns_tag_only_and_unconstrained_catalog_results(self):
         class FakeClient:
             available = True
@@ -1286,6 +1358,64 @@ class ChatbotIntegrationTests(TestCase):
             {item["name"] for item in second.json()["recommendations"]},
             {"Nasi Goreng", "Ayam Geprek", "Nasi Uduk"},
         )
+
+    def test_explicitly_rejected_menu_names_are_absent_from_api_cards(self):
+        rejected_tofu = MenuItem.objects.create(
+            category=self.best.category,
+            name="Tahu Crispy",
+            price=Decimal("10000"),
+        )
+        rejected_tofu.tags.add(self.spicy)
+        rejected_banana = MenuItem.objects.create(
+            category=self.best.category,
+            name="Pisang Goreng",
+            price=Decimal("10000"),
+        )
+        remaining = MenuItem.objects.create(
+            category=self.best.category,
+            name="Tempe Mendoan",
+            price=Decimal("10000"),
+        )
+
+        def fake_converse(
+            message,
+            system_instruction,
+            tool_declarations,
+            tool_handler,
+            before_request,
+            max_iterations,
+        ):
+            result = tool_handler(
+                "search_menu",
+                {
+                    "required_tags": [],
+                    "excluded_tags": ["Tahu Crispy", "Pisang Goreng"],
+                    "excluded_item_ids": [],
+                    "excluded_item_names": [],
+                    "category": "Makanan",
+                    "max_price": None,
+                    "exclude_shown": False,
+                },
+            )
+            return "Tahu Crispy dan Pisang Goreng sudah dikeluarkan.", [
+                {"result": result}
+            ]
+
+        with patch(
+            "recommendation.services.gemini.GeminiClient.available",
+            new_callable=PropertyMock,
+            return_value=True,
+        ), patch(
+            "recommendation.services.gemini.GeminiClient.converse",
+            side_effect=fake_converse,
+        ):
+            response = self.post_chat("Aku tidak mau tahu crispy dan pisang goreng")
+
+        payload = response.json()
+        names = {item["name"] for item in payload["recommendations"]}
+        self.assertNotIn(rejected_tofu.name, names)
+        self.assertNotIn(rejected_banana.name, names)
+        self.assertIn(remaining.name, names)
 
     def test_cms_tag_alias_is_used_by_chatbot(self):
         smoky = MenuTag.objects.create(name="smoky", display_name="Berasap")

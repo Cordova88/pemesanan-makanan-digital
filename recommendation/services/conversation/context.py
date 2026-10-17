@@ -12,6 +12,7 @@ class ConversationContext:
     SEARCH_KEY = "recommendation_search"
     LAST_RESULT_EMPTY_KEY = "recommendation_last_result_empty"
     GEMINI_CALLS_KEY = "gemini_calls"
+    EXCLUDED_ITEM_IDS_KEY = "recommendation_excluded_item_ids"
 
     def __init__(self, session):
         self.session = session
@@ -28,6 +29,7 @@ class ConversationContext:
             "recommendation_required_tags",
             self.SEARCH_KEY,
             self.LAST_RESULT_EMPTY_KEY,
+            self.EXCLUDED_ITEM_IDS_KEY,
             "recommendation_last_message",
             "recommendation_last_response",
         ):
@@ -96,6 +98,9 @@ class ConversationContext:
             },
             "active_search": self.search_constraints().to_dict(),
             "shown_ids": list(self.session.get(self.SHOWN_KEY, [])),
+            "excluded_item_ids": list(
+                self.session.get(self.EXCLUDED_ITEM_IDS_KEY, [])
+            ),
             "last_recommendation_ids": list(
                 state.get("last_recommendations", [])
             ),

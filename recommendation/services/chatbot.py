@@ -109,6 +109,7 @@ class ChatbotService:
             self.gemini_client,
             self.recommender,
             self.tag_extractor,
+            session=self.session,
         )
         self.explanation_service = RecommendationExplanationService(self.gemini_client)
 
@@ -748,7 +749,7 @@ class ChatbotService:
             self.session[self.SHOWN_KEY] = ids
             self.session["last_recommendations"] = ids
             self.session["shown_recommendation_ids"] = ids
-            self.session[self.LAST_RESULT_EMPTY_KEY] = False
+            self.session[self.LAST_RESULT_EMPTY_KEY] = not bool(matches)
             self.session["recommendation_last_message"] = message[:500]
             self.session["recommendation_last_response"] = response[:1200]
             self.session.modified = True
