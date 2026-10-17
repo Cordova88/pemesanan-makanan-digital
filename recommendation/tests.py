@@ -622,6 +622,29 @@ class GeminiAssistantToolTests(TestCase):
             {"preferences": Preferences().to_dict(), "shown_ids": []},
         )
         self.assertEqual([item["id"] for item in browse["items"]], [self.item.id])
+        self.assertEqual(browse["constraints"]["category"], "Makanan")
+
+    def test_search_tool_rejects_unknown_categories(self):
+        class FakeClient:
+            available = True
+
+        assistant = GeminiAssistant(
+            FakeClient(),
+            RecommendationService(),
+            TagExtractor(),
+        )
+        result = assistant._search_menu(
+            {
+                "required_tags": [],
+                "excluded_tags": [],
+                "category": "Food",
+                "max_price": None,
+                "exclude_shown": False,
+            },
+            {"preferences": Preferences().to_dict(), "shown_ids": []},
+        )
+        self.assertFalse(result["ok"])
+        self.assertIn("category", result["error"].lower())
 
     def test_empty_search_is_not_reported_as_empty_catalog(self):
         class FakeClient:
@@ -1200,6 +1223,69 @@ class ChatbotIntegrationTests(TestCase):
             ["Mie Pedas", "Ayam Geprek"],
         )
         self.assertIn("pedas", payload["message"])
+
+    def test_changed_tool_search_replaces_previous_api_cards(self):
+        nasi_uduk = MenuItem.objects.create(
+            category=self.best.category,
+            name="Nasi Uduk",
+            price=Decimal("14000"),
+        )
+        nasi_uduk.tags.add(self.rice)
+        nasi_goreng = MenuItem.objects.create(
+            category=self.best.category,
+            name="Nasi Goreng",
+            price=Decimal("15000"),
+        )
+        nasi_goreng.tags.add(self.rice)
+        calls = iter(
+            [
+                {
+                    "required_tags": ["spicy"],
+                    "excluded_tags": [],
+                    "category": None,
+                    "max_price": None,
+                    "exclude_shown": False,
+                },
+                {
+                    "required_tags": ["rice"],
+                    "excluded_tags": [],
+                    "category": None,
+                    "max_price": None,
+                    "exclude_shown": False,
+                },
+            ]
+        )
+
+        def fake_converse(
+            message,
+            system_instruction,
+            tool_declarations,
+            tool_handler,
+            before_request,
+            max_iterations,
+        ):
+            result = tool_handler("search_menu", next(calls))
+            return "Ini hasil pencarian terbaru.", [{"result": result}]
+
+        with patch(
+            "recommendation.services.gemini.GeminiClient.available",
+            new_callable=PropertyMock,
+            return_value=True,
+        ), patch(
+            "recommendation.services.gemini.GeminiClient.converse",
+            side_effect=fake_converse,
+        ):
+            first = self.post_chat("Cari yang pedas")
+            second = self.post_chat("Kalau nasi ada apa?")
+
+        self.assertEqual(
+            {item["name"] for item in first.json()["recommendations"]},
+            {"Ayam Geprek", "Mie Pedas"},
+        )
+        self.assertEqual(
+            {item["name"] for item in second.json()["recommendations"]},
+            {"Nasi Goreng", "Ayam Geprek", "Nasi Uduk"},
+        )
 
     def test_cms_tag_alias_is_used_by_chatbot(self):
         smoky = MenuTag.objects.create(name="smoky", display_name="Berasap")

@@ -5,7 +5,7 @@ import json
 import re
 from google.genai import types
 
-from menu.models import MenuItem
+from menu.models import Category, MenuItem
 
 from recommendation.services.recommendation import SearchConstraints
 from recommendation.services.tag_extractor import Preferences
@@ -129,10 +129,21 @@ class GeminiAssistant:
         excluded = self._validated_tags(arguments.get("excluded_tags"), allowed_tags)
         category = arguments.get("category")
         max_price = arguments.get("max_price")
-        if category is not None and (
-            not isinstance(category, str) or len(category) > 100
-        ):
-            return {"ok": False, "error": "Invalid category."}
+        if category is not None:
+            if not isinstance(category, str) or len(category) > 100:
+                return {"ok": False, "error": "Invalid category."}
+            category_name = next(
+                (
+                    name
+                    for name in Category.objects.filter(is_active=True)
+                    .values_list("name", flat=True)
+                    if name.casefold() == category.casefold()
+                ),
+                None,
+            )
+            if category_name is None:
+                return {"ok": False, "error": "Category is not in the catalog."}
+            category = category_name
         if max_price is not None and (
             type(max_price) is not int or max_price <= 0 or max_price > 1_000_000
         ):
@@ -141,6 +152,22 @@ class GeminiAssistant:
             return {"ok": False, "error": "Invalid catalog tags."}
 
         current = Preferences.from_dict(context.get("preferences", {}))
+        if (
+            not required
+            and not excluded
+            and category is None
+            and max_price is None
+            and not current.tags
+            and not current.mood_tags
+            and not current.prefer_affordable
+        ):
+            category = "Makanan"
+        elif (
+            category is None
+            and "drink" not in required
+            and "drink" not in current.tags
+        ):
+            category = "Makanan"
         constraints = SearchConstraints(
             required_tags=frozenset(required),
             excluded_tags=frozenset(excluded),
@@ -161,6 +188,15 @@ class GeminiAssistant:
         )
         context["last_tool_constraints"] = constraints.to_dict()
         context["last_tool_matches"] = matches
+        logger.info(
+            "Gemini search_menu completed (tags=%s, category=%s, max_price=%s, "
+            "status=%s, item_ids=%s)",
+            sorted(required),
+            category,
+            max_price,
+            "matches" if matches else "no_matches",
+            [match.item.id for match in matches],
+        )
         return {
             "ok": True,
             "search_status": "matches" if matches else "no_matches",
