@@ -16,16 +16,20 @@ export function bindCustomerNavigation() {
     element.addEventListener(`shown.bs.${kind}`, () => opening.delete(id));
     element.addEventListener(`show.bs.${kind}`, () => {
       opening.add(id);
+      document.body.classList.add("customer-overlay-open");
       if (!replaying && history.state?.customerScreen !== id) {
         history.pushState({customerScreen: id}, "", `#${route}`);
         window.dispatchEvent(new Event("customer:navigation"));
       }
     });
     element.addEventListener(`hidden.bs.${kind}`, () => {
-      if (!replaying && history.state?.customerScreen === id) {
-        history.replaceState({customerScreen: "menu"}, "", "#menu");
-        window.dispatchEvent(new Event("customer:navigation"));
-      }
+      // A drawer can close in order to open another dialog. Let that show
+      // event run first; dismissing a screen returns to its actual predecessor.
+      setTimeout(() => {
+        document.body.classList.toggle("customer-overlay-open",
+          screens.some(([screen]) => document.getElementById(screen).classList.contains("show")));
+        if (!replaying && history.state?.customerScreen === id) history.back();
+      }, 0);
     });
   }
   window.addEventListener("popstate", async event => {
@@ -49,6 +53,7 @@ export function bindCustomerNavigation() {
       const [id, kind] = entry;
       (kind === "modal" ? bootstrap.Modal : bootstrap.Offcanvas).getOrCreateInstance(document.getElementById(id)).show();
     }
+    document.body.classList.toggle("customer-overlay-open", Boolean(entry));
     replaying = false;
   });
 }

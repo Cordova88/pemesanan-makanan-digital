@@ -1,16 +1,18 @@
-import { api } from "./api.mjs?v=images-p8";
-import { bindCart, refreshCart } from "./cart.mjs?v=images-p8";
-import { bindCheckout } from "./checkout.mjs?v=images-p8";
-import { bindMenu, renderCatalog } from "./menu.mjs?v=images-p8";
-import { bindTableScanner, establishTableContext } from "./table-scanner.mjs?v=images-p8";
-import { state } from "./state.mjs?v=images-p8";
-import { bindCustomerNavigation } from "./navigation.mjs?v=images-p8";
+import { api } from "./api.mjs?v=customer-p4-r5";
+import { bindCart, refreshCart } from "./cart.mjs?v=customer-p4-r5";
+import { bindCheckout } from "./checkout.mjs?v=customer-p4-r5";
+import { bindMenu, renderCatalog } from "./menu.mjs?v=customer-p4-r5";
+import { bindTableScanner, establishTableContext } from "./table-scanner.mjs?v=customer-p4-r5";
+import { state } from "./state.mjs?v=customer-p4-r5";
+import { bindCustomerNavigation } from "./navigation.mjs?v=customer-p4-r5";
+import { bindCatalogAi } from "./catalog-ai.mjs?v=chef-r6";
 
 function showView() {
   const showMenu = ["#menu", "#pilihan-menu", "#keranjang", "#konfirmasi", "#jenis-pesanan"].includes(window.location.hash) || new URLSearchParams(window.location.search).has("menu");
+  const changed = document.querySelector("#menuView").classList.contains("d-none") === showMenu;
   document.querySelector("#homeView").classList.toggle("d-none", showMenu);
   document.querySelector("#menuView").classList.toggle("d-none", !showMenu);
-  window.scrollTo(0, 0);
+  if (changed) window.scrollTo(0, 0);
 }
 
 export function updateServiceContext() {
@@ -36,6 +38,7 @@ async function initializeStorefront() {
   bindCheckout();
   bindTableScanner();
   showView();
+  bindCatalogAi();
   window.addEventListener("hashchange", showView);
   window.addEventListener("customer:navigation", showView);
   document.querySelectorAll("[data-service]").forEach(button => button.addEventListener("click", () => {
@@ -57,7 +60,7 @@ async function initializeStorefront() {
     state.menu = response.items;
     renderCatalog();
     const selectedId = Number(new URLSearchParams(window.location.search).get("menu"));
-    if (selectedId) { const {openItem}=await import("./menu.mjs?v=images-p8"); openItem(selectedId); }
+    if (selectedId) { const {openItem}=await import("./menu.mjs?v=customer-p4-r5"); openItem(selectedId); }
     await refreshCart();
   } catch (error) {
     console.error("Initialization error:", error);

@@ -204,7 +204,7 @@ html,body,.chat-messages,#checkoutModal .modal-body{scrollbar-width:none}
 .catalog-main .menu-section-title{padding:0;transform:none;position:absolute;left:-6px;top:4px;width:190px;height:44px;margin:0;z-index:1}
 .catalog-main .menu-section-title:before{display:none}
 .menu-section-title img{display:block;width:190px;height:44px}
-.menu-count{position:absolute;right:-15px;top:15px;width:70px;height:20px;padding:3px 0;text-align:center}
+.menu-count{position:absolute;right:0;top:15px;width:70px;height:20px;padding:3px 0;text-align:center}
 .cart-caption{display:flex;align-items:center;justify-content:center;gap:3px;height:16px;line-height:16px}
 .footer-bag{position:relative;width:20px;height:20px;background:url('../images/bag.svg?v=p4-20261014-r4') center/contain no-repeat}
 .footer-bag>span{position:absolute;top:-4px;right:-4px;min-width:10px;height:10px;border-radius:50%;background:var(--red);color:white;font-size:8px;line-height:10px;text-align:center}
@@ -328,3 +328,16 @@ body:not(.dine-in) .service-context .service-icon{background-image:url('../image
 .receipt-more.receipt-urgent>summary{color:var(--red);font-weight:700}
 .receipt-copy-controls{display:flex;justify-content:center;gap:12px;margin:8px 0}
 @media(max-width:380px){.review-item-heading{padding-left:112px}.review-detail{padding:14px 16px}.receipt-food{width:72px;flex-basis:72px}.receipt-summary>#total{font-size:14px}.payment-notice{gap:8px;padding:12px}.detail-row strong{max-width:50%}}
+
+/* Page 4: floating chef helper belongs only to the menu screen. */
+.catalog-ai{position:fixed;right:max(16px,calc((100vw - 412px)/2 + 24px));bottom:calc(24px + env(safe-area-inset-bottom));z-index:1025;display:flex;align-items:flex-end;gap:8px;max-width:calc(100vw - 32px);border-radius:12px;color:var(--ink)}
+.catalog-ai img{width:60px;height:64px;object-fit:contain;filter:drop-shadow(0 3px 2px #13234a20);flex:0 0 60px}
+.catalog-ai-bubble{position:relative;width:158px;min-height:58px;padding:10px 14px;background:var(--paper);border:2px solid var(--blue);border-radius:12px 4px 28px 4px;box-shadow:2px 3px 0 #f5ad53;font-size:12px;font-weight:700;line-height:17px;transform-origin:right bottom;opacity:0;transform:translate(8px,6px) scale(.88);transition:opacity .24s ease,transform .24s ease;pointer-events:none}
+.catalog-ai-bubble:after{content:'';position:absolute;right:-7px;bottom:12px;width:10px;height:10px;border-top:2px solid var(--blue);border-right:2px solid var(--blue);background:var(--paper);transform:rotate(45deg)}
+.catalog-ai.is-speaking .catalog-ai-bubble{opacity:1;transform:translate(0,0) scale(1)}
+.catalog-ai.is-typing .catalog-ai-text:after{content:'';display:inline-block;height:12px;border-right:1px solid currentColor;margin-left:2px;vertical-align:-1px;animation:chef-caret .7s steps(1) infinite}
+#menuView:has(#floatingCart:not(.d-none)) .catalog-ai{bottom:calc(128px + env(safe-area-inset-bottom))}
+.customer-overlay-open .catalog-ai{visibility:hidden;pointer-events:none}
+#reviewService{cursor:default}
+@keyframes chef-caret{50%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.catalog-ai-bubble{transition:none}.catalog-ai-text:after{animation:none}}

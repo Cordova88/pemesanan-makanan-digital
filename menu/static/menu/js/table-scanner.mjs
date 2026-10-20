@@ -1,5 +1,5 @@
-import { api, toast } from "./api.mjs?v=images-p8";
-import { state, TABLE_CONTEXT_KEY, TABLE_CONTEXT_MAX_AGE } from "./state.mjs?v=images-p8";
+import { api, toast } from "./api.mjs?v=customer-p4-r5";
+import { state, TABLE_CONTEXT_KEY, TABLE_CONTEXT_MAX_AGE } from "./state.mjs?v=customer-p4-r5";
 
 function storedTableContext() {
   try {

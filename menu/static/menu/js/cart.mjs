@@ -1,7 +1,7 @@
-import { createFoodVisual } from './menu-card.mjs?v=images-p8';
-import { api, money, toast } from "./api.mjs?v=images-p8";
-import { state } from "./state.mjs?v=images-p8";
-import { openItem } from "./menu.mjs?v=images-p8";
+import { createFoodVisual } from './menu-card.mjs?v=customer-p4-r5';
+import { api, money, toast } from "./api.mjs?v=customer-p4-r5";
+import { state } from "./state.mjs?v=customer-p4-r5";
+import { openItem } from "./menu.mjs?v=customer-p4-r5";
 
 let pendingNoteSave = Promise.resolve(true);
 export async function flushCartNotes() {

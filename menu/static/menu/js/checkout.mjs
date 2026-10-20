@@ -1,14 +1,16 @@
-import { api, money, toast } from "./api.mjs?v=images-p8";
-import { state } from "./state.mjs?v=images-p8";
-import { createFoodVisual } from './menu-card.mjs?v=images-p8';
-import { renderOrderType } from "./table-scanner.mjs?v=images-p8";
-import { flushCartNotes } from "./cart.mjs?v=images-p8";
+import { api, money, toast } from "./api.mjs?v=customer-p4-r5";
+import { state } from "./state.mjs?v=customer-p4-r5";
+import { createFoodVisual } from './menu-card.mjs?v=customer-p4-r5';
+import { renderOrderType } from "./table-scanner.mjs?v=customer-p4-r5";
+import { flushCartNotes } from "./cart.mjs?v=customer-p4-r5";
 
 let reviewing = false;
 let submitting = false;
+let reviewedData = null;
 
 function showDetails() {
   reviewing = false;
+  reviewedData = null;
   document.querySelector("#checkoutDetails").hidden = false;
   document.querySelector("#checkoutReview").hidden = true;
   document.querySelector("#checkoutTitle").textContent = "Detail pemesanan";
@@ -18,6 +20,11 @@ function showDetails() {
 }
 
 function showReview(formData) {
+  // Submit exactly the details displayed in this read-only review.
+  reviewedData = Object.freeze({
+    ...formData,
+    table_token: formData.order_type === "DINE_IN" ? state.tableContext?.token : null,
+  });
   const dineIn = formData.order_type === "DINE_IN";
   document.body.classList.toggle("dine-in", dineIn);
   document.querySelector("#reviewServiceLabel").textContent = dineIn ? "Makan di tempat" : "Bawa pulang";
@@ -94,7 +101,9 @@ async function openCheckout() {
 async function submitCheckout(event) {
   event.preventDefault();
   if (submitting) return;
-  const formData = Object.fromEntries(new FormData(event.target));
+  const formData = reviewing
+    ? reviewedData
+    : Object.fromEntries(new FormData(event.target));
   const errorMessage = document.querySelector("#checkoutError");
   errorMessage.classList.add("d-none");
 
@@ -109,11 +118,7 @@ async function submitCheckout(event) {
     return;
   }
 
-  const payload = {
-    ...formData,
-    table_token:
-      formData.order_type === "DINE_IN" ? state.tableContext?.token : null,
-  };
+  const payload = reviewedData;
 
   try {
     submitting = true;
@@ -137,8 +142,6 @@ async function submitCheckout(event) {
 }
 
 export function bindCheckout() {
-  document.querySelector("#editCheckout").addEventListener("click", showDetails);
-  document.querySelector("#reviewService").addEventListener("click", showDetails);
   document
     .querySelector("#checkoutButton")
     .addEventListener("click", openCheckout);

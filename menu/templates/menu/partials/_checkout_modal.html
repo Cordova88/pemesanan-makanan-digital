@@ -22,13 +22,13 @@
         </div>
         <div id="checkoutReview" class="checkout-step" hidden>
           <p class="muted small">Pastikan menu dan meja sudah sesuai.</p>
-          <button type="button" id="reviewService" class="service-context paper-card"><span class="service-icon" aria-hidden="true"></span><span><strong id="reviewServiceLabel"></strong><small id="reviewServiceDetail"></small></span><span class="ms-auto" aria-hidden="true"></span></button>
+          <div id="reviewService" class="service-context paper-card"><span class="service-icon" aria-hidden="true"></span><span><strong id="reviewServiceLabel"></strong><small id="reviewServiceDetail"></small></span><span class="ms-auto" aria-hidden="true"></span></div>
           <h3 class="section-title review-section-title mb-3">Pesananmu</h3><div id="reviewItems"></div>
           <h3 class="section-title review-section-title my-3">Cara pembayaran</h3>
           <div class="paper-card payment-card"><div class="payment-method"><span class="payment-bag" aria-hidden="true"></span><div><h3>Bayar di kasir</h3><p>Tunjukkan kode pesanan ke kasir.</p></div><span class="service-chevron" aria-hidden="true"></span></div><p class="payment-explanation">Pesanan dibuat setelah kamu menekan tombol.</p></div>
           <div class="paper-card summary-card"><p><span>Subtotal</span><strong id="reviewSubtotal"></strong></p><p><span>Total pembayaran</span><strong id="reviewTotal"></strong></p></div>
-          <div class="payment-notice"><span class="clock-symbol" aria-hidden="true"></span><div><strong>Belum dibayar</strong><p>Lanjutkan pembayaran langsung ke kasir.</p></div><a href="/chatbot/" class="ai-button" aria-label="Buka RasaKita AI"><span class="bot-symbol" aria-hidden="true"></span></a></div>
-          <button id="editCheckout" type="button" class="btn btn-sm btn-outline-secondary">Ubah detail pesanan</button>
+          <div class="payment-notice"><span class="clock-symbol" aria-hidden="true"></span><div><strong>Belum dibayar</strong><p>Lanjutkan pembayaran langsung ke kasir.</p></div></div>
+          <button id="cancelCheckout" type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batalkan konfirmasi</button>
         </div>
         <div id="checkoutError" class="alert alert-danger d-none mt-3" role="alert"></div>
       </div>

@@ -1,6 +1,6 @@
-import { createMenuCard, createFoodVisual, createDetailPhoto } from './menu-card.mjs?v=images-p8';
-import { money } from "./api.mjs?v=images-p8";
-import { state } from "./state.mjs?v=images-p8";
+import { createMenuCard, createFoodVisual, createDetailPhoto } from './menu-card.mjs?v=customer-p4-r5';
+import { money } from "./api.mjs?v=customer-p4-r5";
+import { state } from "./state.mjs?v=customer-p4-r5";
 
 function renderMenu() {
   const query = document.querySelector("#search").value.toLowerCase();
@@ -176,12 +176,7 @@ export function openItem(id, line = null) {
   stepper.append(less,quantity,more);
   const total = document.createElement("strong");
   total.className = "accent item-total";
-  const ai = document.createElement("a");
-  ai.href = "/chatbot/";
-  ai.className = "ai-button";
-  ai.setAttribute("aria-label","Buka RasaKita AI");
-  ai.innerHTML = '<span class="bot-symbol" aria-hidden="true"></span><small>AI</small>';
-  row.append(stepper,total,ai);
+  row.append(stepper, total);
   body.append(noteLabel,note,row);
   if (line) {
     body.querySelectorAll(".variant-choice").forEach(input => input.checked = line.variant_ids.includes(Number(input.value)));
