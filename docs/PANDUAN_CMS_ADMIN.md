@@ -1,7 +1,7 @@
-# Panduan CMS dan Admin — Pemesanan Makanan Digital V1
+# Panduan CMS dan Admin RasaKita
 
-Panduan operator dan administrator, sesuai implementasi v1 pada 17 Oktober
-2026. Nama tombol mengikuti UI yang tersedia. Alamat contoh memakai port 8890;
+Panduan operator dan administrator untuk proyek bersama pada branch `ahmad`.
+Nama tombol mengikuti UI yang tersedia. Alamat contoh memakai port 8890;
 jika server memakai port lain, sesuaikan bagian alamatnya.
 
 ## Daftar isi
@@ -46,15 +46,15 @@ Biarkan terminal server tetap berjalan. Buka panel yang sesuai:
 
 ### Membuat akun pertama
 
-V1 awal hanya membawa katalog; belum ada akun admin. Buka terminal kedua pada
-folder v1, lalu jalankan:
+Akun admin dibuat sendiri pada setiap instalasi baru. Buka terminal kedua
+pada folder repository yang berisi `manage.py`, lalu jalankan:
 
 ```powershell
 python -B manage.py createsuperuser
 ```
 
-Ikuti prompt username, email, dan password. Password diketik secara tersembunyi
-di terminal. Gunakan akun tersebut untuk login ke CMS dan Django Admin.
+Isi username, email, dan password saat diminta terminal. Password diketik
+secara tersembunyi di terminal. Gunakan akun tersebut untuk login ke CMS dan Django Admin.
 Panduan ini tidak menetapkan atau menyimpan password pengguna.
 
 ### Login dan keluar
@@ -64,7 +64,7 @@ Panduan ini tidak menetapkan atau menyimpan password pengguna.
 3. Akun staf menuju Dashboard CMS. Akun khusus kelompok Cashier menuju kasir.
 4. Gunakan **Keluar** ketika selesai.
 
-CMS memerlukan akun aktif dengan status staf. Pada implementasi v1, akses CMS
+CMS memerlukan akun aktif dengan status staf. Pada aplikasi ini, akses CMS
 ditentukan oleh status staf dan mencakup seluruh halaman CMS; pembatasan per
 model di Django Admin tidak otomatis menjadi pembatasan per fitur CMS.
 
@@ -139,7 +139,7 @@ pemesanan sebuah menu, ubah **Tersedia untuk dipesan** secara eksplisit.
 | Tampilkan di katalog dimatikan | Menu nonaktif dan tidak tampil pada katalog |
 | Kategori nonaktif | Semua menu kategori itu tidak tampil pada katalog |
 
-### Foto yang sesuai desain v1
+### Menyiapkan foto menu
 
 Gunakan foto makanan/minuman terpisah, sebaiknya PNG/WebP transparan. Kartu,
 background, dan blob/liquid shape dibentuk oleh UI; tidak perlu menyatukannya
@@ -339,7 +339,7 @@ Dengan akun superuser yang sudah login:
 5. Simpan dan minta pengguna login melalui `/staff/` dengan akunnya sendiri.
 
 Status **Superuser** diperlukan untuk administrator penuh, bukan setiap operator
-CMS. Pada v1, status staf sendiri sudah memberi akses seluruh fitur CMS.
+CMS. Status staf sendiri sudah memberi akses seluruh fitur CMS.
 Untuk akses Django Admin selain superuser, berikan izin model yang diperlukan
 melalui user/group; status staf saja tidak memberi seluruh izin model di Admin.
 
@@ -391,7 +391,7 @@ Contoh penyiapan Nasi Goreng Rp20.000:
    periksa Log Audit. Jangan membuat status Paid secara manual untuk latihan bayar.
 
 Contoh ini menjelaskan cara memakai fitur; menulis panduan tidak menjalankan
-latihan atau membuat data baru pada database v1 Anda.
+latihan atau membuat data baru pada database lokal Anda.
 
 ## 13. Rutinitas dan pemecahan masalah
 
@@ -416,7 +416,7 @@ latihan atau membuat data baru pada database v1 Anda.
 
 | Gejala | Yang diperiksa |
 |---|---|
-| Situs tidak terbuka | Terminal server masih berjalan, alamat/port benar, berada di folder v1 |
+| Situs tidak terbuka | Terminal server masih berjalan, alamat/port benar, berada di folder repository |
 | Login gagal | Akun sudah dibuat, password benar, akun aktif dan memiliki status staf atau grup Cashier |
 | Bisa login tetapi diarahkan ke kasir | Akun berada di grup Cashier tanpa status staf |
 | Menu tidak tampil | Kategori aktif, Tampilkan di katalog aktif, Tersedia untuk dipesan aktif |
@@ -427,19 +427,17 @@ latihan atau membuat data baru pada database v1 Anda.
 | Foto tetap berlatar kotak | File tidak transparan; gunakan cutout PNG/WebP transparan |
 | QR tidak bekerja di ponsel | Alamat QR bukan localhost ponsel; server/jaringan/domain sudah dapat dijangkau |
 | QR meja ditolak | Meja masih aktif dan tautan tidak diubah |
-| Daftar terlihat kosong | Hapus filter dengan Reset; v1 awal memang belum berisi meja/transaksi/log |
+| Daftar terlihat kosong | Hapus filter dengan Reset; instalasi baru belum berisi meja/transaksi/log |
 | Tombol tambah/menu navigasi tidak terbuka | Pastikan aset UI/CDN termuat; koneksi diperlukan untuk library yang memakai CDN |
 
-### Catatan penggunaan v1
+### Catatan penggunaan
 
 Menu CMS tersedia sesuai panduan di atas; sejumlah halaman menyediakan nonaktif,
 bukan hapus. Tidak ada tombol ekspor transaksi atau detail transaksi baru pada
 CMS Pesanan. Perubahan akun/transaksi langsung di Admin memerlukan pemahaman
 relasi data. Untuk proses harian, ikuti alur CMS/kasir yang telah tersedia.
 
-Panduan disusun dari URL, form, template, registrasi Admin, dan aturan layanan
-lokal v1. Pembuatan akun pertama dan langkah Admin belum dijalankan pada database
-v1 yang bersih; nama menu Admin dapat mengikuti bahasa/izin akun.
+Nama menu Admin dapat mengikuti pengaturan bahasa dan izin akun yang digunakan.
 
 Referensi teknis untuk pengembang: users/urls.py, users/views.py, users/forms.py,
 users/templates/users/, menu/forms.py, menu/admin.py, orders/admin.py, dan

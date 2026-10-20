@@ -1,8 +1,9 @@
 # Panduan Pengembangan RasaKita
 
-Panduan frontend dan backend untuk **branch `ahmad`**, diperbarui 20 Oktober
-2026. Susunannya mengikuti panduan di `main`, tetapi menjelaskan implementasi
-v1 yang telah diintegrasikan ke branch ini.
+Panduan untuk anggota tim RasaKita, **Universitas Mulawarman, Samarinda,
+Kalimantan Timur**, pada branch `ahmad`. Isinya membantu anggota memahami
+pembagian modul dan mengembangkan fitur bersama. Semua perintah dijalankan
+dari folder repository yang berisi `manage.py`.
 
 Mulai dari [README](../README.md) untuk instalasi. Untuk mencoba sebagai
 pelanggan, staf, atau kasir, baca [panduan penggunaan](PANDUAN_PENGGUNAAN.md).
@@ -19,7 +20,7 @@ pelanggan, staf, atau kasir, baca [panduan penggunaan](PANDUAN_PENGGUNAAN.md).
 8. [Chatbot lokal dan hybrid](#8-chatbot-lokal-dan-hybrid)
 9. [Kelas dan OOP](#9-kelas-dan-oop)
 10. [Migrasi, foto, dan data awal](#10-migrasi-foto-dan-data-awal)
-11. [Pengujian dan urutan perubahan](#11-pengujian-dan-urutan-perubahan)
+11. [Alur kerja tim](#11-alur-kerja-tim)
 12. [Batas sistem](#12-batas-sistem)
 
 ## 1. Gambaran sistem
@@ -56,14 +57,16 @@ flowchart TD
 itu. Nama file ini tidak bergantung pada nama folder repository. Jangan
 menghapusnya atau mengganti default ke `config.settings` tanpa meninjau perbedaannya.
 
-- `v1_settings.py`: SQLite `db.sqlite3`, media lokal, zona waktu Makassar,
+- `v1_settings.py`: SQLite `db.sqlite3`, media lokal, waktu WITA (UTC+8) untuk Samarinda,
   host loopback, dan Gemini nonaktif.
 - `config/settings.py`: profil terpisah yang membaca environment sesuai kode
   di file itu. Jangan menganggap nama variabelnya sama dengan profil lain.
 - `local_gemini_settings.py`: profil lokal opsional yang dibuat per laptop;
   tidak disediakan melalui Git. Dapat membaca `.env` jika pemiliknya menambahkan
-  `load_dotenv` sesuai panduan pengujian.
+  `load_dotenv`. Konfigurasi dan key disiapkan sendiri oleh pemilik laptop.
 - File `.env` saja tidak otomatis mengaktifkan Gemini pada `v1_settings`.
+- Nama teknis zona waktu pada Django adalah `Asia/Makassar`. Pengenal ini
+  mewakili WITA yang juga digunakan di Samarinda; bukan lokasi tim pengembang.
 - Rahasia development `.local-secret-key` dibuat otomatis secara lokal.
 
 Instalasi baru mengikuti README, termasuk foto katalog. Tidak memerlukan
@@ -119,8 +122,8 @@ start.ps1                       menjalankan server lokal
 | Konteks dan penyimpanan chat | `conversation_session.py`, `conversation_store.py` |
 
 Path layanan chatbot yang disingkat berada di `recommendation/services/`.
-Pengujian sekarang berada di paket `tests/` per aplikasi; jangan menambahkan
-kembali file `tests.py` lama yang sudah dipindahkan.
+Folder `tests/` pada setiap aplikasi menyimpan contoh pemeriksaan otomatis
+untuk aturan modul tersebut.
 
 ## 4. Aliran request
 
@@ -278,7 +281,7 @@ konfirmasi bahan dan risiko kontak silang kepada staf tetap diperlukan.
 - **Lokal:** `GEMINI_ENABLED=False`; respons dan keputusan lokal tanpa API.
 - **Ranking:** Gemini dapat membantu urutan kandidat yang lolos filter.
   `ranking_validation=accepted` menunjukkan keluaran dipakai; sukses HTTP provider belum cukup.
-- **Wording:** fitur kalimat AI opsional, default nonaktif pada v1. Kalimat
+- **Wording:** fitur kalimat AI opsional, default nonaktif pada profil lokal. Kalimat
   tetap dapat berupa template lokal walaupun ranking Gemini aktif.
 - **Proposal v3:** jalur interpretasi opsional dengan validasi; pemasangan SDK
   atau keberadaan key saja tidak mengaktifkan jalur ini.
@@ -287,7 +290,7 @@ Key/model/flag ada pada profil lokal terpisah, bukan frontend. Pilih model yang
 tersedia untuk proyek Gemini sendiri; jangan menyalin key anggota lain.
 `provider_attempt` mencatat upaya. Timeout/fallback tetap dapat memakai kuota;
 token tidak tersedia bukan berarti nol. Reset chat bukan cara menghapus batas
-panggilan. Detail konfigurasi/verifikasi ada di [panduan pengujian](PANDUAN_TESTING_LOKAL.md).
+panggilan. Cara memeriksa alur lewat browser ada di [panduan pemeriksaan lokal](PANDUAN_TESTING_LOKAL.md).
 
 ## 9. Kelas dan OOP
 
@@ -341,45 +344,32 @@ hilang; salin aset awal sesuai README atau pulihkan backup yang cocok.
 Jangan menghapus `menu/assets/recovered-menu/` sebagai aset tidak terpakai:
 foto awal, pemulihan foto, dan pengujian membutuhkan isinya.
 
-## 11. Pengujian dan urutan perubahan
+## 11. Alur kerja tim
 
-Pemeriksaan awal dari folder repository dengan Python proyek:
+1. Buka terminal di folder repository, lalu aktifkan lingkungan Python proyek.
+2. Jalankan `git status` dan pastikan perubahan milik sendiri sudah dikenali.
+   Sepakati branch pekerjaan dengan tim sebelum mulai mengubah fitur.
+3. Baca alur modul yang akan diubah. Gunakan tabel pada bagian 3 untuk menemukan
+   file yang bertanggung jawab; koordinasikan perubahan pada modul anggota lain.
+4. Ubah satu kebutuhan yang jelas. Jika model berubah, sertakan migrasi baru
+   dan jelaskan dampaknya terhadap data anggota lain.
+5. Jalankan pemeriksaan dasar dari folder repository:
 
-```powershell
-python -B manage.py check
-python -B manage.py test menu.tests.test_selection --noinput
-python -B manage.py test users.tests.test_access_contracts --noinput
-```
+   ```powershell
+   python -B manage.py check
+   ```
 
-Database tes Django berbeda dari database aplikasi. Jangan menggunakan transaksi
-di katalog kerja sebagai pengganti pengujian. Tes foto dapat menulis file, jadi
-gunakan media sementara ketika memperluas suite. Tes AI memakai provider palsu
-dan cache terisolasi secara default.
+6. Jalankan web sesuai README, lalu coba alur yang berubah dengan data latihan.
+   Panduan langkahnya ada di [pemeriksaan lokal](PANDUAN_TESTING_LOKAL.md).
+   Jika memakai `--noreload`, restart server setelah mengubah kode Python.
+7. Periksa `git diff`. Sertakan hanya perubahan yang berkaitan dengan tugas,
+   dan perbarui panduan jika cara penggunaan atau penyiapannya berubah.
+8. Buat commit setelah diperiksa. Integrasi antarbranch mengikuti review tim;
+   perubahan pada `ahmad` tidak otomatis mengubah `main`.
 
-Di workspace UTS penulis juga tersedia runner terisolasi:
-
-```powershell
-python -B output/pengembangan/integrasi-repo-20261020/run_full.py menu cart orders users recommendation
-```
-
-Perintah ini dijalankan dari UTS, bukan folder repository. `output/` tidak ikut
-clone GitHub; anggota baru tidak perlu memilikinya untuk menjalankan web.
-Runner memblokir SDK/koneksi eksternal dan memakai SQLite dalam memori, media
-sementara, serta cache uji. Jangan melemahkan konfigurasi production untuk meloloskan tes.
-
-Urutan ketika menambah fitur:
-
-1. Periksa branch dan perubahan lokal melalui `git status`.
-2. Pilih modul pemilik fitur; baca alur dan tes existing.
-3. Ubah aturan service/model bila perlu, kemudian view dan frontend pemanggil.
-4. Uji input normal/salah, akses, serta perubahan katalog/harga.
-5. Periksa diff dan migrasi; perbarui panduan terkait.
-6. Commit ke branch pekerjaan setelah diperiksa. Integrasi ke `main` melalui
-   review tim; push ke `ahmad` tidak mengubah `main`.
-
-Uji metadata katalog lengkap dan tidak lengkap. Jangan memberi semua tag pada
-semua menu agar hasil terlihat cocok. Perubahan budget/alergi/harga juga perlu
-diuji dalam percakapan lanjutan.
+Database dan foto upload tidak ikut diperbarui oleh Git. Anggota lain perlu
+menjalankan migrasi baru bila ada, tetapi tidak perlu memuat ulang katalog awal
+atau membuat ulang akun setiap menerima perubahan source.
 
 ## 12. Batas sistem
 
@@ -393,36 +383,3 @@ diuji dalam percakapan lanjutan.
   kombinasi yang mungkin sudah didukung.
 - Profil lokal bukan konfigurasi hosting siap pakai. Lihat
   [verifikasi hosting](PANDUAN_VERIFIKASI_HOSTING.md).
-
-## 13. Menjaga tampilan di berbagai ukuran layar
-
-Halaman pelanggan mengikuti desain mobile Figma dengan lebar maksimal **412 px**.
-Pada HP yang lebih kecil, halaman mengikuti lebar layar. Pada desktop, halaman
-tetap berada di tengah dengan lebar mobile; kartu tidak diperbesar memenuhi monitor.
-
-Aturan penyesuaian ada di
-[responsive.css](../menu/static/menu/css/responsive.css), yang dimuat setelah CSS
-tampilan utama. Jika mengubah jarak atau ukuran, periksa dahulu berkas ini agar
-aturan baru tidak saling menimpa. Jangan memperkecil seluruh halaman dengan
-`transform: scale(...)`, karena teks dan tombol ikut menjadi terlalu kecil.
-
-[responsive.mjs](../menu/static/menu/js/responsive.mjs) mengukur tinggi bilah
-keranjang dan ruang layar yang terlihat. Karena itu, posisi maskot AI tidak
-bergantung pada satu perkiraan tinggi footer. Foto, judul, dan pilihan pada detail
-menu berada dalam satu area gulir, sedangkan tombol tambah tetap di bawah.
-
-Saat mencoba perubahan tampilan:
-
-1. Jalankan server; setelah perubahan template, restart bila memakai `--noreload`.
-2. Buka alat pengembang browser dan pilih simulasi perangkat mobile.
-3. Coba lebar 320, 360, 390, 412, dan 430 px, lalu putar ke posisi mendatar.
-4. Periksa menu kosong/berisi keranjang, detail menu, keranjang, jenis pesanan,
-   konfirmasi, chatbot, serta struk. Coba nama menu dan catatan yang panjang.
-5. Pastikan halaman tidak bergulir ke samping. Gulir sampai bagian terakhir dan
-   pastikan tombol penting tetap bisa dijangkau.
-6. Coba keyboard asli di HP, terutama saat mengisi catatan dan chatbot. Simulasi
-   browser belum membuktikan perilaku keyboard dan area aman pada semua HP.
-7. Di desktop, pastikan halaman dan dialog memakai bingkai mobile yang sama.
-
-Perubahan ini mengatur tampilan. Harga, validasi pesanan, serta aturan chatbot
-tetap dihitung oleh layanan backend seperti sebelumnya.

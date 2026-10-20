@@ -27,7 +27,7 @@ dipakai ketika menunjuk kode, bukan syarat untuk mulai membaca ceritanya.
 10. [Dari hasil pencarian menjadi kalimat](#10-dari-hasil-pencarian-menjadi-kalimat)
 11. [Dari kartu menu menjadi pesanan](#11-dari-kartu-menu-menjadi-pesanan)
 12. [Mengapa ada batas penggunaan dan pemeriksaan keamanan?](#12-mengapa-ada-batas-penggunaan-dan-pemeriksaan-keamanan)
-13. [Cara membaca log dan menguji](#13-cara-membaca-log-dan-menguji)
+13. [Memahami catatan proses](#13-memahami-catatan-proses)
 14. [Contoh percakapan untuk dipelajari](#14-contoh-percakapan-untuk-dipelajari)
 15. [Keterbatasan dan urutan membaca kode](#15-keterbatasan-dan-urutan-membaca-kode)
 
@@ -295,12 +295,14 @@ Keluaran JSON yang bisa dibaca belum otomatis lolos seluruh pemeriksaan.
 - `v1_settings.py` menonaktifkan Gemini pada penggunaan lokal default.
 - `CHATBOT_AI_RESPONSE_MODE` membedakan tugas respons seperti ranking/wording.
 - `CHATBOT_AI_WORDING_ENABLED` bukan otomatis aktif ketika ranking diaktifkan.
+- `CHATBOT_RANKING_STRUCTURED_OUTPUT_ENABLED` mengatur format JSON terstruktur
+  khusus ranking. Default nonaktif; validasi backend tetap berlaku bila diaktifkan.
 - `CHATBOT_PROPOSAL_V3_ENABLED` adalah jalur proposal opsional, bukan arti bahwa
   semua pesan sudah diinterpretasi penuh oleh AI.
 
-Konfigurasi Gemini per laptop tidak ikut Git sebagai rahasia. Lihat
-[panduan pengujian lokal](PANDUAN_TESTING_LOKAL.md) untuk percobaan terkontrol.
-Jangan membuka atau menyalin key anggota lain untuk mempelajari alurnya.
+Konfigurasi Gemini disiapkan per laptop dan tidak ikut Git karena memuat
+rahasia. Mode lokal tidak memerlukannya. Pengaktifan layanan berbayar perlu
+disepakati dengan pemilik akun; jangan menyalin key anggota lain.
 
 ## 10. Dari hasil pencarian menjadi kalimat
 
@@ -368,7 +370,7 @@ penghitung bersama banyak worker. Hosting memerlukan konfigurasi penyimpanan,
 cache bersama, HTTPS, dan batas penggunaan yang diverifikasi. Jangan menyalin
 pengecualian profil uji sebagai konfigurasi production.
 
-## 13. Cara membaca log dan menguji
+## 13. Memahami catatan proses
 
 | Yang terlihat | Artinya | Bukan bukti bahwa… |
 |---|---|---|
@@ -386,18 +388,10 @@ juga bukan berarti gratis. Timeout dapat membuat pemakaian belum diketahui.
 Catat ID request dan ringkasan aman; cocokkan dengan dashboard penyedia bila
 sedang melakukan percobaan live.
 
-### Tiga lapis belajar menguji
-
-1. **Tanpa web:** jalankan contoh `BudgetConstraint` dan generator palsu pada modul OOP.
-2. **Tes aplikasi:** baca tes konteks, budget, keamanan, dan generator di
-   [`recommendation/tests/`](../recommendation/tests/). Provider palsu dipakai
-   untuk menguji aturan dan fallback tanpa layanan luar.
-3. **Browser lokal:** coba percakapan di instalasi latihan tanpa Gemini.
-   Gemini live merupakan percobaan terpisah dengan batas pemakaian dan pemantauan.
-
-Tes otomatis bukan jaminan semua bahasa manusia sudah dimengerti. Uji satu
-perubahan dalam beberapa pesan, bukan hanya satu pesan yang berdiri sendiri.
-Cara menjalankan suite ada di [panduan pengembangan](PANDUAN_PENGEMBANGAN.md#11-pengujian-dan-urutan-perubahan).
+Saat menelusuri kendala, gunakan urutan pesan yang menyebabkan masalah dan
+cocokkan hasilnya dengan katalog. Catat langkah serta hasil yang terlihat agar
+anggota lain bisa mengulangnya. Panduan pemeriksaan melalui browser ada di
+[pemeriksaan lokal](PANDUAN_TESTING_LOKAL.md).
 
 ## 14. Contoh percakapan untuk dipelajari
 

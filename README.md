@@ -4,6 +4,9 @@ Aplikasi restoran berbasis Django: pelanggan memilih menu dan membuat pesanan,
 staf mengelola katalog, dan kasir mencatat pembayaran. Chatbot membantu mencari
 menu; pemesanan tetap dilanjutkan melalui pilihan menu dan keranjang.
 
+Proyek bersama mahasiswa **Universitas Mulawarman, Samarinda, Kalimantan Timur**.
+Waktu operasional mengikuti **WITA (UTC+8)**.
+
 Panduan ini mengikuti **branch `ahmad`**. Pembaruan source tidak otomatis mengubah
 database, akun, foto upload, atau konfigurasi di laptop anggota lain.
 
@@ -13,7 +16,9 @@ database, akun, foto upload, atau konfigurasi di laptop anggota lain.
 - SQLite sudah tersedia bersama Python; tidak perlu memasang MySQL atau Laragon.
 - Internet diperlukan saat clone, instalasi dependency, serta memuat Bootstrap
   dan pemindai QR dari CDN. Chatbot lokal tidak membutuhkan API key Gemini.
-- Contoh memakai PowerShell Windows dan dijalankan dari folder proyek.
+- Contoh memakai PowerShell Windows. Jalankan semua perintah dari folder
+  `pemesanan-makanan-digital` yang berisi `manage.py`; lokasi penyimpanannya bebas
+  pada laptop masing-masing anggota.
 
 ## Instalasi pertama — lima langkah
 
@@ -69,7 +74,9 @@ Folder `media/` tidak ikut GitHub. Foto awal tersedia di
 ```powershell
 New-Item -ItemType Directory -Path media/menu/detail -Force | Out-Null
 
-"ayam-geprek","nasi-goreng","kentang-goreng","es-jeruk" |ForEach-Object {Copy-Item "menu/assets/recovered-menu/$_.webp" "media/menu/"}
+"ayam-geprek", "nasi-goreng", "kentang-goreng", "es-jeruk" | ForEach-Object {
+    Copy-Item "menu/assets/recovered-menu/$_.webp" "media/menu/"
+}
 
 Copy-Item "menu/assets/recovered-menu/ayam-detail.webp" "media/menu/detail/"
 ```
@@ -147,7 +154,7 @@ mengisi data katalog. Keduanya berbeda.
 
 | File/folder | Kegunaan |
 |---|---|
-| `v1_settings.py` | Konfigurasi default lokal; diperlukan meskipun nama folder tidak memakai akhiran v1. |
+| `v1_settings.py` | Konfigurasi bawaan untuk menjalankan `manage.py` secara lokal. |
 | `config/settings.py` | Profil terpisah, misalnya untuk persiapan deployment; bukan default `manage.py` lokal. |
 | `db.sqlite3` | Katalog, akun, pesanan, dan sesi lokal. Tidak masuk Git. |
 | `media/`, `private/menu-originals/` | Foto upload dan arsip foto asli. Tidak masuk Git. |
@@ -178,6 +185,6 @@ otomatis mengirim pesan ke Gemini. Mode hybrid dijelaskan di
   OOP, chatbot, dan cara mengubah fitur.
 - [Penggunaan](docs/PANDUAN_PENGGUNAAN.md): pelanggan, staf, kasir, akun, dan simulasi.
 - [CMS/Admin](docs/PANDUAN_CMS_ADMIN.md): rincian layar dan form pengelolaan.
-- [Pengujian lokal](docs/PANDUAN_TESTING_LOKAL.md) dan
+- [Pemeriksaan lokal](docs/PANDUAN_TESTING_LOKAL.md) dan
   [verifikasi hosting](docs/PANDUAN_VERIFIKASI_HOSTING.md).
 - [Indeks seluruh panduan](docs/README.md).
