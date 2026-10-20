@@ -4,7 +4,7 @@ import { bindCheckout } from "./checkout.mjs?v=customer-p4-r5";
 import { bindMenu, renderCatalog } from "./menu.mjs?v=customer-p4-r5";
 import { bindTableScanner, establishTableContext } from "./table-scanner.mjs?v=customer-p4-r5";
 import { state } from "./state.mjs?v=customer-p4-r5";
-import { bindCustomerNavigation } from "./navigation.mjs?v=customer-p4-r5";
+import { bindCustomerNavigation } from "./navigation.mjs?v=service-layer-r8";
 import { bindCatalogAi } from "./catalog-ai.mjs?v=chef-r6";
 
 function showView() {
@@ -27,13 +27,9 @@ export function updateServiceContext() {
 }
 
 async function initializeStorefront() {
-  bindCustomerNavigation();
+  const navigation = bindCustomerNavigation();
   bindMenu();
-  document.querySelector(".cart-service").addEventListener("click",()=>{
-    const drawer=document.querySelector("#cartDrawer");
-    drawer.addEventListener("hidden.bs.offcanvas",()=>bootstrap.Modal.getOrCreateInstance(document.querySelector("#serviceModal")).show(),{once:true});
-    bootstrap.Offcanvas.getInstance(drawer).hide();
-  });
+  document.querySelector(".cart-service").addEventListener("click", navigation.openServiceFromCart);
   bindCart();
   bindCheckout();
   bindTableScanner();

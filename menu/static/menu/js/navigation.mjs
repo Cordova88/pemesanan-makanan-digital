@@ -7,6 +7,8 @@ export function bindCustomerNavigation() {
     ["serviceModal", "modal", "jenis-pesanan"],
   ];
   let replaying = false;
+  let serviceFromCart = false;
+  let guardCartFocus = false;
   const opening = new Set();
   if (!history.state?.customerScreen) {
     history.replaceState({customerScreen: location.hash && location.hash !== "#beranda" ? "menu" : "home"}, "", location.href);
@@ -16,6 +18,7 @@ export function bindCustomerNavigation() {
     element.addEventListener(`shown.bs.${kind}`, () => opening.delete(id));
     element.addEventListener(`show.bs.${kind}`, () => {
       opening.add(id);
+      if (id === "serviceModal") serviceFromCart = document.getElementById("cartDrawer").classList.contains("show");
       document.body.classList.add("customer-overlay-open");
       if (!replaying && history.state?.customerScreen !== id) {
         history.pushState({customerScreen: id}, "", `#${route}`);
@@ -37,12 +40,13 @@ export function bindCustomerNavigation() {
     replaying = true;
     const target = event.state?.customerScreen;
     const closing = [];
+    const keepCart = target === "serviceModal" && serviceFromCart;
     for (const [id, kind] of screens) {
       const element = document.getElementById(id);
       if (id !== target && opening.has(id)) {
         await new Promise(resolve => element.addEventListener(`shown.bs.${kind}`, resolve, {once: true}));
       }
-      if (element.classList.contains("show") && id !== target) {
+      if (element.classList.contains("show") && id !== target && !(keepCart && id === "cartDrawer")) {
         closing.push(new Promise(resolve => element.addEventListener(`hidden.bs.${kind}`, resolve, {once: true})));
         (kind === "modal" ? bootstrap.Modal : bootstrap.Offcanvas).getInstance(element)?.hide();
       }
@@ -56,4 +60,51 @@ export function bindCustomerNavigation() {
     document.body.classList.toggle("customer-overlay-open", Boolean(entry));
     replaying = false;
   });
+
+  const drawer = document.getElementById("cartDrawer");
+  const service = document.getElementById("serviceModal");
+  service.addEventListener("show.bs.modal", () => { guardCartFocus = false; });
+  service.addEventListener("shown.bs.modal", () => {
+    // The parent drawer had its own focus trap before the modal took over.
+    service.focus({preventScroll: true});
+  });
+  drawer.addEventListener("keydown", event => {
+    // During the opening animation focus may still be in the parent drawer.
+    if (event.key === "Escape" && service.classList.contains("show")) {
+      event.stopImmediatePropagation();
+      bootstrap.Modal.getInstance(service)?.hide();
+    }
+  }, true);
+  service.addEventListener("hidden.bs.modal", () => {
+    if (!drawer.classList.contains("show")) return;
+    // Bootstrap's modal takes over its own focus trap. Restore keyboard access
+    // to the still-open cart after the child dialog closes, using public DOM APIs.
+    guardCartFocus = true;
+    drawer.querySelector(".cart-service").focus({preventScroll: true});
+  });
+  drawer.addEventListener("hidden.bs.offcanvas", () => { guardCartFocus = false; });
+  const cartIsForeground = () => guardCartFocus && drawer.classList.contains("show")
+    && !document.querySelector(".modal.show");
+  document.addEventListener("focusin", event => {
+    if (cartIsForeground() && !drawer.contains(event.target)) drawer.focus({preventScroll: true});
+  });
+  drawer.addEventListener("keydown", event => {
+    if (event.key !== "Tab" || !cartIsForeground()) return;
+    const controls = [...drawer.querySelectorAll("a[href],button,input,textarea,select,[tabindex]")]
+      .filter(el => !el.disabled && el.tabIndex >= 0 && el.getClientRects().length);
+    const first = controls[0], last = controls.at(-1);
+    if (!first) { event.preventDefault(); drawer.focus(); return; }
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === drawer)) {
+      event.preventDefault(); last.focus();
+    } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === drawer)) {
+      event.preventDefault(); first.focus();
+    }
+  });
+
+  return {
+    openServiceFromCart() {
+      // The cart stays visible and retains its scroll position beneath the popup.
+      bootstrap.Modal.getOrCreateInstance(service).show(drawer.querySelector(".cart-service"));
+    },
+  };
 }

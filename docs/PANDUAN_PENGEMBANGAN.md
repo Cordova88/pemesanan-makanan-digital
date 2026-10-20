@@ -393,3 +393,36 @@ diuji dalam percakapan lanjutan.
   kombinasi yang mungkin sudah didukung.
 - Profil lokal bukan konfigurasi hosting siap pakai. Lihat
   [verifikasi hosting](PANDUAN_VERIFIKASI_HOSTING.md).
+
+## 13. Menjaga tampilan di berbagai ukuran layar
+
+Halaman pelanggan mengikuti desain mobile Figma dengan lebar maksimal **412 px**.
+Pada HP yang lebih kecil, halaman mengikuti lebar layar. Pada desktop, halaman
+tetap berada di tengah dengan lebar mobile; kartu tidak diperbesar memenuhi monitor.
+
+Aturan penyesuaian ada di
+[responsive.css](../menu/static/menu/css/responsive.css), yang dimuat setelah CSS
+tampilan utama. Jika mengubah jarak atau ukuran, periksa dahulu berkas ini agar
+aturan baru tidak saling menimpa. Jangan memperkecil seluruh halaman dengan
+`transform: scale(...)`, karena teks dan tombol ikut menjadi terlalu kecil.
+
+[responsive.mjs](../menu/static/menu/js/responsive.mjs) mengukur tinggi bilah
+keranjang dan ruang layar yang terlihat. Karena itu, posisi maskot AI tidak
+bergantung pada satu perkiraan tinggi footer. Foto, judul, dan pilihan pada detail
+menu berada dalam satu area gulir, sedangkan tombol tambah tetap di bawah.
+
+Saat mencoba perubahan tampilan:
+
+1. Jalankan server; setelah perubahan template, restart bila memakai `--noreload`.
+2. Buka alat pengembang browser dan pilih simulasi perangkat mobile.
+3. Coba lebar 320, 360, 390, 412, dan 430 px, lalu putar ke posisi mendatar.
+4. Periksa menu kosong/berisi keranjang, detail menu, keranjang, jenis pesanan,
+   konfirmasi, chatbot, serta struk. Coba nama menu dan catatan yang panjang.
+5. Pastikan halaman tidak bergulir ke samping. Gulir sampai bagian terakhir dan
+   pastikan tombol penting tetap bisa dijangkau.
+6. Coba keyboard asli di HP, terutama saat mengisi catatan dan chatbot. Simulasi
+   browser belum membuktikan perilaku keyboard dan area aman pada semua HP.
+7. Di desktop, pastikan halaman dan dialog memakai bingkai mobile yang sama.
+
+Perubahan ini mengatur tampilan. Harga, validasi pesanan, serta aturan chatbot
+tetap dihitung oleh layanan backend seperti sebelumnya.
