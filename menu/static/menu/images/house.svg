@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="38 144 40 40" fill="none"><path d="M66 144H50C43.3726 144 38 149.373 38 156V172C38 178.627 43.3726 184 50 184H66C72.6274 184 78 178.627 78 172V156C78 149.373 72.6274 144 66 144Z" fill="#FBE8E3" />
+<path d="M56 172H49V162L58 156L67 162V172H60M67 162H64H62C61 162 52 162 52 162H49.5M56 172H60M56 172V167H60V172" stroke="#B8322E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

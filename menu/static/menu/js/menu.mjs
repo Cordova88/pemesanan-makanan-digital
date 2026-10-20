@@ -1,7 +1,6 @@
-import { money } from "./api.mjs";
-import { state } from "./state.mjs";
-
-function menuImage(item) { return item.image_url || ""; }
+import { createMenuCard, createFoodVisual, createDetailPhoto } from './menu-card.mjs?v=images-p8';
+import { money } from "./api.mjs?v=images-p8";
+import { state } from "./state.mjs?v=images-p8";
 
 function renderMenu() {
   const query = document.querySelector("#search").value.toLowerCase();
@@ -11,7 +10,7 @@ function renderMenu() {
       item.name.toLowerCase().includes(query),
   );
   const grid = document.querySelector("#menuGrid");
-  document.querySelector("#menuCount").textContent = `${filtered.length} menu`;
+  document.querySelector("#menuCount").textContent = `${filtered.length} Menu`;
   grid.replaceChildren();
 
   if (!filtered.length) {
@@ -22,69 +21,17 @@ function renderMenu() {
     return;
   }
 
-  filtered.forEach((item) => {
+  filtered.forEach((item, index) => {
     const column = document.createElement("div");
-    column.className = "col-6 col-md-4 col-lg-3";
-    const card = document.createElement("article");
-    card.className = "card menu-card h-100 bg-white";
-    const cover = document.createElement("div");
-    cover.className = "food-cover mb-2";
-    const image = document.createElement("img");
-    if (menuImage(item)) {
-      const image = document.createElement("img");
-      image.src = menuImage(item);
-      image.alt = item.name;
-      image.loading = "lazy";
-      image.width = 400;
-      image.height = 300;
-      image.addEventListener("error", () => {
-        cover.replaceChildren();
-        cover.innerHTML = `<span class="food-placeholder">${item.name.charAt(0).toUpperCase()}</span>`;
-      }, { once: true });
-      cover.append(image);
-    } else {
-      cover.innerHTML = `<span class="food-placeholder">${item.name.charAt(0).toUpperCase()}</span>`;
-    }
-
-    const body = document.createElement("div");
-    body.className = "card-body p-1 d-flex flex-column";
-    const tags = document.createElement("div");
-    tags.className = "d-flex gap-1 flex-wrap mb-2";
-    (item.tags || []).slice(0, 2).forEach((tag) => {
-      const chip = document.createElement("span");
-      chip.className = "badge bg-light text-secondary border fw-normal";
-      chip.textContent = tag;
-      tags.append(chip);
-    });
-    const name = document.createElement("h3");
-    name.className = "h6 fw-bold mb-1 text-truncate";
-    name.textContent = item.name;
-    const description = document.createElement("p");
-    description.className =
-      "small text-muted line-clamp-2 mb-3 flex-grow-1";
-    description.textContent = item.description || "Dibuat segar untukmu hari ini.";
-    const footer = document.createElement("div");
-    footer.className =
-      "d-flex align-items-center justify-content-between mt-auto gap-1";
-    const price = document.createElement("span");
-    price.className = "fw-bold text-dark";
-    price.textContent = money(item.price);
-    const add = document.createElement("button");
-    add.type = "button";
-    add.className = "btn btn-primary-app rounded-circle menu-add d-flex align-items-center justify-content-center";
-    add.dataset.menuId = item.id;
-    add.textContent = "+";
-
-    footer.append(price, add);
-    body.append(tags, name, description, footer);
-    card.append(cover, body);
-    column.append(card);
+    column.className = "col-6";
+    column.append(createMenuCard(item, { eager: index < 2 }));
     grid.append(column);
   });
 }
 
 function renderCategories() {
-  const categories = ["Semua", ...new Set(state.menu.map((item) => item.category))];
+  const available = [...new Set(state.menu.map(item => item.category))];
+  const categories = ["Semua", ...["Makanan","Minuman","Camilan"].filter(name=>available.includes(name)), ...available.filter(name=>!["Makanan","Minuman","Camilan"].includes(name))];
   const container = document.querySelector("#categories");
   container.replaceChildren();
 
@@ -92,44 +39,44 @@ function renderCategories() {
     const button = document.createElement("button");
     button.type = "button";
     button.className =
-      "btn category-chip rounded-pill px-3 py-1.5 small" +
+      "category-chip" +
       (category === state.category ? " active" : "");
+    button.setAttribute("aria-pressed", String(category === state.category));
     button.dataset.category = category;
     button.textContent = category;
     container.append(button);
   });
 }
 
-function openItem(id) {
+export function openItem(id, line = null) {
+  state.editingLine = line?.id || null;
   state.chosen = state.menu.find((item) => item.id === id);
   if (!state.chosen) {
     return;
   }
   document.querySelector("#modalTitle").textContent = state.chosen.name;
+  document.querySelector("#itemBasePrice").textContent = money(state.chosen.price);
   document.querySelector("#modalDescription").textContent = state.chosen.description || "";
   const modalImage = document.querySelector("#modalImage");
   modalImage.replaceChildren();
-  if (state.chosen.image_url) {
-    const image = document.createElement("img");
-    image.src = state.chosen.image_url;
-    image.alt = state.chosen.name;
-    image.className = "w-100 h-100 object-fit-cover rounded-3";
-    image.onerror = () => modalImage.innerHTML = `<span class="food-placeholder">${state.chosen.name.charAt(0)}</span>`;
-    modalImage.append(image);
-  } else {
-    modalImage.innerHTML = `<span class="food-placeholder">${state.chosen.name.charAt(0)}</span>`;
-  }
+  modalImage.append(createDetailPhoto(state.chosen));
 
   const body = document.querySelector("#modalBody");
   body.replaceChildren();
   state.chosen.variants.forEach((group) => {
     const section = document.createElement("div");
-    section.className = "mb-3";
+    section.className = "choice-section mb-3";
     const title = document.createElement("label");
     title.className = "form-label fw-semibold small d-flex align-items-center gap-2";
-    title.innerHTML = `${group.name} <span class="badge ${group.required ? "bg-success-subtle text-success" : "bg-light text-secondary"}">${group.required ? "Wajib" : "Opsional"}</span>`;
+    title.textContent = group.name;
+    const requirement = document.createElement("span");
+    requirement.className = `badge ${group.required ? "bg-success-subtle text-success" : "bg-light text-secondary"}`;
+    requirement.textContent = group.required ? "Wajib pilih" : "Opsional";
+    title.append(requirement);
     section.append(title);
 
+    const chips = document.createElement("div");
+    chips.className = "variant-chips";
     group.options.forEach((option) => {
       const row = document.createElement("div");
       row.className = "option-row mb-2 d-flex align-items-center gap-2";
@@ -139,6 +86,7 @@ function openItem(id) {
       input.name = `group-${group.id}`;
       input.value = option.id;
       input.required = group.required;
+      input.setAttribute("aria-label", option.name);
       input.checked = group.required && group.options[0].id === option.id;
       input.dataset.price = option.price_adjustment;
       const label = document.createElement("label");
@@ -154,8 +102,9 @@ function openItem(id) {
           input.click();
         }
       });
-      section.append(row);
+      chips.append(row);
     });
+    section.append(chips);
     if (group.required) {
       section.querySelector(".variant-choice").checked = true;
     }
@@ -164,7 +113,7 @@ function openItem(id) {
 
   if (state.chosen.addons.length) {
     const section = document.createElement("div");
-    section.className = "mb-3";
+    section.className = "choice-section mb-3";
     const title = document.createElement("label");
     title.className = "form-label fw-semibold small d-flex align-items-center gap-2";
     title.innerHTML = 'Tambahan <span class="badge bg-light text-secondary">Opsional</span>';
@@ -176,10 +125,16 @@ function openItem(id) {
       input.className = "form-check-input addon-choice";
       input.type = "checkbox";
       input.value = addon.id;
+      input.setAttribute("aria-label", addon.name);
       input.dataset.price = addon.price;
       const label = document.createElement("label");
       label.className = "form-check-label small";
-      label.textContent = `${addon.name} +${money(addon.price)}`;
+      const addonName = document.createElement("span");
+      addonName.textContent = addon.name;
+      const addonPrice = document.createElement("strong");
+      addonPrice.className = "accent";
+      addonPrice.textContent = `+${money(addon.price)}`;
+      label.append(addonName, addonPrice);
       row.append(input, label);
       row.addEventListener("click", (event) => {
         if (event.target !== input) {
@@ -191,34 +146,61 @@ function openItem(id) {
     body.append(section);
   }
 
-  const quantityLabel = document.createElement("label");
-  quantityLabel.className = "form-label fw-semibold small mt-1";
-  quantityLabel.htmlFor = "itemQty";
-  quantityLabel.textContent = "Jumlah";
+  const noteLabel = document.createElement("label");
+  noteLabel.className = "form-label kitchen-label";
+  noteLabel.htmlFor = "itemNote";
+  noteLabel.textContent = "Catatan untuk dapur (opsional)";
+  const note = document.createElement("textarea");
+  note.id = "itemNote";
+  note.className = "form-control kitchen-note";
+  note.maxLength = 500;
+  note.rows = 2;
+  note.placeholder = "Sambal dipisah, ya.";
+  note.value = line?.note || "";
+  const row = document.createElement("div");
+  row.className = "item-quantity-row";
+  const stepper = document.createElement("div");
+  stepper.className = "item-stepper";
   const quantity = document.createElement("input");
   quantity.id = "itemQty";
-  quantity.className = "form-control";
   quantity.type = "number";
   quantity.min = "1";
-  quantity.value = "1";
-  quantity.className = "form-control text-center";
-  body.append(quantityLabel, quantity);
-  const total = document.createElement("div");
-  total.className = "text-end text-secondary small mt-3";
-  body.append(total);
+  quantity.step = "1";
+  quantity.max = "99";
+  quantity.value = line?.quantity || 1;
+  quantity.setAttribute("aria-label", "Jumlah porsi");
+  const less = document.createElement("button"), more = document.createElement("button");
+  less.type = more.type = "button";
+  less.textContent = "−"; more.textContent = "+";
+  less.setAttribute("aria-label","Kurangi porsi"); more.setAttribute("aria-label","Tambah porsi");
+  stepper.append(less,quantity,more);
+  const total = document.createElement("strong");
+  total.className = "accent item-total";
+  const ai = document.createElement("a");
+  ai.href = "/chatbot/";
+  ai.className = "ai-button";
+  ai.setAttribute("aria-label","Buka RasaKita AI");
+  ai.innerHTML = '<span class="bot-symbol" aria-hidden="true"></span><small>AI</small>';
+  row.append(stepper,total,ai);
+  body.append(noteLabel,note,row);
+  if (line) {
+    body.querySelectorAll(".variant-choice").forEach(input => input.checked = line.variant_ids.includes(Number(input.value)));
+    body.querySelectorAll(".addon-choice").forEach(input => input.checked = line.addon_ids.includes(Number(input.value)));
+  }
   const updateTotal = () => {
-    const variantTotal = [...body.querySelectorAll(".variant-choice:checked")]
-      .reduce((sum, input) => sum + Number(input.dataset.price || 0), 0);
-    const addonTotal = [...body.querySelectorAll(".addon-choice:checked")]
-      .reduce((sum, input) => sum + Number(input.dataset.price || 0), 0);
-    const value = (Number(state.chosen.price) + variantTotal + addonTotal) * Number(quantity.value || 1);
-    total.textContent = `Total ${money(value)}`;
-    document.querySelector("#confirmAdd").textContent = `Tambahkan · ${money(value)}`;
+    const count = Number(quantity.value);
+    const extra = [...body.querySelectorAll("input:checked")].reduce((sum,input)=>sum+Number(input.dataset.price||0),0);
+    const value = (Number(state.chosen.price)+extra) * (Number.isFinite(count) ? count : 0);
+    total.textContent = money(value);
+    less.disabled = count <= 1;
+    more.disabled = count >= 99;
+    document.querySelector("#itemFooterTotal").textContent = `${count || 0} porsi · Total ${money(value)}`;
+    document.querySelector("#confirmAdd").textContent = line ? "Simpan pilihan" : "Tambah ke keranjang";
   };
-  body.querySelectorAll("input").forEach((input) => {
-    input.addEventListener("change", updateTotal);
-  });
-  quantity.addEventListener("input", updateTotal);
+  less.onclick = () => { quantity.value = Math.max(1,Number(quantity.value)-1); updateTotal(); };
+  more.onclick = () => { quantity.value = Math.min(99,Number(quantity.value)+1); updateTotal(); };
+  body.onchange = updateTotal;
+  quantity.addEventListener("input",updateTotal);
   updateTotal();
 
   bootstrap.Modal.getOrCreateInstance(
@@ -248,4 +230,22 @@ export function bindMenu() {
 export function renderCatalog() {
   renderCategories();
   renderMenu();
+  const hero = document.querySelector('#homeHero');
+  const featured = state.menu.find(item => item.image_url) || state.menu[0];
+  hero.replaceChildren();
+  if (featured) hero.append(createFoodVisual(featured, { eager: true }));
+  const favorites = document.querySelector("#homeFavorites");
+  favorites.replaceChildren();
+  state.menu.slice(0, 2).forEach((item) => {
+    const card = document.createElement("a");
+    card.href = "#menu";
+    card.addEventListener("click", () => openItem(item.id));
+    card.className = "favorite-card";
+    const image = createFoodVisual(item);
+    const name = document.createElement("strong");
+    name.textContent = item.name;
+    card.append(image, name);
+    favorites.append(card);
+  });
+  if (!state.menu.length) favorites.textContent = "Menu belum tersedia.";
 }

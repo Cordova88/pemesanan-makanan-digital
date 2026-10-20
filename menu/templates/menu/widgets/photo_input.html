@@ -1,0 +1,10 @@
+{% load static %}
+<div class="menu-photo-editor" data-photo-editor data-photo-module="{% static 'menu/js/menu-card.mjs' %}?v=images-p8" data-photo-original="{{ widget.photo_url }}" data-menu-id="{{ widget.attrs.data_menu_id|default:'' }}" data-photo-kind="{{ widget.attrs.data_photo_kind|default:'card' }}">
+  <div data-photo-card class="menu-photo-editor__card" aria-label="{% if widget.attrs.data_photo_kind == 'detail' %}Pratinjau foto arsip{% else %}Pratinjau kartu menu{% endif %}" hidden></div>
+  {% if widget.attrs.data_photo_kind != 'detail' %}<div data-photo-selection class="menu-photo-editor__selection" aria-label="Pratinjau foto pilihan menu" hidden></div>{% endif %}
+  {% if widget.photo_url %}<img data-photo-static src="{{ widget.photo_url }}" class="menu-photo-editor__static" alt="Foto menu tersimpan" width="176" height="132">{% endif %}
+  <p data-photo-status class="menu-photo-editor__status" role="status">{% if widget.photo_url %}Foto tersimpan.{% else %}Belum ada foto. Kartu akan memakai gambar pengganti.{% endif %}</p>
+  {% include 'django/forms/widgets/clearable_file_input.html' %}
+  <p data-photo-error class="menu-photo-editor__error" role="alert" hidden></p>
+  <p class="menu-photo-editor__hint">{% if widget.attrs.data_photo_kind == 'detail' %}Foto arsip ini tidak tampil pada halaman pelanggan. Gunakan Gambar menu untuk mengganti foto pelanggan.{% else %}Unggah foto makanan/minuman saja, sebaiknya PNG atau WebP transparan. Card dan blob dibuat otomatis. Foto yang sama dipakai di katalog, beranda, dan pilihan menu. Foto tanpa latar transparan tetap ditampilkan dengan latarnya; latar tidak dihapus otomatis.{% endif %}</p>
+</div>

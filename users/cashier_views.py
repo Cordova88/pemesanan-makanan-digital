@@ -1,3 +1,5 @@
+from collections.abc import Callable
+from django.http import HttpRequest, HttpResponse
 from functools import wraps
 
 from django.contrib.auth.decorators import login_required
@@ -17,18 +19,18 @@ STATUS_TABS = [
 ]
 
 
-def cashier_page_required(view):
+def cashier_page_required(view: Callable[..., HttpResponse]) -> Callable[..., HttpResponse]:
     """Harus login (lewat /staff/login/) dan lolos aturan peran yang sama dengan API orders."""
     @login_required(login_url="staff:login")
     @wraps(view)
-    def wrapper(request, *args, **kwargs):
+    def wrapper(request: HttpRequest, *args: object, **kwargs: object) -> HttpResponse:
         check_cashier(request.user)  # melempar PermissionDenied -> halaman 403
         return view(request, *args, **kwargs)
     return wrapper
 
 
 @cashier_page_required
-def dashboard(request):
+def dashboard(request: HttpRequest) -> HttpResponse:
     q = request.GET.get("q", "").strip().upper()
     status = request.GET.get("status", "PENDING")
     if status not in dict(STATUS_TABS):
@@ -58,7 +60,7 @@ def dashboard(request):
 
 
 @cashier_page_required
-def order_detail(request, public_id):
+def order_detail(request: HttpRequest, public_id: str) -> HttpResponse:
     public_id = public_id.upper()
     try:
         order = expire_order_if_due(public_id)  # status kedaluwarsa dimaterialisasi dulu
@@ -68,5 +70,5 @@ def order_detail(request, public_id):
     order = (Order.objects.select_related("table", "payment")
             .prefetch_related("items__variants", "items__addons")
             .get(pk=order.pk))
-    tables = Table.objects.filter(is_active=True).order_by("number") if order.status == "PENDING" else []
+    tables = Table.objects.filter(is_active=True).order_by("number") if order.is_pending else []
     return render(request, "users/kasir/order.html", {"order": order, "tables": tables})

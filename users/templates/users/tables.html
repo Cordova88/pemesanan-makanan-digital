@@ -12,17 +12,8 @@
       <div class="card-body">
         <form method="post" class="vstack gap-3">
           {% csrf_token %}
-          {% if form.non_field_errors %}<div class="alert alert-danger mb-0">{{ form.non_field_errors }}</div>{% endif %}
-          <div>
-            <label class="form-label fw-semibold" for="{{ form.number.id_for_label }}">Nomor / nama meja</label>
-            {{ form.number }}
-            <div class="text-danger small">{{ form.number.errors }}</div>
-          </div>
-          <div class="form-check form-switch">
-            {{ form.is_active }}
-            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">Aktif</label>
-          </div>
-          <button class="btn btn-success"><i class="bi bi-plus-lg me-1"></i>Simpan</button>
+          {% include 'users/includes/cms_form_fields.html' %}
+          <button class="btn btn-success">Simpan meja</button>
         </form>
       </div>
     </div>
@@ -40,7 +31,6 @@
             <tr>
               <th>Meja</th>
               <th>Status</th>
-              <th>Token publik</th>
               <th class="text-end">Aksi</th>
             </tr>
           </thead>
@@ -49,15 +39,14 @@
             <tr{% if not table.is_active %} class="text-secondary"{% endif %}>
               <td class="fw-semibold">Meja {{ table.number }}</td>
               <td>{% if table.is_active %}<span class="badge text-bg-success rounded-pill">Aktif</span>{% else %}<span class="badge text-bg-secondary rounded-pill">Nonaktif</span>{% endif %}</td>
-              <td><code class="small text-secondary">{{ table.token|truncatechars:22 }}</code></td>
               <td class="text-end">
-                <a class="btn btn-sm btn-outline-success" href="{% url 'staff:table-qr' table.pk %}"><i class="bi bi-qr-code me-1"></i>QR</a>
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'staff:table-qr' table.pk %}"><i class="bi bi-qr-code me-1"></i>Lihat QR</a>
                 <a class="btn btn-sm btn-outline-secondary" href="{% url 'staff:table-edit' table.pk %}"><i class="bi bi-pencil me-1"></i>Edit</a>
               </td>
             </tr>
             {% empty %}
             <tr>
-              <td colspan="4" class="text-center text-secondary py-4">Belum ada meja. Tambahkan yang pertama di sebelah kiri.</td>
+              <td colspan="3" class="text-center text-secondary py-4">Belum ada meja. Gunakan form tambah meja.</td>
             </tr>
             {% endfor %}
           </tbody>

@@ -1,12 +1,11 @@
 <div class="offcanvas offcanvas-bottom cart-bottom-sheet border-0 shadow-lg" tabindex="-1" id="cartDrawer" aria-labelledby="cartDrawerTitle">
-  <div class="w-100 pt-2 pb-1 d-flex justify-content-center"><div class="bg-stone-300 rounded-pill" style="width:40px;height:5px"></div></div>
   <div class="offcanvas-header border-bottom px-4 py-3">
     <h2 id="cartDrawerTitle" class="fw-bold fs-5 mb-0">Keranjang <span id="drawerItemCount" class="text-muted fw-normal fs-6">· 0 item</span></h2>
-    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Tutup keranjang"></button>
+    <button type="button" class="back-button" data-bs-dismiss="offcanvas" aria-label="Kembali ke menu">‹</button>
   </div>
-  <div id="cartLines" class="offcanvas-body px-4 py-2 overflow-auto"></div>
+  <div class="offcanvas-body overflow-auto"><p class="cart-intro">Cek pilihanmu sebelum lanjut.</p><button class="service-context paper-card cart-service" type="button"><span class="service-icon" aria-hidden="true"></span><span><strong class="cart-service-label"></strong><small class="cart-service-detail"></small></span><span class="ms-auto">›</span></button><div id="cartLines"></div><button class="add-more" data-bs-dismiss="offcanvas">+ Tambah menu</button><h3 class="section-title cart-summary-title">Ringkasan pesanan</h3><div class="paper-card summary-card"><p><span id="drawerSubtotalLabel">Subtotal (0 porsi)</span><strong id="drawerSubtotal">Rp0</strong></p><p class="muted mb-0"><span id="drawerAddonsLabel">Tambahan</span><b>Sudah termasuk</b></p><p class="summary-total"><span>Total</span><strong id="summaryTotal">Rp0</strong></p></div><a href="/chatbot/" class="ai-button ms-auto" aria-label="Buka RasaKita AI"><span class="bot-symbol" aria-hidden="true"></span><small>AI</small></a></div>
   <footer class="cart-footer p-4">
-    <div class="d-flex justify-content-between mb-3"><span class="text-secondary">Total</span><strong id="drawerTotal" class="fs-5">Rp0</strong></div>
-    <button id="checkoutButton" class="btn btn-primary-app w-100 py-3 rounded-3 fw-bold" disabled>Lanjut ke Checkout</button>
+    <strong id="drawerTotal" hidden>Rp0</strong><p class="footer-hint">Harga sesuai pilihan menu</p>
+    <button id="checkoutButton" class="btn btn-primary-app w-100" disabled>Lanjut konfirmasi</button>
   </footer>
 </div>

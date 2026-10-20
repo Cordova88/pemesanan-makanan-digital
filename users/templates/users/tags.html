@@ -1,14 +1,23 @@
 {% extends 'users/base.html' %}{% block content %}
 <h1 class="h3 mb-2">Tag Menu</h1>
+<div class="menu-toolbar d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <small class="text-secondary">{{ tags|length }} dari {{ tag_total }} tag</small>
+  <form class="menu-search d-flex gap-2" method="get" role="search">
+    <input class="form-control" type="search" aria-label="Cari tag" name="q" value="{{ query }}" placeholder="Cari kode atau nama tag">
+    <button class="btn btn-outline-secondary" type="submit" aria-label="Cari tag"><i class="bi bi-search" aria-hidden="true"></i></button>
+    {% if query %}<a class="btn btn-outline-secondary" href="{% url 'staff:tags' %}">Reset</a>{% endif %}
+  </form>
+</div>
 <p class="text-secondary">
   Kelola ciri menu seperti Pedas, Ayam, atau Berkuah, lalu pilih tag pada form
   tambah atau edit menu. Pada Edit Tag, hilangkan centang menu untuk melepas tag.
   Saat menghapus tag, kamu dapat melepasnya dari semua menu sekaligus tanpa menghapus menu.
 </p>
-<div class="card border-0 shadow-sm mb-4">
+<div class="card stat mb-4">
   <div class="card-body">
     <h2 class="h5">Tambah tag</h2>
     <form method="post" class="row g-3">
+      {% if form.errors %}<div class="col-12"><div class="alert alert-danger mb-0" role="alert">Tag belum disimpan. Periksa kolom yang ditandai.</div></div>{% endif %}
       {% csrf_token %} {% if form.non_field_errors %}
       <div class="col-12 text-danger">{{ form.non_field_errors }}</div>
       {% endif %} {% for field in form %}
@@ -28,7 +37,7 @@
     </form>
   </div>
 </div>
-<div class="card border-0 shadow-sm">
+<div class="card stat">
   <div class="table-responsive">
     <table class="table align-middle mb-0">
       <thead>
@@ -36,13 +45,13 @@
           <th>Tag</th>
           <th>Kode</th>
           <th>Jumlah menu</th>
-          <th></th>
+          <th>Tindakan</th>
         </tr>
       </thead>
       <tbody>
         {% for tag in tags %}
         <tr>
-          <td><span class="badge text-bg-success">{{ tag }}</span></td>
+          <td><span class="badge badge-tag">{{ tag }}</span></td>
           <td>{{ tag.name }}</td>
           <td>{{ tag.menu_count }}</td>
           <td>
@@ -61,7 +70,7 @@
         {% empty %}
         <tr>
           <td colspan="4" class="text-center py-4">
-            Belum ada tag. Tambahkan tag pertama di atas.
+            {% if query %}Tidak ada tag yang cocok dengan pencarian. Gunakan Reset untuk melihat semua tag.{% else %}Belum ada tag. Tambahkan tag pertama di atas.{% endif %}
           </td>
         </tr>
         {% endfor %}

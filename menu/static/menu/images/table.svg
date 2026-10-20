@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="38 144 40 40" width="40" height="40" fill="none"><path d="M66 144H50C43.3726 144 38 149.373 38 156V172C38 178.627 43.3726 184 50 184H66C72.6274 184 78 178.627 78 172V156C78 149.373 72.6274 144 66 144Z" fill="#FBE8E3" />
+<path d="M52 165V173C52 173 52.5 173 53.5 173C54.5 173 54 169.5 54.5 168.5C55 167.5 56.5 167 58 167C59.5 167 61 167.5 61.5 168.5C62 169.5 62 173 62 173H64V165M49 160H67V165H49V160Z" stroke="#B8322E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+<defs /></svg>

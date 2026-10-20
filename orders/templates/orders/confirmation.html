@@ -1,199 +1,8 @@
-<!doctype html>
-<html lang="id">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Status Pesanan — RasaKita</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    />
-    <style>
-      :root {
-        --brand: #047857;
-        --paper: #fafaf9;
-      }
-      body {
-        background: var(--paper);
-        color: #0f172a;
-        font-family:
-          system-ui,
-          -apple-system,
-          "Segoe UI",
-          Roboto,
-          sans-serif;
-      }
-      .brand {
-        color: var(--brand);
-        font-weight: 800;
-        letter-spacing: -0.5px;
-      }
-      .receipt {
-        max-width: 560px;
-        border: 0;
-        border-radius: 22px;
-        box-shadow: 0 12px 35px rgba(15, 23, 42, 0.08);
-      }
-      .status {
-        font-size: 0.78rem;
-        letter-spacing: 0.04em;
-      }
-      .qr-box {
-        width: 190px;
-        min-height: 190px;
-        display: grid;
-        place-items: center;
-        border: 1px solid #e2e8f0;
-        border-radius: 18px;
-        background: #fff;
-        margin: auto;
-      }
-      .expiry {
-        background: #ecfdf5;
-        border: 1px solid #bbf7d0;
-        color: #166534;
-        border-radius: 14px;
-      }
-      .expiry.expiry-warning {
-        background: #fffbeb;
-        border-color: #fde68a;
-        color: #92400e;
-      }
-      .expiry.expiry-danger {
-        background: #fef2f2;
-        border-color: #fecaca;
-        color: #991b1b;
-      }
-      .copy-link {
-        cursor: pointer;
-      }
-    </style>
-  </head>
-  <body>
-    <nav class="navbar bg-white border-bottom">
-      <div class="container py-2">
-        <a class="navbar-brand brand fs-4 m-0" href="/"
-          >rasa<span class="text-dark">kita</span></a
-        >
-        <a class="small text-decoration-none text-secondary" href="/"
-          >← Kembali ke menu</a
-        >
-      </div>
-    </nav>
-
-    <main class="container py-4 py-md-5">
-      <section class="card receipt mx-auto bg-white overflow-hidden">
-        <!-- Header Banner -->
-        <div class="text-center p-4 pb-3 border-bottom">
-          <div
-            class="rounded-circle bg-success-subtle text-success d-inline-flex align-items-center justify-content-center mb-3"
-            style="width: 54px; height: 54px"
-          >
-            ✓
-          </div>
-          <h1 class="h4 fw-bold mb-1">Pesanan Berhasil Dibuat</h1>
-          <p class="text-secondary mb-0 small">
-            Tunjukkan kode QR atau ID pesanan ini kepada kasir.
-          </p>
-        </div>
-
-        <!-- Card Body Content -->
-        <div class="card-body p-4">
-          <div id="loading" class="text-center text-secondary py-4">
-            Memuat detail pesanan…
-          </div>
-
-          <div id="content" class="d-none">
-            <!-- Order ID & Status Badge -->
-            <div             class="d-flex justify-content-between align-items-center mb-3">
-              <div>
-                <div class="small text-secondary fw-semibold">ID PESANAN</div>
-                <div class="d-flex align-items-center gap-2">
-                  <strong id="orderId" class="fs-4 text-dark"></strong>
-                  <button id="copyIdButton" type="button" class="btn btn-sm btn-outline-secondary rounded-pill">Salin</button>
-                </div>
-              </div>
-              <span
-                id="status"
-                class="badge rounded-pill status px-3 py-2"
-              ></span>
-            </div>
-
-            <!-- Service Type & Table Context Banner -->
-            <div
-              id="serviceType"
-              class="small rounded-3 bg-light p-3 mb-3 border"
-            ></div>
-
-            <!-- Transaction QR Code -->
-            <div
-              class="qr-box p-2 mb-3"
-              id="qrCode"
-              aria-label="QR code pesanan"
-            ></div>
-
-            <button
-              id="copyButton"
-              class="btn btn-outline-secondary btn-sm w-100 copy-link mb-3 rounded-3 py-2"
-            >
-              Salin tautan pesanan
-            </button>
-
-            <!-- Expiration Countdown -->
-            <div
-              id="expiryBox"
-              class="expiry p-3 mb-3 d-flex justify-content-between align-items-center"
-            >
-              <div>
-                <strong class="d-block">Batas Pembayaran</strong>
-                <span id="expiryDescription" class="small"></span>
-              </div>
-              <div class="text-end"><strong id="countdown" class="fs-5 d-block"></strong><span id="absoluteExpiry" class="small text-secondary"></span></div>
-            </div>
-
-            <!-- Order Summary Details -->
-            <div class="border-top pt-3">
-              <h2 class="h6 fw-bold mb-3">Rincian Pesanan</h2>
-              <div id="items"></div>
-
-              <!-- Customer Note (If provided) -->
-              <div
-                id="orderNoteContainer"
-                class="d-none mt-3 p-2.5 bg-light rounded-3 border small"
-              >
-                <span class="text-muted fw-semibold">Catatan:</span>
-                <span id="orderNoteText" class="text-dark"></span>
-              </div>
-
-              <!-- Payment Total -->
-              <div
-                class="d-flex justify-content-between border-top mt-3 pt-3 align-items-center"
-              >
-                <span class="fw-bold text-dark">Total Pembayaran</span>
-                <strong id="total" class="text-success fs-5"></strong>
-              </div>
-            </div>
-          </div>
-
-          <div id="error" class="alert alert-danger d-none mb-0"></div>
-        </div>
-
-        <!-- Card Footer -->
-        <div class="card-footer bg-white border-top p-3 text-center">
-          <a
-            id="showOrderLink"
-            class="small text-secondary text-decoration-none"
-            href="#"
-          >
-            Halaman ini dapat dibuka kembali menggunakan tautan pesanan.
-          </a>
-        </div>
-      </section>
-    </main>
-
+{% load static %}
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bayar di kasir — RasaKita</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><link href="{% static 'menu/css/retro.css' %}?v=images-p8" rel="stylesheet"><link href="{% static 'menu/css/page4.css' %}?v=images-p8" rel="stylesheet"><link rel="stylesheet" href="{% static 'menu/css/menu-card.css' %}?v=images-p8"></head><body><div class="customer-shell status-shell"><header class="status-header"><a href="/#menu">‹ &nbsp; Bayar di kasir</a></header><main class="receipt"><div class="text-center px-4 pt-4"><div class="status-success" aria-hidden="true">✓</div><h1 id="statusHeading" class="h4 fw-bold">Pesanan sudah dibuat</h1><p id="statusInstruction" class="muted small">Selesaikan pembayaran di kasir.</p></div><div class="p-4"><div id="loading" class="text-center muted py-4">Memuat detail pesanan…</div><div id="content" class="d-none"><div class="text-center"><span id="status" class="badge rounded-pill"></span></div><div class="paper-card order-code-card"><span class="muted small">KODE PESANAN</span><strong id="orderId"></strong><div id="qrCode" class="qr-box" aria-label="QR kode pesanan"></div><p class="muted small mt-3">Kode pesanan · bukan kode pembayaran</p></div><div class="paper-card receipt-summary"><div id="receiptFood" class="receipt-food"></div><div class="receipt-summary-info"><small id="serviceType"></small><strong id="receiptMenu"></strong><p id="receiptChoices"></p></div><strong id="total" class="accent"></strong></div><div class="cashier-callout"><span class="cashier-ticket" aria-hidden="true"></span><div><strong id="cashierInstruction">Tunjukkan kode ini kepada kasir.</strong><p>Dengan kode ini, pesananmu akan diproses.</p></div><a class="ai-button" href="/chatbot/" aria-label="Buka RasaKita AI"><span class="bot-symbol" aria-hidden="true"></span></a></div><details class="receipt-more"><summary>Rincian dan batas pembayaran</summary><div class="receipt-copy-controls"><button type="button" id="copyIdButton" class="btn btn-sm">Salin kode</button><button type="button" id="copyButton" class="btn btn-sm">Salin tautan pesanan</button></div><div id="expiryBox" class="expiry p-3 mb-3 d-flex justify-content-between align-items-center gap-2"><div><strong>Batas pembayaran</strong><p id="expiryDescription" class="small mb-0"></p></div><div class="text-end"><strong id="countdown" class="d-block"></strong><span id="absoluteExpiry" class="small"></span></div></div><div class="paper-card mt-3"><h2 class="section-title">Rincian pesanan</h2><div id="items" class="mt-3"></div><div id="orderNoteContainer" class="d-none small mt-3"><span class="muted">Catatan: </span><span id="orderNoteText"></span></div></div><a id="showOrderLink" class="d-block text-center muted small mt-4" href="#">Halaman ini dapat dibuka kembali melalui tautan pesanan.</a></details></div><div id="error" class="alert alert-danger d-none" role="alert"></div></div></main><footer class="status-bottom"><p>Pembayaran dikonfirmasi oleh kasir.</p><a href="/#menu" class="btn btn-primary-app">Kembali ke menu</a></footer></div>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-    <script>
+    <script type="module">
+import { createFoodVisual } from "{% static 'menu/js/menu-card.mjs' %}?v=images-p8";
       const publicId = "{{ public_id|escapejs }}";
       const orderUrl = `${window.location.origin}/orders/${publicId}/`;
       const money = (value) =>
@@ -201,11 +10,11 @@
           style: "currency",
           currency: "IDR",
           maximumFractionDigits: 0,
-        }).format(value);
+        }).format(value).replace(/\s/g, "");
 
       let order, timer;
 
-      const statusLabels = {PENDING:"Menunggu",PAID:"Dibayar",CANCELLED:"Dibatalkan",EXPIRED:"Kedaluwarsa",REFUNDED:"Refund"};
+      const statusLabels = {PENDING:"Menunggu pembayaran",PAID:"Dibayar",CANCELLED:"Dibatalkan",EXPIRED:"Kedaluwarsa",REFUNDED:"Refund"};
       function statusStyle(status) {
         return (
           {
@@ -237,32 +46,25 @@
 
         const status = document.querySelector("#status");
         status.textContent = statusLabels[order.status] || order.status;
+        document.querySelector("#statusHeading").textContent = {PENDING:"Pesanan sudah dibuat", PAID:"Pembayaran diterima", CANCELLED:"Pesanan dibatalkan", EXPIRED:"Pesanan kedaluwarsa", REFUNDED:"Pembayaran dikembalikan"}[order.status] || "Status pesanan";
+        document.querySelector("#statusInstruction").textContent = order.status === "PENDING" ? "Selesaikan pembayaran di kasir." : "Status terbaru pesananmu.";
+        document.querySelector("#cashierInstruction").textContent = order.status === "PENDING" ? "Tunjukkan kode ini kepada kasir." : "Hubungi kasir jika membutuhkan bantuan.";
         status.className = `badge rounded-pill status px-3 py-2 ${statusStyle(order.status)}`;
 
         document.querySelector("#total").textContent = money(order.total);
 
-        // Safe Service Type & Table Display
-        const serviceTypeEl = document.querySelector("#serviceType");
-        if (order.order_type === "DINE_IN") {
-          const tableNum = order.table?.number || order.table_number || "—";
-          serviceTypeEl.innerHTML = `
-          <div class="d-flex align-items-center gap-2">
-            <span class="fs-6">🍽️</span>
-            <div>
-              <strong class="d-block text-dark">Makan di Tempat (Dine In)</strong>
-              <span class="text-muted">Nomor Meja: <strong class="text-dark">Meja ${safeText(tableNum)}</strong></span>
-            </div>
-          </div>`;
-        } else {
-          serviceTypeEl.innerHTML = `
-          <div class="d-flex align-items-center gap-2">
-            <span class="fs-6">🥡</span>
-            <div>
-              <strong class="d-block text-dark">Bawa Pulang (Takeaway)</strong>
-              <span class="text-muted">Tidak menggunakan meja</span>
-            </div>
-          </div>`;
+        const quantity = order.items.reduce((sum,item)=>sum+item.quantity,0);
+        document.querySelector("#serviceType").textContent = `${order.order_type === "DINE_IN" ? "Meja " + (order.table?.number || order.table_number || "—") : "Bawa pulang"} · ${quantity} item`;
+        const first = order.items[0];
+        document.querySelector("#receiptMenu").textContent = order.items.length === 1 ? first.name : `${first.name} + ${order.items.length - 1} menu`;
+        document.querySelector("#receiptChoices").textContent = [...(first.variants||[]).map(v=>v.name), ...(first.addons||[]).map(a=>a.name), `${quantity} porsi`].join(" · ");
+        const food=document.querySelector("#receiptFood");
+        if(food.dataset.photo !== (first.image_url || "") || food.dataset.menu !== String(first.menu_item_id)) {
+          food.replaceChildren(createFoodVisual(first, {eager:true}));
+          food.dataset.photo=first.image_url || "";food.dataset.menu=String(first.menu_item_id);
         }
+        document.querySelector(".receipt-more").classList.toggle("receipt-urgent", order.status === "PENDING" && new Date(order.expires_at)-Date.now()<=900000);
+        if (order.status === "PENDING" && new Date(order.expires_at)-Date.now()<=900000) document.querySelector(".receipt-more").open = true;
 
         // Render Line Items with Variants & Addons
         document.querySelector("#items").innerHTML = order.items
@@ -273,11 +75,11 @@
             ].filter(Boolean);
 
             const optionsText = optionsList.length
-              ? `<div class="small text-muted mt-0.5">${safeText(optionsList.join(" · "))}</div>`
+              ? `<div class="small text-muted mt-1">${safeText(optionsList.join(" · "))}</div>`
               : "";
 
             return `
-          <div class="d-flex justify-content-between align-items-start gap-3 mb-2.5">
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
             <div>
               <span class="fw-semibold text-dark">${safeText(item.name)}</span>
               <span class="text-secondary small">× ${item.quantity}</span>
@@ -382,7 +184,9 @@
       };
 
       document.querySelector("#copyIdButton").onclick = async () => {
-        await navigator.clipboard.writeText(order.public_id);
+        if (!order) return;
+        try { await navigator.clipboard.writeText(order.public_id); }
+        catch { window.prompt("Salin kode pesanan:", order.public_id); return; }
         document.querySelector("#copyIdButton").textContent = "Tersalin";
         setTimeout(() => document.querySelector("#copyIdButton").textContent = "Salin", 1800);
       };

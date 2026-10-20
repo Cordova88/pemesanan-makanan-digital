@@ -1,51 +1,34 @@
-<!doctype html>
-<html lang="id">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Bantu Pilih Menu — RasaKita</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    :root { --primary:#047857; --ink:#1c1917; --line:#e7e5e4; }
-    body { background:#fafaf9; color:var(--ink); font-family:Inter,ui-sans-serif,system-ui,sans-serif; }
-    .chat { max-width:720px; height:100dvh; }
-    .messages { overflow:auto; scrollbar-width:thin; }
-    .bubble { max-width:88%; padding:.75rem 1rem; border-radius:18px; white-space:pre-wrap; overflow-wrap:anywhere; }
-    .bot { background:#f5f5f4; border-bottom-left-radius:5px; }
-    .me { background:var(--primary); color:#fff; margin-left:auto; border-bottom-right-radius:5px; }
-    .typing span { display:inline-block; width:6px; height:6px; margin:0 2px; background:#a8a29e; border-radius:50%; animation:bounce 1s infinite; }
-    .typing span:nth-child(2){animation-delay:.15s}.typing span:nth-child(3){animation-delay:.3s}
-    @keyframes bounce { 0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-4px)} }
-    @media (prefers-reduced-motion:reduce){.typing span{animation:none}}
-  </style>
-</head>
-<body>
-  <main class="chat mx-auto bg-white flex flex-col shadow-sm">
-    <header class="px-5 py-4 border-b flex items-center justify-between gap-3">
-      <a href="/" class="text-sm text-stone-600 no-underline hover:text-stone-900">← Kembali ke menu</a>
-      <strong class="text-base">Bantu pilih menu</strong>
-      <button class="h-10 px-3 rounded-full border border-stone-300 text-sm hover:bg-stone-50" id="reset" type="button" aria-label="Mulai percakapan baru">↻ <span class="hidden sm:inline">Mulai lagi</span></button>
-    </header>
-    <section class="messages flex-1 p-5 space-y-3" id="messages" aria-live="polite"></section>
-    <div id="preferences" class="px-5 flex flex-wrap gap-2"></div>
-    <form class="p-5 pt-3 border-t flex gap-2" id="form">
-      {% csrf_token %}
-      <input id="input" maxlength="500" class="min-w-0 flex-1 h-12 px-4 rounded-xl border border-stone-300 outline-none focus:ring-2 focus:ring-emerald-700" placeholder="Ada yang kamu inginkan?" autocomplete="off" aria-label="Pesan untuk chatbot">
-      <button class="w-12 h-12 rounded-full bg-emerald-700 text-white disabled:opacity-50" id="send" type="submit" aria-label="Kirim pesan">↑</button>
-    </form>
-  </main>
-  <script>
+{% load static %}
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RasaKita AI — Bantu pilih menu</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><link href="{% static 'menu/css/retro.css' %}?v=chat-v32-p7" rel="stylesheet"><link href="{% static 'menu/css/page4.css' %}?v=chat-v32-p7" rel="stylesheet"><link rel="stylesheet" href="{% static 'menu/css/menu-card.css' %}?v=images-p8"></head><body><main class="chat-shell"><header class="chat-header"><a href="/#menu" aria-label="Kembali ke menu">‹</a><div class="flex-grow-1"><strong>RasaKita AI</strong><small>Bantu pilih sesuai selera kamu</small></div><button id="reset" type="button" class="chat-reset" aria-label="Mulai percakapan baru">↻</button></header><section id="messages" class="chat-messages" aria-live="polite" aria-label="Percakapan"></section><p class="small text-muted px-3 mb-2" role="note">{% if gemini_enabled %}Sebagian pesan dapat dikirim ke Google Gemini untuk membantu memahami permintaan atau menyusun jawaban.{% else %}Mode lokal aktif. Pesan tidak dikirim ke Gemini.{% endif %} Pilihan disimpan sementara dalam sesi ini. Pemesanan tetap melalui keranjang.</p><form id="form" class="chat-input">{% csrf_token %}<input id="input" maxlength="500" placeholder="Tulis seleramu…" autocomplete="off" aria-label="Pesan untuk chatbot"><button id="send" type="submit" class="chat-send" aria-label="Kirim pesan"><span class="send-arrow" aria-hidden="true"></span></button></form></main>
+  <script type="module">
+import { createFoodVisual } from "{% static 'menu/js/menu-card.mjs' %}?v=images-p8";
     const box=document.querySelector("#messages"),input=document.querySelector("#input"),form=document.querySelector("#form"),sendButton=document.querySelector("#send"),csrf=document.querySelector("[name=csrfmiddlewaretoken]").value;
-    let lastMessage="";
+    let revision=null, queue=Promise.resolve(), queued=0;
     function bubble(text,isUser=false){const el=document.createElement("div");el.className=`bubble ${isUser?"me":"bot"}`;el.textContent=text;box.append(el);box.scrollTop=box.scrollHeight;return el}
-    function typing(){const el=document.createElement("div");el.className="bubble bot typing";el.innerHTML="<span></span><span></span><span></span>";box.append(el);box.scrollTop=box.scrollHeight;return el}
-    async function postJson(url,body){const response=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":csrf},body:JSON.stringify(body)});const data=await response.json();if(!response.ok)throw new Error(data.error||"Permintaan tidak berhasil.");return data}
-    function renderPreferences(data){const target=document.querySelector("#preferences");target.replaceChildren();const values=[...(data.preferences?.tags||[]),...(data.preferences?.mood_tags||[])];values.slice(0,5).forEach(value=>{const chip=document.createElement("span");chip.className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs";const label=document.createElement("span");label.textContent=value;const remove=document.createElement("button");remove.type="button";remove.className="font-semibold hover:text-emerald-950";remove.setAttribute("aria-label",`Hapus preferensi ${value}`);remove.textContent="×";remove.onclick=()=>sendMessage(`hapus preferensi ${value}`,`Hapus ${value}`);chip.append(label,remove);target.append(chip)})}
-    function render(data){if(typeof data.message!=="string")throw new Error("Respons chatbot tidak valid.");box.querySelectorAll("[data-recommendation-card]").forEach(card=>card.remove());bubble(data.message);renderPreferences(data);const quick=document.createElement("div");quick.className="flex flex-wrap gap-2";(data.quick_replies||[]).forEach(reply=>{const button=document.createElement("button");button.type="button";button.className="px-3 py-2 rounded-full border border-stone-300 text-sm";button.textContent=reply.label;button.onclick=()=>reply.action==="reset"?resetChat():sendMessage(reply.value,reply.label,reply.action);quick.append(button)});if(quick.childElementCount)box.append(quick);(data.recommendations||[]).forEach((item,index)=>{const card=document.createElement("div");card.dataset.recommendationCard="";card.className="bg-white border border-stone-200 rounded-xl p-4 shadow-sm";const name=document.createElement("strong");name.textContent=item.name;const details=document.createElement("p");details.className="text-sm text-stone-500 mt-1";details.textContent=(item.labels||[]).slice(0,4).join(" • ");const price=document.createElement("p");price.className="font-semibold mt-2";price.textContent="Rp"+Number(item.price).toLocaleString("id-ID");const fit=document.createElement("span");fit.className="inline-block text-xs rounded-full bg-emerald-50 text-emerald-800 px-2 py-1 mt-2";fit.textContent=index===0&&!data.catalog_question?"Paling cocok buat kamu":"Cocok juga buat kamu";const choose=document.createElement("button");choose.type="button";choose.className="block mt-3 px-4 py-2 rounded-lg bg-emerald-700 text-white text-sm";choose.textContent="Pilih menu";choose.onclick=()=>configure(item);card.append(name,details,price,fit,choose);box.append(card)});box.scrollTop=box.scrollHeight}
-    async function sendMessage(message,displayMessage=message,action=""){const text=(message||"").trim();if(!text&&displayMessage!=="")return;if(displayMessage)bubble(displayMessage,true);input.value="";sendButton.disabled=true;const wait=typing();try{render(await postJson("/api/recommendation/chat/",{message:text,action}))}catch(error){const failed=bubble("Gagal terhubung.");const retry=document.createElement("button");retry.className="block mt-2 text-sm underline";retry.textContent="Coba lagi";retry.onclick=()=>sendMessage(lastMessage,lastMessage);failed.append(retry)}finally{lastMessage=text;wait.remove();sendButton.disabled=false;box.scrollTop=box.scrollHeight}}
-    function resetChat(){box.replaceChildren();input.value="";sendMessage("mulai lagi","","reset")}
-    function configure(item){bubble("Atur pilihan untuk "+item.name+".");const card=document.createElement("div");card.className="bg-white border border-stone-200 rounded-xl p-4";(item.variants||[]).forEach(group=>{const title=document.createElement("p");title.className="font-semibold mt-2";title.textContent=group.name+(group.required?" · Wajib":"");card.append(title);(group.options||[]).forEach(option=>{const label=document.createElement("label");label.className="flex gap-2 py-2 text-sm";const radio=document.createElement("input");radio.type="radio";radio.name="group-"+group.id;radio.value=option.id;radio.required=group.required;label.append(radio,document.createTextNode(option.name+(Number(option.price_adjustment)?" +Rp"+Number(option.price_adjustment).toLocaleString("id-ID"):"")));card.append(label)})});const add=document.createElement("button");add.type="button";add.className="mt-3 px-4 py-2 rounded-lg bg-emerald-700 text-white text-sm";add.textContent="Tambahkan ke keranjang";add.onclick=async()=>{add.disabled=true;try{const result=await postJson("/api/recommendation/add/",{menu_item_id:item.id,quantity:1,variant_ids:[...card.querySelectorAll('input[type="radio"]:checked')].map(option=>Number(option.value)),addon_ids:[]});bubble(result.message||"Ditambahkan.");}catch{bubble("Gagal menambahkan menu.")}finally{add.disabled=false}};card.append(add);box.append(card);box.scrollTop=box.scrollHeight}
-    form.addEventListener("submit",e=>{e.preventDefault();sendMessage(input.value)});document.querySelector("#reset").addEventListener("click",resetChat);sendMessage("","");
+    function typing(){const el=document.createElement("div");el.className="bubble bot typing";el.setAttribute("role","status");el.setAttribute("aria-label","Sedang memproses pesan");el.innerHTML="<span></span><span></span><span></span>";box.append(el);box.scrollTop=box.scrollHeight;return el}
+    async function postJson(url,body){
+      const response=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":csrf},body:JSON.stringify(body)});
+      const data=await response.json();
+      if(!response.ok){if(response.status===409&&Number.isSafeInteger(data.revision)&&data.revision>=0)revision=data.revision;throw Object.assign(new Error("Permintaan belum berhasil."),{publicMessage:data.error||"Permintaan belum berhasil."})}
+      if(!Number.isSafeInteger(data.revision)||data.revision<0||(revision!==null&&data.revision<=revision))throw Object.assign(new Error("Respons kedaluwarsa."),{publicMessage:"Percakapan berubah. Muat ulang halaman sebelum melanjutkan."});
+      revision=data.revision;return data;
+    }
+    function render(data){if(typeof data.message!=="string")throw new Error("Respons chatbot tidak valid.");bubble(data.message);const quick=document.createElement("div");quick.className="chat-quick-replies";(data.quick_replies||[]).forEach(reply=>{const button=document.createElement("button");button.type="button";button.className="";button.textContent=reply.label;button.onclick=()=>reply.action==="reset"?resetChat(data.revision):sendMessage(reply.value,reply.label,reply.action,data.revision);quick.append(button)});if(quick.childElementCount)box.append(quick);(data.recommendations||[]).forEach((item,index)=>{const card=document.createElement("div");card.className="chat-recommendation";const name=document.createElement("strong");name.textContent=item.name;const details=document.createElement("p");details.className="muted small mt-1";details.textContent=(item.labels||[]).slice(0,4).join(" • ");const price=document.createElement("p");price.className="fw-semibold mt-2";price.textContent="Rp"+Number(item.price).toLocaleString("id-ID");const fit=document.createElement("span");fit.className="badge rounded-pill text-bg-light";fit.textContent=index===0&&!data.catalog_question?"Paling cocok buat kamu":"Cocok juga buat kamu";const choose=document.createElement("button");choose.type="button";choose.className="d-block";choose.textContent="Lihat pilihan menu";choose.onclick=()=>window.location.href="/?menu="+encodeURIComponent(item.id)+"#menu";card.append(createFoodVisual(item));card.append(name,details,price,fit,choose);box.append(card)});box.scrollTop=box.scrollHeight}
+    async function performSend(text,displayMessage,action,boundRevision){
+      if(displayMessage)bubble(displayMessage,true);if(input.value.trim()===text)input.value="";const wait=typing();
+      try{const body={message:text,action};const expected=Number.isSafeInteger(boundRevision)?boundRevision:revision;if(expected!==null)body.revision=expected;const data=await postJson("/api/recommendation/chat/",body);if(action==="reset"){box.replaceChildren()}render(data)}
+      catch(error){const failed=bubble(error.publicMessage||"Gagal terhubung.");const retry=document.createElement("button");retry.className="btn btn-link small";retry.textContent="Coba lagi";retry.onclick=()=>sendMessage(text,displayMessage,action);failed.append(retry)}
+      finally{wait.remove();box.scrollTop=box.scrollHeight}
+    }
+    function sendMessage(message,displayMessage=message,action="",boundRevision=null){
+      const text=(message||"").trim();if(!text&&displayMessage!=="")return Promise.resolve();
+      if(queued>0)return queue;
+      queued++;sendButton.disabled=true;document.querySelector("#reset").disabled=true;form.setAttribute("aria-busy","true");const job=queue.then(()=>performSend(text,displayMessage,action,boundRevision));
+      const settled=job.finally(()=>{queued--;sendButton.disabled=false;document.querySelector("#reset").disabled=false;form.setAttribute("aria-busy","false")});queue=settled.catch(()=>{});
+      return settled;
+    }
+    function resetChat(boundRevision=null){return sendMessage("mulai lagi","","reset",boundRevision)}
+    form.addEventListener("submit",e=>{e.preventDefault();sendMessage(input.value)});document.querySelector("#reset").addEventListener("click",()=>resetChat());sendMessage("","");
   </script>
 </body>
 </html>

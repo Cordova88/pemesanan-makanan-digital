@@ -1,3 +1,4 @@
+from collections.abc import Collection
 from decimal import Decimal
 from django.contrib.auth.models import Group, User
 from django.core.management.base import BaseCommand
@@ -9,7 +10,7 @@ from recommendation.services.language import TAG_LABELS
 class Command(BaseCommand):
     help = "Create development admin, cashier, and Indonesian menu sample data."
 
-    def handle(self, *args, **kwargs):
+    def handle(self, *args: object, **kwargs: object) -> None:
         cashiers, _ = Group.objects.get_or_create(name="Cashier")
         admin, _ = User.objects.get_or_create(
             username="admin",
@@ -45,7 +46,13 @@ class Command(BaseCommand):
             )
             tags[name] = tag
 
-        def menu(name, category, price, item_tags, **defaults):
+        def menu(
+            name: str,
+            category: Category,
+            price: str | int,
+            item_tags: Collection[str],
+            **defaults: object,
+        ) -> MenuItem:
             item, _ = MenuItem.objects.get_or_create(
                 name=name,
                 category=category,

@@ -1,12 +1,45 @@
+from typing import ClassVar
+from collections.abc import Iterable
 from .language import normalize_text
 import re
 
-# [OOP: Encapsulation] Daftar frasa tiap suasana hati (PHRASES) dan cara mencocokkannya
-# dibungkus dalam satu class.
-# [OOP: Abstraction] Pemanggil cukup memanggil extract(); detail normalisasi dan pencocokan tersembunyi.
+
+class UserContext:
+    def __init__(
+        self, emotions: Iterable[str] = (), physical: Iterable[str] = (),
+        situations: Iterable[str] = (), cleared_physical: Iterable[str] = (),
+    ) -> None:
+        self.emotions: frozenset[str] = frozenset(emotions)
+        self.physical: frozenset[str] = frozenset(physical)
+        self.situations: frozenset[str] = frozenset(situations)
+        self.cleared_physical: frozenset[str] = frozenset(cleared_physical)
+
+    @property
+    def has_context(self) -> bool:
+        return bool(self.emotions or self.physical or self.situations or self.cleared_physical)
+
+
 class MoodExtractor:
-    # [OOP: Class attribute] Kamus frasa milik class, dipakai bersama semua objek MoodExtractor.
-    PHRASES = {
+    EMOTIONS: ClassVar[dict[str, tuple[str, ...]]] = {
+        "sad": ("sedih", "bad mood", "bete", "lagi down"),
+        "happy": ("senang", "happy", "bahagia", "gembira"),
+        "stressed": ("stres", "stress", "tertekan"),
+        "frustrated": ("kesal", "frustrasi", "marah"),
+        "disappointed": ("kecewa",),
+    }
+    PHYSICAL: ClassVar[dict[str, tuple[str, ...]]] = {
+        "tired": ("capek", "cape", "lelah", "kecapekan", "energi habis", "butuh tenaga"),
+        "hungry": ("lapar", "kelaparan", "perut kosong", "belum makan"),
+        "thirsty": ("haus", "tenggorokan kering"),
+        "hot": ("gerah", "kepanasan", "panas banget", "lagi panas"),
+    }
+    SITUATIONS: ClassVar[dict[str, tuple[str, ...]]] = {
+        "hurry": ("buru-buru", "waktunya mepet", "jangan lama", "lagi sibuk"),
+        "working": ("kerja", "bekerja"),
+        "studying": ("kuliah", "belajar"),
+        "with_friends": ("bareng teman", "bersama teman"),
+    }
+    PHRASES: ClassVar[dict[str, tuple[str, ...]]] = {
         "tired": (
             "capek", "cape", "lelah", "kecapekan", "habis kerja",
             "baru pulang kerja", "hari ini berat", "energi habis",
@@ -36,16 +69,48 @@ class MoodExtractor:
         ),
     }
 
-    # [OOP: Abstraction] Mengembalikan himpunan mood (mis. tired, quick) dari teks pengguna.
-    def extract(self, text):
+    def extract(self, text: str) -> set[str]:
         normalized = normalize_text(text)
-        moods = set()
+        normalized = re.split(r"\bsekarang\b", normalized)[-1]
+        moods: set[str] = set()
         for mood, phrases in self.PHRASES.items():
-            if any(self._contains(normalized, normalize_text(phrase)) for phrase in phrases):
+            if any(self._active(normalized, normalize_text(phrase)) for phrase in phrases):
                 moods.add(mood)
+        context = self.extract_context(normalized)
+        if "tired" not in context.physical:
+            moods.discard("tired")
+        if {"thirsty", "hot"} & context.cleared_physical and not ({"thirsty", "hot"} & context.physical):
+            moods.discard("hot_thirsty")
+        if "hungry" in context.cleared_physical:
+            moods.discard("very_hungry")
         return moods
 
-    # [OOP: Static method + Encapsulation] Helper internal tanpa state untuk mencocokkan frasa utuh.
+    @classmethod
+    def _active(cls, text: str, phrase: str) -> bool:
+        matches = list(re.finditer(r"(?<!\w)" + re.escape(phrase) + r"(?!\w)", text))
+        return bool(matches) and not bool(re.search(r"\b(?:(?:tidak|bukan|belum)\s+(?:(?:lagi|sedang|merasa|terlalu|sangat|begitu)\s+){0,3}|(?:bikin|membuat|supaya|agar|biar)\s+(?:aku\s+)?)$", text[:matches[-1].start()]))
+
+    def extract_context(self, text: str) -> UserContext:
+        normalized = normalize_text(text)
+        full = normalized
+        normalized = re.split(r"\bsekarang\b", normalized)[-1]
+        emotions = {kind for kind, phrases in self.EMOTIONS.items() if any(self._active(normalized, phrase) for phrase in phrases)}
+        physical: set[str] = set()
+        cleared: set[str] = set()
+        for kind, phrases in self.PHYSICAL.items():
+            if any(self._contains(full, phrase) and not self._active(full, phrase) for phrase in phrases):
+                cleared.add(kind)
+        for kind, phrases in self.PHYSICAL.items():
+            for phrase in phrases:
+                if not self._contains(normalized, phrase):
+                    continue
+                if self._active(normalized, phrase):
+                    physical.add(kind)
+                else:
+                    cleared.add(kind)
+        situations = {kind for kind, phrases in self.SITUATIONS.items() if any(self._active(normalized, phrase) for phrase in phrases)}
+        return UserContext(emotions, physical, situations, cleared)
+
     @staticmethod
-    def _contains(text, phrase):
+    def _contains(text: str, phrase: str) -> bool:
         return re.search(r"(?<!\w)" + re.escape(phrase) + r"(?!\w)", text) is not None

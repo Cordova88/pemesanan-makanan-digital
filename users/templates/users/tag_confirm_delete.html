@@ -1,6 +1,6 @@
 {% extends 'users/base.html' %}{% block content %}
 <h1 class="h3 mb-4">Hapus Tag Menu</h1>
-<div class="card border-0 shadow-sm">
+<div class="content-narrow"><div class="card stat">
   <div class="card-body">
     {% if items %}
     <div class="alert alert-warning">Tag <strong>{{ tag }}</strong> masih dipakai {{ items|length }} menu. Penghapusan akan melepas tag dari semua menu berikut. Menu dan tag lainnya tetap tersimpan.</div>
@@ -12,7 +12,7 @@
     {% else %}
     <p>Hapus tag <strong>{{ tag }}</strong> ({{ tag.name }})? Tag ini belum dipakai menu.</p>
     {% endif %}
-    <p class="text-secondary">Penghapusan tag beserta aliasnya tidak dapat dibatalkan. Membuat tag dengan kode yang sama tidak mengembalikan pemakaian sebelumnya.</p>
+    <p class="text-secondary">{{ alias_count }} alias akan ikut dihapus. Penghapusan tag beserta aliasnya tidak dapat dibatalkan. Membuat tag dengan kode yang sama tidak mengembalikan pemakaian sebelumnya.</p>
     <form method="post">
       {% csrf_token %}
       {% if items %}
@@ -21,9 +21,11 @@
         <label class="form-check-label" for="confirm-detach">Saya setuju melepas tag ini dari semua menu di atas.</label>
       </div>
       {% endif %}
-      <button class="btn btn-danger" type="submit">{% if items %}Lepaskan dari semua menu dan hapus tag{% else %}Ya, hapus tag{% endif %}</button>
-      <a class="btn btn-outline-secondary" href="{% url 'staff:tags' %}">Batal</a>
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-secondary" href="{% url 'staff:tags' %}">Batal</a>
+        <button class="btn btn-danger" type="submit">{% if items %}Lepaskan dari semua menu dan hapus tag{% else %}Ya, hapus tag{% endif %}</button>
+      </div>
     </form>
   </div>
-</div>
+</div></div>
 {% endblock %}

@@ -1,0 +1,56 @@
+/* Food cards and artwork: one source for catalog, detail, cart and previews. */
+.food-card{position:relative;isolation:isolate;display:flex;flex-direction:column;min-width:0;background:white;border-radius:17px;box-shadow:0 4px 4px #00000040;margin-top:24px;color:#13234a;font-family:Arial,Helvetica,sans-serif}
+/* Original Figma paths/gradients, each a reusable vector without raster. */
+.food-card__art{position:relative;isolation:isolate;aspect-ratio:1.29;min-height:0;display:grid;place-items:center;pointer-events:none}
+.food-card>.food-card__art{margin-top:-24px}
+.food-card__blob{position:absolute;inset:0 -5% -17%;z-index:-1;background:var(--food-blob) center/100% 100% no-repeat}
+.food-card__art[data-theme=coral]{--food-blob:url('../images/blob-coral.svg')}
+.food-card__art[data-theme=peach]{--food-blob:url('../images/blob-peach.svg')}
+.food-card__art[data-theme=peach-alt]{--food-blob:url('../images/blob-peach-alt.svg')}
+.food-card__art[data-theme=coral-alt]{--food-blob:url('../images/blob-coral-alt.svg')}
+.food-card__image{position:absolute;width:100%;height:100%;object-fit:contain;border-radius:14px;opacity:0}
+.food-card__image.is-loaded{opacity:1}
+.food-card__placeholder{font-size:11px;color:#13234a;text-align:center;padding:12px;max-width:100px}
+.food-card__placeholder[hidden]{display:none}
+.food-card__content{position:relative;display:flex;flex:1;flex-direction:column;gap:2px;padding:6px 12px 6px;min-width:0}
+.food-card__name{font-size:15px;font-weight:700;line-height:18px;min-height:18px;max-height:36px;margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.food-card__description{font-size:10px;line-height:12px;height:24px;color:#737b88;margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.food-card__footer{display:flex;align-items:center;justify-content:space-between;gap:2px;margin-top:auto;min-height:36px;flex-wrap:wrap}
+.food-card__price{font-size:14px;color:#ff0700;overflow-wrap:anywhere;min-width:0;max-width:100%}
+.food-card__add{position:relative;flex:0 0 36px;min-height:44px;border:0;background:transparent;color:white;font-size:25px;line-height:1;padding:0;cursor:pointer;isolation:isolate}
+.food-card__add:before{content:'';position:absolute;z-index:-1;width:26px;height:26px;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;background:#ff0700}
+.food-card__add:hover:before{background:#b8322e}
+.food-card__add:focus-visible{outline:2px solid #293e8e;outline-offset:1px;border-radius:8px}
+@media(max-width:359px){.food-card__content{padding-inline:9px}.food-card__name{font-size:13px}.food-card__price{font-size:12px}}
+@media(max-width:380px){.food-card__footer{min-height:64px;align-content:center}}
+
+/* Local integration: preserve screen layout, replace only food artwork. */
+#menuGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px;margin:0;align-items:stretch}
+#menuGrid>.col-6{display:flex;min-width:0;width:100%;padding:0;margin:0}
+#menuGrid>.col-12{grid-column:1/-1;width:auto}
+#menuGrid .food-card{width:100%;flex:1}
+#menuGrid .food-card__art{aspect-ratio:1.45}
+#menuGrid .food-card__image{height:110%;width:110%;max-width:none}
+#modalImage{display:flex;align-items:center;justify-content:center;width:100%;height:230px;aspect-ratio:auto;margin:0 0 16px;background:transparent;box-shadow:none;overflow:visible}
+#modalImage>.food-card__art{height:100%;width:100%;margin:0;aspect-ratio:auto}
+#modalImage .food-card__blob{inset:0 7% -2%}
+#modalImage .food-card__image{object-fit:contain;margin:0;width:100%;max-width:100%}
+.home-hero{height:240px;margin:20px -24px 24px;border-radius:0;box-shadow:none;overflow:hidden}
+.home-hero>.food-card__art{width:100%;height:100%;margin:0;aspect-ratio:auto}
+.home-hero .food-card__blob{inset:0;--food-blob:none;background:none}
+.home-hero .food-card__blob:before,.home-hero .food-card__blob:after{content:'';position:absolute;top:0;bottom:0;width:70%;background:center/100% 100% no-repeat}
+.home-hero .food-card__blob:before{left:-8%;background-image:url('../images/blob-coral.svg');transform:rotate(-12deg)}
+.home-hero .food-card__blob:after{right:-8%;background-image:url('../images/blob-peach.svg');transform:rotate(12deg)}
+.home-hero .food-card__image{width:100%;height:100%;object-fit:contain;max-width:none;border-radius:0}
+.favorite-card>.food-card__art{width:100%;height:140px;aspect-ratio:auto;background:transparent;margin:0}
+.favorite-card .food-card__blob{inset:0 -3%}
+.favorite-card .food-card__image{height:100%;width:100%;margin:0;object-fit:contain;background:transparent;border-radius:10px}
+.cart-item-image.food-card__art,.review-image.food-card__art{position:absolute;width:140px;height:112px;left:-6px;top:-8px;margin:0;aspect-ratio:auto;background:transparent}
+.cart-item-image .food-card__blob,.review-image .food-card__blob{inset:0 -2% -6%}
+.receipt-food>.food-card__art{height:100%;width:100%;margin:0;aspect-ratio:auto}
+.receipt-food .food-card__blob{inset:0}
+.receipt-food .food-card__image{width:100%;height:100%;object-fit:contain}
+
+.chat-recommendation>.food-card__art{width:110px;height:96px;float:right;margin:0 0 8px 12px;aspect-ratio:auto}
+.chat-recommendation .food-card__blob{inset:0}
+@media(max-width:380px){#modalImage{height:200px}.home-hero{height:210px}.favorite-card>.food-card__art{height:120px}}

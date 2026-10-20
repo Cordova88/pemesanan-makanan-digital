@@ -21,33 +21,3 @@ document.querySelectorAll('[data-choice-picker]').forEach((picker) => {
   picker.addEventListener('change', update);
   update();
 });
-
-document.querySelectorAll('[data-menu-editor]').forEach((editor) => {
-  const input = editor.querySelector('[data-menu-image-input]');
-  const preview = editor.querySelector('[data-menu-image-preview]');
-  const empty = editor.querySelector('[data-menu-image-empty]');
-  const clear = editor.querySelector('input[name="image-clear"]');
-  const original = preview.getAttribute('src');
-  let objectUrl;
-  const update = () => {
-    if (objectUrl) URL.revokeObjectURL(objectUrl);
-    objectUrl = undefined;
-    const file = input.files[0];
-    let source = original;
-    if (file) {
-      objectUrl = URL.createObjectURL(file);
-      source = objectUrl;
-    } else if (clear && clear.checked) {
-      source = null;
-    }
-    preview.hidden = !source;
-    empty.hidden = Boolean(source);
-    if (source) preview.src = source;
-    else preview.removeAttribute('src');
-  };
-  input.addEventListener('change', update);
-  if (clear) clear.addEventListener('change', update);
-  window.addEventListener('pagehide', () => {
-    if (objectUrl) URL.revokeObjectURL(objectUrl);
-  });
-});

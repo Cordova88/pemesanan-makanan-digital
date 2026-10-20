@@ -1,0 +1,20 @@
+.menu-photo-editor{max-width:100%;min-width:0;overflow-wrap:anywhere}
+.menu-photo-editor__card{width:224px;max-width:100%;padding:30px 24px 12px;background:#faf8f2;border-radius:12px;margin:0 0 12px;box-sizing:border-box}
+.menu-photo-editor__card .food-card{width:100%;margin:0;pointer-events:none}
+.menu-photo-editor__card .food-card__art{margin-top:-20px}
+.menu-photo-editor__card .food-card__name{color:#13234a;font-size:15px;line-height:18px}
+.menu-photo-editor__card .food-card__description{padding:0;color:#737b88;font-size:10px;line-height:12px;margin:0;height:24px}
+.menu-photo-editor__card .food-card__price{color:#ff0700;font-size:14px}
+.menu-photo-editor__card .food-card__add{opacity:1;color:#fff}
+.menu-photo-editor__static{display:block;max-width:100%;object-fit:contain;border-radius:10px;background:#faf8f2}
+.menu-photo-editor__status,.menu-photo-editor__hint{font-size:12px;line-height:1.5;margin:8px 0!important;padding:0!important;color:#57616b}
+.menu-photo-editor__error{font-size:13px;color:#ba2121;margin:8px 0!important;padding:0!important}
+.menu-photo-editor input[type=file]{max-width:100%}
+.menu-photo-editor [hidden]{display:none!important}
+.menu-photo-editor__card--detail{width:100%;max-width:364px;padding:0;overflow:hidden}
+.menu-photo-editor__card--detail>.food-card__art{width:100%;height:190px;aspect-ratio:auto;margin:0}
+.menu-photo-editor__card--detail .food-card__image{width:100%;height:100%;object-fit:contain}
+.menu-photo-editor__selection{width:100%;max-width:364px;background:#faf8f2;border-radius:12px;padding:12px;margin-bottom:12px;box-sizing:border-box}
+.menu-photo-editor__selection>p{font-size:12px;color:#57616b;margin:0 0 12px}
+.menu-photo-editor__selection>.food-card__art{width:100%;height:190px;aspect-ratio:auto;margin:0}
+.menu-photo-editor__selection .food-card__blob{inset:0 7% -2%}
