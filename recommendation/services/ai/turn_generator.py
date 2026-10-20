@@ -18,7 +18,13 @@ class TurnGenerator(TextGenerator):
 
     def protect(self, message: str, *, sensitive_context: bool = False) -> None:
         # Conservative bypass: never try to ask a provider to redact private data.
-        self._private |= sensitive_context or bool(
+        self._private |= sensitive_context or self.contains_private_data(message)
+
+    @staticmethod
+    def contains_private_data(message: str) -> bool:
+        """Use the same conservative bypass for messages and projected catalog text."""
+
+        return bool(
             re.search(
                 r'@|https?://|\b\d{7,}\b|\b(?:alamat|telepon|telpon|whatsapp|email|'
                 r'password|passwd|token|secret|api[_ -]?key|nik|rekening|depresi|'
@@ -55,6 +61,12 @@ class TurnGenerator(TextGenerator):
         return True
 
     def generate(self, prompt: str) -> str | None:
+        return self._generate(prompt, ranking=False)
+
+    def generate_ranking(self, prompt: str) -> str | None:
+        return self._generate(prompt, ranking=True)
+
+    def _generate(self, prompt: str, *, ranking: bool) -> str | None:
         if self._private or not self._reserved or self._attempted:
             return None
 
@@ -62,6 +74,9 @@ class TurnGenerator(TextGenerator):
         self._attempted = True
 
         try:
+            if ranking and isinstance(self.provider, TextGenerator):
+                return self.provider.generate_ranking(prompt)
+
             return self.provider.generate(prompt)
         except Exception:
             return None

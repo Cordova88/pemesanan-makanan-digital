@@ -13,3 +13,8 @@ class TextGenerator(ABC):
         """
 
         raise NotImplementedError
+
+    def generate_ranking(self, prompt: str) -> str | None:
+        """Optional ranking format support; text-only providers keep their behavior."""
+
+        return self.generate(prompt)

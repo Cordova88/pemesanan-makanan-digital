@@ -60,6 +60,42 @@ class GeminiClient(TextGenerator):
 
     @override
     def generate(self, prompt: str) -> str | None:
+        return self._generate(prompt, structured_ranking=False)
+
+    @override
+    def generate_ranking(self, prompt: str) -> str | None:
+        # Opt in only after checking the deployed model. Never retry without schema.
+        structured = getattr(settings, 'CHATBOT_RANKING_STRUCTURED_OUTPUT_ENABLED', False)
+
+        return self._generate(prompt, structured_ranking=structured)
+
+    @staticmethod
+    def _ranking_schema() -> dict[str, object]:
+        """Formatting aid only; eligibility and strict validation stay in the backend."""
+
+        return {
+            'type': 'object',
+            'properties': {
+                'ranked_candidates': {
+                    'type': 'array',
+                    'minItems': 1,
+                    'maxItems': 8,
+                    'items': {
+                        'type': 'object',
+                        'properties': {
+                            'id': {'type': 'integer'},
+                            'score': {'type': 'number', 'minimum': 0, 'maximum': 1},
+                        },
+                        'required': ['id', 'score'],
+                        'additionalProperties': False,
+                    },
+                },
+            },
+            'required': ['ranked_candidates'],
+            'additionalProperties': False,
+        }
+
+    def _generate(self, prompt: str, *, structured_ranking: bool) -> str | None:
         model = settings.GEMINI_MODEL
 
         if not getattr(settings, 'GEMINI_ENABLED', False):
@@ -94,10 +130,16 @@ class GeminiClient(TextGenerator):
         started = perf_counter()
 
         try:
+            config = types.GenerateContentConfig(max_output_tokens=512)
+
+            if structured_ranking:
+                config.response_mime_type = 'application/json'
+                config.response_json_schema = self._ranking_schema()
+
             response = self.client.models.generate_content(
                 model=model,
                 contents=prompt,
-                config=types.GenerateContentConfig(max_output_tokens=512),
+                config=config,
             )
             text = response.text or None
 

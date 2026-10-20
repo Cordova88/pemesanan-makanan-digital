@@ -15,9 +15,162 @@ from ..services.conversation_session import ConversationSession
 from ..services.gemini import GeminiClient
 from ..services.security import ChatInput, ChatInputError, UsageGuard, request_context
 from ..services.telemetry import token_count
+from ..services.telemetry import ranking_event, provider_event
 from ..services.tag_extractor import Preferences
 from ..services.chatbot import ChatbotService
 from ..views import chat
+
+
+class RankingTelemetryTests(SimpleTestCase):
+    def test_catalog_privacy_check_reuses_the_existing_turn_bypass(self) -> None:
+        from ..services.ai.turn_generator import TurnGenerator
+
+        for text, private in (
+            ('Nasi Goreng', False),
+            ('Camilan', False),
+            ('private@example.invalid', True),
+            ('telepon 081234567890', True),
+            ('api_key PRIVATE_CANARY', True),
+        ):
+            with self.subTest(text=text):
+                generator = TurnGenerator(Mock())
+                generator.protect(text)
+                self.assertEqual(TurnGenerator.contains_private_data(text), private)
+                self.assertEqual(
+                    generator.reservation_block_reason, 'private_turn' if private else None
+                )
+
+    def test_reasons_are_allowlisted_and_only_attached_to_schema_rejections(self) -> None:
+        for outcome, reason in (
+            ('invalid_schema', 'PRIVATE_RESPONSE'),
+            ('accepted', 'score'),
+            ('proposal_validated', 'shape'),
+            ('PRIVATE_OUTCOME', None),
+        ):
+            with self.subTest(outcome=outcome), patch(
+                'recommendation.services.telemetry.logger.info'
+            ) as log, self.assertRaises(ValueError):
+                ranking_event(outcome, reason=reason)
+
+            log.assert_not_called()
+
+    def test_diagnostics_contain_only_fixed_metadata_and_request_correlation(self) -> None:
+        token = request_context.set({'request_id': 'test-correlation', 'client': 'PRIVATE_CLIENT'})
+
+        try:
+            with self.assertLogs('recommendation.services.gemini', level='INFO') as logs:
+                ranking_event('invalid_schema', reason='unknown_id')
+                ranking_event('proposal_validated')
+                ranking_event('accepted')
+        finally:
+            request_context.reset(token)
+
+        events = [json.loads(record.message) for record in logs.records]
+        base_keys = {'timestamp', 'request_id', 'event', 'outcome'}
+        self.assertEqual(set(events[0]), base_keys | {'reason'})
+        self.assertEqual(set(events[1]), base_keys)
+        self.assertEqual(set(events[2]), base_keys)
+        self.assertEqual({event['request_id'] for event in events}, {'test-correlation'})
+        self.assertNotIn('PRIVATE_', '\n'.join(logs.output))
+
+
+@override_settings(GEMINI_MAX_CALLS_PER_SESSION=50, CHATBOT_SEMANTIC_RERANKING_ENABLED=True)
+class RankingRequestDiagnosticsTests(TestCase):
+    def setUp(self) -> None:
+        from menu.models import Category, MenuItem
+
+        cache.clear()
+        category = Category.objects.create(name='Makanan')
+        self.first = MenuItem.objects.create(name='Pilihan A', category=category, price=10000)
+        self.second = MenuItem.objects.create(name='Pilihan B', category=category, price=15000)
+        self.session = SessionStore()
+        self.provider = Mock(available=True)
+        self.provider.generate.side_effect = self.generate
+
+    def generate(self, prompt: str) -> str:
+        # Synthetic provider metadata exercises the existing request ID pipeline.
+        provider_event('test-ranking', 'success', 0)
+
+        return json.dumps({'ranked_candidates': [{'id': self.second.pk, 'score': 1}]})
+
+    def send_ranked(self, *, conflict: bool = False):
+        from contextlib import ExitStack
+        from ..services.conversation_store import ConversationConflict, ConversationStore
+
+        request = RequestFactory().post(
+            '/api/recommendation/chat/',
+            data=json.dumps({'message': 'enak buat nemenin nugas'}),
+            content_type='application/json',
+            HTTP_X_REQUEST_ID='PRIVATE_HEADER',
+        )
+        request.session = self.session
+
+        with ExitStack() as stack:
+            stack.enter_context(
+                patch(
+                    'recommendation.views.ChatbotService',
+                    side_effect=lambda session: ChatbotService(
+                        session, gemini_client=self.provider
+                    ),
+                )
+            )
+
+            if conflict:
+                stack.enter_context(
+                    patch.object(
+                        ConversationStore,
+                        'commit',
+                        side_effect=ConversationConflict(9),
+                    )
+                )
+
+            logs = stack.enter_context(
+                self.assertLogs('recommendation.services.gemini', level='INFO')
+            )
+            response = chat(request)
+
+        events = [json.loads(record.message) for record in logs.records]
+        self.assertEqual({event['request_id'] for event in events}, {response['X-Request-ID']})
+        self.assertRegex(response['X-Request-ID'], r'^[0-9a-f]{32}$')
+        self.assertNotIn('PRIVATE_', '\n'.join(logs.output))
+        self.assertNotIn('nemenin nugas', '\n'.join(logs.output))
+        self.assertEqual(self.provider.generate.call_count, 1)
+        self.assertEqual(request_context.get(), {})
+
+        return response, events
+
+    def test_ranking_application_and_final_request_success_have_same_request_id(self) -> None:
+        response, events = self.send_ranked()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.content)['recommendations'][0]['id'], self.second.pk)
+        self.assertEqual(
+            [(event['event'], event['outcome']) for event in events],
+            [
+                ('provider_attempt', 'success'),
+                ('ranking_validation', 'proposal_validated'),
+                ('ranking_validation', 'accepted'),
+                ('chat_request', 'success'),
+            ],
+        )
+
+    def test_accepted_ranking_does_not_imply_commit_success(self) -> None:
+        from ..services.conversation_store import ConversationStore
+
+        response, events = self.send_ranked(conflict=True)
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(json.loads(response.content)['revision'], 9)
+        self.assertEqual(
+            [(event['event'], event['outcome']) for event in events],
+            [
+                ('provider_attempt', 'success'),
+                ('ranking_validation', 'proposal_validated'),
+                ('ranking_validation', 'accepted'),
+                ('chat_request', 'revision_conflict'),
+            ],
+        )
+        self.assertNotIn('recommendations', json.loads(response.content))
+        stored = ConversationStore(self.session['chatbot_client_id'], self.session).session
+        self.assertNotIn(ConversationSession.SEARCH_KEY, stored)
 
 
 class ChatBoundaryTests(TestCase):

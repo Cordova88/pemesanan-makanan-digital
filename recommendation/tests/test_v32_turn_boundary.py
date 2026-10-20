@@ -155,7 +155,13 @@ class TurnBoundaryTests(TestCase):
             self.assertNotIn(value, self.provider.calls[0])
 
         packet = json.loads(self.provider.calls[0].split('Data: ', 1)[1])
-        self.assertTrue(all(set(row) == {'id', 'tags'} for row in packet['candidates']))
+        self.assertTrue(
+            all(set(row) == {'id', 'name', 'category', 'tags'} for row in packet['candidates'])
+        )
+        self.assertEqual(
+            {row['id']: (row['name'], row['category']) for row in packet['candidates']},
+            {self.a.pk: (self.a.name, 'Minuman'), self.b.pk: (self.b.name, 'Minuman')},
+        )
 
     def test_sensitive_residual_is_kept_local(self) -> None:
         for text in (

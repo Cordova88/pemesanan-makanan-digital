@@ -63,7 +63,7 @@ def fallback_event(stage: str) -> None:
     )
 
 
-def ranking_event(outcome: str) -> None:
+def ranking_event(outcome: str, *, reason: str | None = None) -> None:
     """Allowlisted diagnostics only; never provider text, IDs or customer data."""
 
     if outcome not in {
@@ -73,10 +73,12 @@ def ranking_event(outcome: str) -> None:
         'provider_exception',
         'invalid_json',
         'invalid_schema',
+        'proposal_validated',
         'catalog_changed',
         'candidate_mismatch',
         'accepted',
         'insufficient_candidates',
+        'insufficient_evidence',
         'feature_disabled',
         'context_protected',
         'private_turn',
@@ -87,16 +89,23 @@ def ranking_event(outcome: str) -> None:
     }:
         raise ValueError('Unsupported ranking outcome')
 
-    logger.info(
-        json.dumps(
-            {
-                'timestamp': datetime.now(timezone.utc).isoformat(),
-                'request_id': correlation_id(),
-                'event': 'ranking_validation',
-                'outcome': outcome,
-            }
-        )
-    )
+    if reason is not None and (
+        outcome != 'invalid_schema'
+        or reason not in {'shape', 'id_type', 'unknown_id', 'duplicate_id', 'score'}
+    ):
+        raise ValueError('Unsupported ranking reason')
+
+    event = {
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'request_id': correlation_id(),
+        'event': 'ranking_validation',
+        'outcome': outcome,
+    }
+
+    if reason is not None:
+        event['reason'] = reason
+
+    logger.info(json.dumps(event))
 
 
 def provider_event(
