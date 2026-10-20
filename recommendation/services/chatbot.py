@@ -1,22 +1,31 @@
-from django.conf import settings
 from menu.models import MenuTag
 
 from .conversation_interpreter import ConversationInterpreter, ConversationIntent
+from .conversation.context import ConversationContext
+from .conversation.preferences import PreferenceStateService
 from .language import TAG_LABELS, normalize_text, tag_label
 from .mood_extractor import MoodExtractor
 from .mood_resolver import MoodResolver
 from .recommendation import RecommendationService, SearchConstraints
 from .tag_extractor import Preferences, TagExtractor
 from .ai.GeminiInterpreter import GeminiInterpreter
+from .ai.assistant import GeminiAssistant
+from .ai.conversation import ConversationDirector
 from .ai.explanations import RecommendationExplanationService
+from .ai.responses import ConversationResponseService
 from .gemini import GeminiClient
 
 
+# [OOP: Abstraction] ChatbotService berperan sebagai fasad: view cukup memanggil reply();
+# seluruh alur (normalisasi, ekstraksi tag/mood, ranking, penjelasan AI) disembunyikan di baliknya.
+# [OOP: Composition] Memiliki (has-a) TagExtractor, MoodExtractor, MoodResolver,
+# RecommendationService, ConversationInterpreter, GeminiClient, GeminiInterpreter, dan
+# RecommendationExplanationService; semuanya dibuat di __init__ dan tugasnya didelegasikan.
+# [OOP: Encapsulation] State percakapan disimpan di session lewat konstanta kunci
+# (SESSION_KEY, SHOWN_KEY, dst.); method berawalan _ adalah bagian internal class.
 class ChatbotService:
-    SESSION_KEY = "recommendation_state"
-    SHOWN_KEY = "recommendation_shown"
-    SEARCH_KEY = "recommendation_search"
-    LAST_RESULT_EMPTY_KEY = "recommendation_last_result_empty"
+    # [OOP: Class attribute] Kunci session dan daftar frasa (RESET_PHRASES, MORE_PHRASES,
+    # GEMINI_FOOD_CUES, dst.) milik class dan dipakai bersama semua objek, bukan state per instance.
     RESET_PHRASES = {"reset", "mulai lagi", "mulai dari awal"}
     CONFUSION_PHRASES = {
         "bingung",
@@ -62,10 +71,18 @@ class ChatbotService:
         "eneg",
         "bikin nagih",
     )
-    GEMINI_CALLS_KEY = "gemini_calls"
-
+    SESSION_KEY = ConversationContext.SESSION_KEY
+    SHOWN_KEY = ConversationContext.SHOWN_KEY
+    SEARCH_KEY = ConversationContext.SEARCH_KEY
+    LAST_RESULT_EMPTY_KEY = ConversationContext.LAST_RESULT_EMPTY_KEY
+    # [OOP: Composition] Semua komponen dibuat di sini sebagai atribut instance (has-a).
+    # [OOP: Dependency Injection] Satu GeminiClient dibagikan ke GeminiInterpreter dan
+    # RecommendationExplanationService lewat parameter konstruktor.
+    # [OOP: Association] session disuntikkan dari luar (request.session); class tidak membuatnya sendiri.
     def __init__(self, session):
         self.session = session
+        self.context = ConversationContext(session)
+        self.preference_state = PreferenceStateService(self.context)
         self.tag_extractor = TagExtractor()
         catalog_tags = MenuTag.objects.filter(
             menu_items__is_active=True,
@@ -86,30 +103,22 @@ class ChatbotService:
             self.gemini_client,
             allowed_tags=self.tag_extractor._aliases,
         )
+        self.conversation_director = ConversationDirector(self.gemini_client)
+        self.response_service = ConversationResponseService(self.gemini_client)
+        self.assistant = GeminiAssistant(
+            self.gemini_client,
+            self.recommender,
+            self.tag_extractor,
+            session=self.session,
+        )
         self.explanation_service = RecommendationExplanationService(self.gemini_client)
 
+    # [OOP: Abstraction] Menghapus state percakapan di session dengan satu panggilan.
     def reset(self):
-        self.session.pop(self.SESSION_KEY, None)
-        self.session.pop(self.SHOWN_KEY, None)
-        self.session.pop("recommendation_context", None)
-        self.session.pop("shown_recommendation_ids", None)
-        self.session.pop("last_recommendations", None)
-        self.session.pop("last_question", None)
-        self.session.pop(self.GEMINI_CALLS_KEY, None)
-        self.session.pop("recommendation_required_tags", None)
-        self.session.pop(self.SEARCH_KEY, None)
-        self.session.pop(self.LAST_RESULT_EMPTY_KEY, None)
-        self.session.modified = True
+        self.context.reset()
 
-    def _consume_gemini_call(self):
-        maximum = max(0, int(settings.GEMINI_MAX_CALLS_PER_SESSION))
-        calls = int(self.session.get(self.GEMINI_CALLS_KEY, 0))
-        if calls >= maximum:
-            return False
-        self.session[self.GEMINI_CALLS_KEY] = calls + 1
-        self.session.modified = True
-        return True
-
+    # [OOP: Class method] Hanya memakai atribut class (GEMINI_FOOD_CUES, GEMINI_UNCERTAIN_CUES),
+    # tanpa state instance; menentukan apakah pesan layak diteruskan ke Gemini.
     @classmethod
     def _eligible_for_gemini(cls, message, interpretation):
         if len(message) > 500:
@@ -117,6 +126,13 @@ class ChatbotService:
         if interpretation.contextual_revision:
             return True
         normalized = normalize_text(message)
+        if any(
+            cue in normalized
+            for cue in ConversationInterpreter.PREFERENCE_CORRECTION_CUES
+        ):
+            return True
+        if "mood naik" in normalized or "bikin mood" in normalized:
+            return True
         if interpretation.intent in {
             ConversationIntent.RECOMMEND,
             ConversationIntent.UPDATE_PREFERENCES,
@@ -129,99 +145,18 @@ class ChatbotService:
         return any(cue in normalized for cue in cls.GEMINI_FOOD_CUES)
 
     def _preferences(self):
-        return Preferences.from_dict(self.session.get(self.SESSION_KEY, {}))
+        return self.context.preferences()
 
     def _search_constraints(self):
-        stored = self.session.get(self.SEARCH_KEY)
-        if isinstance(stored, dict):
-            return SearchConstraints.from_dict(stored)
-        preferences = self._preferences()
-        return SearchConstraints(
-            required_tags=frozenset(
-                self.session.get("recommendation_required_tags", [])
-            ),
-            category=preferences.category,
-            max_price=preferences.max_price,
-            moods=frozenset(preferences.moods),
-        )
+        return self.context.search_constraints()
 
     def _constraints_for_interpretation(self, interpretation, old_follow_up=None):
-        previous = self._search_constraints()
-        has_previous = bool(
-            previous.required_tags
-            or previous.excluded_tags
-            or previous.category
-            or previous.max_price is not None
-            or previous.moods
-        )
-        constraint_only_update = (
-            not interpretation.tags
-            and not interpretation.excluded_tags
-            and not interpretation.category
-            and (
-                interpretation.max_price is not None
-                or interpretation.clear_max_price
-                or interpretation.prefer_affordable
-                or interpretation.clear_prefer_affordable
-            )
-        )
-        continuing = (
-            old_follow_up in {"meal_type", "base"}
-            or (constraint_only_update and has_previous)
-        )
-        explicit_clear = any(
-            operation.action == "CLEAR"
-            for operation in interpretation.operations
-        )
-        if interpretation.intent == ConversationIntent.REPLACE_PREFERENCES:
-            continuing = continuing and not explicit_clear
-        if interpretation.intent == ConversationIntent.RETRY_SEARCH:
-            continuing = False
-
-        base = previous if continuing else SearchConstraints()
-        required_tags = set(base.required_tags)
-        current_tags = set(interpretation.tags)
-        if old_follow_up == "meal_type":
-            current_tags.difference_update({"heavy_meal", "filling"})
-        if continuing and interpretation.intent == ConversationIntent.REPLACE_PREFERENCES:
-            for operation in interpretation.operations:
-                if operation.action == "REPLACE":
-                    required_tags.difference_update(operation.remove_tags)
-        required_tags.update(current_tags)
-        excluded_tags = set(base.excluded_tags)
-        excluded_tags.update(interpretation.excluded_tags)
-        category = interpretation.category or (base.category if continuing else None)
-        if interpretation.clear_max_price:
-            max_price = None
-        elif interpretation.max_price is not None:
-            max_price = interpretation.max_price
-        elif interpretation.prefer_affordable:
-            max_price = None
-        else:
-            max_price = base.max_price if continuing else None
-        moods = set(base.moods)
-        if interpretation.clear_moods:
-            moods.clear()
-        if interpretation.moods:
-            moods = set(interpretation.moods)
-        return SearchConstraints(
-            required_tags=frozenset(required_tags),
-            excluded_tags=frozenset(excluded_tags),
-            category=category,
-            max_price=max_price,
-            moods=frozenset(moods),
+        return self.preference_state.constraints_for_interpretation(
+            interpretation,
+            old_follow_up,
         )
 
-    def _save(self, preferences, state, follow_up=None):
-        payload = preferences.to_dict(state=state, follow_up=follow_up)
-        payload["max_price"] = None
-        payload["category"] = None
-        payload["last_question"] = self.session.get("last_question")
-        payload["last_recommendations"] = self.session.get("last_recommendations", [])
-        payload["shown_recommendation_ids"] = self.session.get("shown_recommendation_ids", [])
-        self.session[self.SESSION_KEY] = payload
-        self.session.modified = True
-
+    # [OOP: Static method] Tidak memakai self; hanya memeriksa objek Preferences yang diberikan.
     @staticmethod
     def _has_preferences(preferences):
         return bool(
@@ -235,15 +170,9 @@ class ChatbotService:
         )
 
     def _has_active_search(self):
-        constraints = self._search_constraints()
-        return bool(
-            constraints.required_tags
-            or constraints.excluded_tags
-            or constraints.category
-            or constraints.max_price is not None
-            or constraints.moods
-        )
+        return self.context.has_active_search()
 
+    # [OOP: Static method] Pembuat satu tombol balasan cepat; tidak butuh state objek.
     @staticmethod
     def _quick_reply(label, value, action=None):
         reply = {"label": label, "value": value}
@@ -251,7 +180,8 @@ class ChatbotService:
             reply["action"] = action
         return reply
 
-    def _question(self, confused=False):
+    # [OOP: Abstraction] Menyusun pertanyaan lanjutan untuk pengguna.
+    def _question(self, confused=False, source_message=""):
         if confused:
             message = "Tenang, nggak perlu mikir 😄 Aku bantu pilih. Kamu lagi lebih ke..."
             replies = [
@@ -272,6 +202,14 @@ class ChatbotService:
                 self._quick_reply("💸 Lagi hemat", "Lagi hemat"),
             ]
         replies = self._catalog_quick_replies(replies)
+        ai_followup = self._ai_followup(
+            source_message,
+            "confusion" if confused else "general",
+            replies,
+        )
+        if ai_followup:
+            message = ai_followup["message"]
+            replies = ai_followup["quick_replies"]
         self.session["last_question"] = "menu_choice"
         return {
             "message": message,
@@ -281,6 +219,34 @@ class ChatbotService:
             "quick_replies": replies,
         }
 
+    def _ai_followup(self, source_message, mode, options, context=None):
+        if not source_message or not self.conversation_director.available:
+            return None
+        if not self.context.consume_provider_request():
+            return None
+        decision = self.conversation_director.decide(
+            source_message,
+            mode,
+            {
+                **(context or {}),
+                "allowed_options": options,
+            },
+        )
+        if decision is None:
+            return None
+        allowed_values = {option["value"] for option in options}
+        if not all(
+            reply["value"] in allowed_values
+            for reply in decision.quick_replies
+        ):
+            return None
+        return {
+            "should_ask_follow_up": decision.should_ask_follow_up,
+            "message": decision.message,
+            "quick_replies": list(decision.quick_replies),
+        }
+
+    # [OOP: Abstraction] Menyusun daftar balasan cepat untuk pertanyaan katalog.
     def _catalog_quick_replies(self, replies):
         existing_values = {reply["value"] for reply in replies}
         catalog_tags = (
@@ -300,13 +266,7 @@ class ChatbotService:
             replies.append(self._quick_reply(label, value))
         return replies
 
-    @staticmethod
-    def _response_preferences(preferences, state, follow_up=None):
-        response = preferences.to_dict(state=state, follow_up=follow_up)
-        response["max_price"] = None
-        response["category"] = None
-        return response
-
+    # [OOP: Abstraction] Menyiapkan preferensi yang dikirim ke layanan penjelasan.
     def _explanation_preferences(self, preferences, constraints):
         return Preferences(
             tags=set(constraints.required_tags),
@@ -318,43 +278,82 @@ class ChatbotService:
             moods=set(constraints.moods),
         )
 
-    def _ask_meal_type(self, preferences):
+    # [OOP: Abstraction] Menyusun respons pertanyaan jenis makanan.
+    def _ask_meal_type(self, preferences, source_message=""):
+        replies = [
+            self._quick_reply("🍚 Makanan berat", "Makanan berat"),
+            self._quick_reply("🍟 Camilan", "Camilan"),
+        ]
+        ai_followup = self._ai_followup(
+            source_message,
+            "meal_type",
+            replies,
+            {"preferences": sorted(preferences.all_positive_tags)},
+        )
+        if ai_followup and not ai_followup["should_ask_follow_up"]:
+            self.session["last_question"] = None
+            return self._recommend(preferences, source_message)
         self.session["last_question"] = "meal_type"
-        self._save(preferences, "ASKING_FOLLOWUP", follow_up="meal_type")
+        self.context.save_preferences(
+            preferences,
+            "ASKING_FOLLOWUP",
+            follow_up="meal_type",
+        )
         return {
-            "message": "Wah, tim pedas nih 🌶️ Kamu lebih pengen makanan berat atau cuma mau ngemil?",
+            "message": (
+                ai_followup["message"]
+                if ai_followup
+                else "Wah, tim pedas nih 🌶️ Kamu lebih pengen makanan berat atau cuma mau ngemil?"
+            ),
             "state": "ASKING_FOLLOWUP",
-            "preferences": self._response_preferences(
+            "preferences": ConversationContext.response_preferences(
                 preferences,
                 "ASKING_FOLLOWUP",
                 follow_up="meal_type",
             ),
             "recommendations": [],
-            "quick_replies": [
-                self._quick_reply("🍚 Makanan berat", "Makanan berat"),
-                self._quick_reply("🍟 Camilan", "Camilan"),
-            ],
+            "quick_replies": ai_followup["quick_replies"] if ai_followup else replies,
         }
 
-    def _ask_base(self, preferences):
+    # [OOP: Abstraction] Menyusun respons pertanyaan dasar makanan (nasi atau mie).
+    def _ask_base(self, preferences, source_message=""):
+        replies = [
+            self._quick_reply("🍚 Nasi", "Pengen nasi"),
+            self._quick_reply("🍜 Mie", "Pengen mie"),
+            self._quick_reply("🤷 Bebas", "Bebas aja"),
+        ]
+        ai_followup = self._ai_followup(
+            source_message,
+            "base",
+            replies,
+            {"preferences": sorted(preferences.all_positive_tags)},
+        )
+        if ai_followup and not ai_followup["should_ask_follow_up"]:
+            self.session["last_question"] = None
+            return self._recommend(preferences, source_message)
         self.session["last_question"] = "base"
-        self._save(preferences, "ASKING_FOLLOWUP", follow_up="base")
+        self.context.save_preferences(
+            preferences,
+            "ASKING_FOLLOWUP",
+            follow_up="base",
+        )
         return {
-            "message": "Sip! Kamu lebih pengen nasi atau mie? Kalau bebas, bilang aja ya 😄",
+            "message": (
+                ai_followup["message"]
+                if ai_followup
+                else "Sip! Kamu lebih pengen nasi atau mie? Kalau bebas, bilang aja ya 😄"
+            ),
             "state": "ASKING_FOLLOWUP",
-            "preferences": self._response_preferences(
+            "preferences": ConversationContext.response_preferences(
                 preferences,
                 "ASKING_FOLLOWUP",
                 follow_up="base",
             ),
             "recommendations": [],
-            "quick_replies": [
-                self._quick_reply("🍚 Nasi", "Pengen nasi"),
-                self._quick_reply("🍜 Mie", "Pengen mie"),
-                self._quick_reply("🤷 Bebas", "Bebas aja"),
-            ],
+            "quick_replies": ai_followup["quick_replies"] if ai_followup else replies,
         }
 
+    # [OOP: Static method] Membentuk teks balasan chatbot dari data yang diberikan, tanpa state objek.
     @staticmethod
     def _response_message(
         preferences,
@@ -423,6 +422,7 @@ class ChatbotService:
         variant_index = sum(ord(character) for character in text) % len(variants)
         return f"{context}\n{summary}{variants[variant_index]}"
 
+    # [OOP: Static method] Balasan standar bila pesan tidak dipahami.
     @staticmethod
     def _unknown_response(source_text):
         variants = (
@@ -436,6 +436,8 @@ class ChatbotService:
             f"{variants[index]}\nCoba kasih tahu misalnya kamu mau yang pedas, ayam, nasi, atau yang murah."
         )
 
+    # [OOP: Abstraction] Menjalankan ranking lewat RecommendationService, lalu membentuk respons.
+    # [OOP: Composition] Mendelegasikan pekerjaan ke komponen yang dimiliki (recommender, explanation_service).
     def _recommend(
         self,
         preferences,
@@ -481,8 +483,17 @@ class ChatbotService:
             match.item.id: self.explanation_service.fallback(match)
             for match in matches
         }
+        generated_response = None
+        if self.response_service.available and self.context.consume_provider_request():
+            generated_response = self.response_service.respond(
+                source_text,
+                preferences,
+                constraints,
+                matches,
+                response_kind=response_kind,
+            )
         generated_intro = None
-        if matches and self._consume_gemini_call():
+        if matches and self.context.consume_provider_request():
             generated_intro, generated_explanations = (
                 self.explanation_service.explain_with_intro(
                     matches,
@@ -501,10 +512,11 @@ class ChatbotService:
         self.session["shown_recommendation_ids"] = list(self.session.get(self.SHOWN_KEY, []))
         self.session[self.LAST_RESULT_EMPTY_KEY] = not matches
         self.session.modified = True
-        self._save(preferences, "RECOMMENDING")
+        self.context.save_preferences(preferences, "RECOMMENDING")
         return {
             "message": (
-                generated_intro
+                generated_response
+                or generated_intro
                 or self._response_message(
                     preferences,
                     source_text,
@@ -512,10 +524,11 @@ class ChatbotService:
                     constraints=constraints,
                 )
                 if matches
-                else "Aku belum menemukan yang pas. Coba ubah pilihan atau batas harganya, ya."
+                else generated_response
+                or "Aku belum menemukan yang pas. Coba ubah pilihan atau batas harganya, ya."
             ),
             "state": "RECOMMENDING",
-            "preferences": self._response_preferences(
+            "preferences": ConversationContext.response_preferences(
                 preferences,
                 "RECOMMENDING",
             ),
@@ -528,6 +541,7 @@ class ChatbotService:
             ],
         }
 
+    # [OOP: Abstraction] Menjawab pertanyaan katalog tanpa mengubah preferensi yang tersimpan.
     def _answer_catalog_question(self, preferences, interpretation, source_text):
         tags = interpretation.catalog_tags
         constraints = SearchConstraints(
@@ -559,7 +573,7 @@ class ChatbotService:
                     f"Aku belum menemukan menu {requested} yang tersedia saat ini."
                 ),
                 "state": state,
-                "preferences": self._response_preferences(
+                "preferences": ConversationContext.response_preferences(
                     preferences,
                     state,
                 ),
@@ -578,7 +592,7 @@ class ChatbotService:
             for match in matches
         }
         generated_intro = None
-        if self._consume_gemini_call():
+        if self.context.consume_provider_request():
             generated_intro, generated_explanations = (
                 self.explanation_service.explain_with_intro(
                     matches,
@@ -594,13 +608,13 @@ class ChatbotService:
         self.session["last_recommendations"] = [match.item.id for match in matches]
         self.session[self.SHOWN_KEY] = [match.item.id for match in matches]
         self.session["shown_recommendation_ids"] = [match.item.id for match in matches]
-        self.session[self.LAST_RESULT_EMPTY_KEY] = False
+        self.session[self.LAST_RESULT_EMPTY_KEY] = not bool(matches)
         self.session.modified = True
         return {
             "message": generated_intro
             or f"Ini pilihan menu {requested} yang tersedia di katalog.",
             "state": state,
-            "preferences": self._response_preferences(
+            "preferences": ConversationContext.response_preferences(
                 preferences,
                 state,
             ),
@@ -613,11 +627,13 @@ class ChatbotService:
             ],
         }
 
+    # [OOP: Static method] Memilih salah satu varian kalimat secara deterministik dari teks; tanpa state objek.
     @staticmethod
     def _deterministic_variant(text, variants):
         index = sum(ord(character) for character in normalize_text(text)) % len(variants)
         return variants[index]
 
+    # [OOP: Abstraction] Menerapkan hasil interpretasi (tambah, hapus, ganti) ke Preferences.
     def _apply_interpretation(self, preferences, interpretation):
         current = Preferences.from_dict(self.session.get(self.SESSION_KEY, {})) if self.session.get(self.SESSION_KEY) else preferences
         if interpretation.intent == ConversationIntent.RESET:
@@ -674,6 +690,7 @@ class ChatbotService:
             current.prefer_affordable = False
         return current
 
+    # [OOP: Abstraction] Menerjemahkan rujukan seperti "yang pertama" menjadi menu dari rekomendasi sebelumnya.
     def _select_previous_recommendation(self, interpretation, session_state):
         previous = session_state.get("last_recommendations", [])
         index = {
@@ -686,12 +703,116 @@ class ChatbotService:
         match = self.recommender.get_available_match(previous[index])
         return match
 
+    def _gemini_first_reply(self, message):
+        context = self.context.gemini_context()
+        response, _tool_results = self.assistant.respond(
+            message or "Mulai percakapan dan bantu pelanggan memilih menu.",
+            context,
+            self.context.consume_provider_request,
+        )
+        if response is None:
+            return {
+                "message": (
+                    "Maaf, asisten AI sedang tidak tersedia. "
+                    "Silakan coba lagi sebentar."
+                ),
+                "state": self.session.get(self.SESSION_KEY, {}).get(
+                    "state",
+                    "COLLECTING_PREFERENCES",
+                ),
+                "preferences": ConversationContext.response_preferences(
+                    self._preferences(),
+                    self.session.get(self.SESSION_KEY, {}).get(
+                        "state",
+                        "COLLECTING_PREFERENCES",
+                    ),
+                ),
+                "recommendations": [],
+                "quick_replies": [],
+            }
+
+        matches = context.get("last_tool_matches", [])
+        constraints_data = context.get("last_tool_constraints")
+        if constraints_data:
+            constraints = SearchConstraints.from_dict(constraints_data)
+            preferences = self._preferences()
+            preferences.tags.update(constraints.required_tags)
+            preferences.tags.difference_update(constraints.excluded_tags)
+            preferences.excluded_tags.update(constraints.excluded_tags)
+            preferences.max_price = constraints.max_price
+            preferences.category = constraints.category
+            self.session[self.SEARCH_KEY] = constraints.to_dict()
+            self.session["recommendation_required_tags"] = sorted(
+                constraints.required_tags
+            )
+            ids = [match.item.id for match in matches]
+            self.session[self.SHOWN_KEY] = ids
+            self.session["last_recommendations"] = ids
+            self.session["shown_recommendation_ids"] = ids
+            self.session[self.LAST_RESULT_EMPTY_KEY] = not bool(matches)
+            self.session["recommendation_last_message"] = message[:500]
+            self.session["recommendation_last_response"] = response[:1200]
+            self.session.modified = True
+            self.context.save_preferences(preferences, "RECOMMENDING")
+            return {
+                "message": response,
+                "state": "RECOMMENDING",
+                "preferences": ConversationContext.response_preferences(
+                    preferences,
+                    "RECOMMENDING",
+                ),
+                "active_search": constraints.to_dict(),
+                "recommendations": matches,
+                "explanations": {
+                    match.item.id: self.explanation_service.fallback(match)
+                    for match in matches
+                },
+                "quick_replies": [
+                    self._quick_reply(
+                        "🔄 Cari Menu Lain",
+                        "Cari menu lain",
+                        action="more",
+                    ),
+                    self._quick_reply(
+                        "🔄 Mulai Lagi",
+                        "mulai lagi",
+                        action="reset",
+                    ),
+                ],
+            }
+
+        state = self.session.get(self.SESSION_KEY, {}).get(
+            "state",
+            "COLLECTING_PREFERENCES",
+        )
+        self.session["recommendation_last_message"] = message[:500]
+        self.session["recommendation_last_response"] = response[:1200]
+        self.session.modified = True
+        return {
+            "message": response,
+            "state": state,
+            "preferences": ConversationContext.response_preferences(
+                self._preferences(),
+                state,
+            ),
+            "recommendations": [],
+            "quick_replies": [],
+        }
+
+    # [OOP: Abstraction] Satu-satunya pintu masuk publik class ini (pola Facade): pesan masuk,
+    # balasan lengkap keluar.
+    # [OOP: Encapsulation] Seluruh method lain berawalan _ sehingga menjadi detail internal.
     def reply(self, message, more=False, action=None):
         normalized = normalize_text(message)
         action = action or ""
         if action == "reset" or normalized in self.RESET_PHRASES:
             self.reset()
+            if self.assistant.available:
+                return self._gemini_first_reply("")
             return self._question()
+
+        if self.assistant.available:
+            return self._gemini_first_reply(message)
 
         if not normalized and not self._has_preferences(self._preferences()):
             return self._question()
@@ -723,7 +844,10 @@ class ChatbotService:
                 preferences = self._preferences()
                 if not self._has_preferences(preferences):
                     state = "COLLECTING_PREFERENCES"
-                response = self._question(confused=True)
+                response = self._question(
+                    confused=True,
+                    source_message=normalized,
+                )
                 return {
                     "message": response["message"],
                     "state": state,
@@ -769,7 +893,7 @@ class ChatbotService:
             return self._recommend(preferences, normalized)
         if (
             self._eligible_for_gemini(normalized, interpretation)
-            and self._consume_gemini_call()
+            and self.context.consume_provider_request()
         ):
             ai_interpretation = self.gemini_interpreter.interpret(
                 normalized,
@@ -920,7 +1044,7 @@ class ChatbotService:
             if interpretation.intent == ConversationIntent.UPDATE_PREFERENCES and not self._has_preferences(updated):
                 if interpretation.clear_moods:
                     response = self._question()
-                    self._save(updated, "COLLECTING_PREFERENCES")
+                    self.context.save_preferences(updated, "COLLECTING_PREFERENCES")
                     return response
                 return self._question(confused=True)
 
@@ -928,7 +1052,7 @@ class ChatbotService:
             self.session[self.SEARCH_KEY] = constraints.to_dict()
             updated.mood_tags = self.mood_resolver.resolve(updated.moods)
             if old_follow_up == "meal_type" and "heavy_meal" in updated.tags and not updated.tags.intersection({"rice", "noodle", "snack"}):
-                return self._ask_base(updated)
+                return self._ask_base(updated, source_message=normalized)
 
             only_spicy = (
                 updated.tags.intersection({"spicy"}) == {"spicy"}
@@ -941,16 +1065,16 @@ class ChatbotService:
                 and not updated.category
             )
             if only_spicy and old_follow_up is None:
-                return self._ask_meal_type(updated)
+                return self._ask_meal_type(updated, source_message=normalized)
 
             if not self._has_preferences(updated):
                 if interpretation.clear_moods:
                     response = self._question()
-                    self._save(updated, "COLLECTING_PREFERENCES")
+                    self.context.save_preferences(updated, "COLLECTING_PREFERENCES")
                     return response
                 return self._question()
 
-            self._save(updated, "RECOMMENDING")
+            self.context.save_preferences(updated, "RECOMMENDING")
             result = self._recommend(
                 updated,
                 normalized,

@@ -1,7 +1,7 @@
 from decimal import Decimal
 from io import StringIO
 import json
-from unittest.mock import patch
+from unittest.mock import PropertyMock, patch
 
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase, override_settings
@@ -26,12 +26,22 @@ from .services.conversation_interpreter import (
     ConversationInterpreter,
 )
 from .services.chatbot import ChatbotService
+from .services.conversation.context import ConversationContext
 from .services.ai.GeminiInterpreter import GeminiInterpreter, validate
+from .services.ai.assistant import GeminiAssistant
+from .services.ai.conversation import ConversationDirector
+from .services.ai.responses import ConversationResponseService
 from .services.ai.explanations import RecommendationExplanationService
 from .services.gemini import GeminiClient
 
 
+# [OOP: Inheritance] Mewarisi SimpleTestCase (versi ringan TestCase tanpa akses database).
+# [OOP: Encapsulation] Objek yang diuji (extractor, parser harga) dibungkus sebagai atribut instance;
+# tiap skenario dibungkus sebagai method test terpisah.
 class LanguageRuleTests(SimpleTestCase):
+    # [OOP: Polymorphism] setUp meng-override hook bawaan TestCase (method overriding); dipanggil
+    # otomatis sebelum setiap test.
+    # [OOP: Composition] Class tes memiliki TagExtractor, MoodExtractor, dan IndonesianPriceParser (has-a).
     def setUp(self):
         self.extractor = TagExtractor()
         self.moods = MoodExtractor()
@@ -57,7 +67,6 @@ class LanguageRuleTests(SimpleTestCase):
         for phrase in ("ayam", "mau ayam", "daging ayam", "olahan ayam"):
             with self.subTest(phrase=phrase):
                 self.assertIn("chicken", self.extractor.extract(phrase).tags)
-
     def test_hunger_snack_and_informal_normalization(self):
         self.assertEqual(normalize_text("Gue lg laper bgt"), "aku lagi lapar banget")
         hunger = self.extractor.extract("Gue lagi laper banget, kenyangin aku")
@@ -149,7 +158,46 @@ class LanguageRuleTests(SimpleTestCase):
                 self.assertIn("sweet", preferences.tags)
 
 
+# [OOP: Inheritance] Mewarisi SimpleTestCase untuk menguji state percakapan terisolasi.
+class ConversationContextTests(SimpleTestCase):
+    def test_provider_budget_is_session_scoped_and_reset_clears_it(self):
+        class Session(dict):
+            modified = False
+
+        session = Session()
+        context = ConversationContext(session)
+        with override_settings(GEMINI_MAX_CALLS_PER_SESSION=2):
+            self.assertTrue(context.consume_provider_request())
+            self.assertTrue(context.consume_provider_request())
+            self.assertFalse(context.consume_provider_request())
+        self.assertEqual(session["gemini_calls"], 2)
+        context.reset()
+        self.assertNotIn("gemini_calls", session)
+
+    def test_gemini_context_contains_bounded_session_facts(self):
+        class Session(dict):
+            modified = False
+
+        session = Session({
+            "recommendation_state": {
+                "tags": ["spicy"],
+                "last_recommendations": [3],
+            },
+            "recommendation_shown": [3],
+            "recommendation_last_message": "pedas",
+            "recommendation_last_response": "Ada pilihan pedas.",
+        })
+        context = ConversationContext(session)
+        result = context.gemini_context()
+        self.assertEqual(result["preferences"]["tags"], ["spicy"])
+        self.assertEqual(result["shown_ids"], [3])
+        self.assertEqual(result["recent_turn"]["customer"], "pedas")
+
+
+# [OOP: Inheritance] Mewarisi SimpleTestCase.
+# [OOP: Encapsulation] Menguji ConversationInterpreter lewat antarmuka publiknya, interpret().
 class ConversationInterpreterTests(SimpleTestCase):
+    # [OOP: Polymorphism] Meng-override setUp bawaan TestCase untuk membuat objek ConversationInterpreter.
     def setUp(self):
         self.interpreter = ConversationInterpreter()
 
@@ -260,7 +308,10 @@ class ConversationInterpreterTests(SimpleTestCase):
         self.assertIn("refreshing", result.tags)
 
 
+# [OOP: Inheritance] Mewarisi SimpleTestCase.
+# [OOP: Encapsulation] Menguji GeminiInterpreter dan GeminiClient dengan validasi keluaran penyedia.
 class GeminiInterpreterTests(SimpleTestCase):
+    # [OOP: Polymorphism] Meng-override setUp bawaan TestCase untuk menyiapkan objek yang diuji.
     def setUp(self):
         self.client = type(
             "FakeGeminiClient",
@@ -384,6 +435,328 @@ class GeminiInterpreterTests(SimpleTestCase):
                 )
 
 
+class ConversationDirectorTests(SimpleTestCase):
+    def test_validated_followup_can_only_use_django_options(self):
+        class FakeGeminiClient:
+            available = True
+
+            def generate(self, _prompt):
+                return json.dumps(
+                    {
+                        "should_ask_follow_up": True,
+                        "message": "Kamu lebih ingin makanan berat atau camilan?",
+                        "quick_replies": [
+                            {
+                                "label": "Makanan berat",
+                                "value": "Makanan berat",
+                            },
+                            {"label": "Camilan", "value": "Camilan"},
+                        ],
+                    }
+                )
+
+        decision = ConversationDirector(FakeGeminiClient()).decide(
+            "Aku mau yang pedas",
+            "meal_type",
+            {
+                "allowed_options": [
+                    {"label": "Makanan berat", "value": "Makanan berat"},
+                    {"label": "Camilan", "value": "Camilan"},
+                ]
+            },
+        )
+
+        self.assertIsNotNone(decision)
+        self.assertEqual(len(decision.quick_replies), 2)
+
+    def test_unsafe_or_unknown_followup_option_is_rejected(self):
+        class FakeGeminiClient:
+            available = True
+
+            def generate(self, _prompt):
+                return json.dumps(
+                    {
+                        "should_ask_follow_up": True,
+                        "message": "<script>alert(1)</script>",
+                        "quick_replies": [
+                            {"label": "Bebas", "value": "Menu rahasia"},
+                        ],
+                    }
+                )
+
+        decision = ConversationDirector(FakeGeminiClient()).decide(
+            "Aku bingung",
+            "confusion",
+            {
+                "allowed_options": [
+                    {"label": "Pedas", "value": "Pengen yang pedas"},
+                ]
+            },
+        )
+
+        self.assertIsNone(decision)
+
+
+class ConversationResponseServiceTests(SimpleTestCase):
+    def test_response_is_grounded_in_django_result_facts(self):
+        class FakeGeminiClient:
+            available = True
+
+            def generate(self, _prompt):
+                return json.dumps(
+                    {"message": "Ayam Geprek cocok karena pilihanmu pedas."}
+                )
+
+        service = ConversationResponseService(FakeGeminiClient())
+        message = service._valid_message(
+            "Ayam Geprek cocok karena pilihanmu pedas.",
+            {
+                "results": [
+                    {
+                        "name": "Ayam Geprek",
+                        "category": "Makanan",
+                        "tags": ["spicy"],
+                        "match_reasons": ["🌶️ Pedas"],
+                    }
+                ]
+            },
+        )
+        self.assertTrue(message)
+
+    def test_response_rejects_unsupported_claims_and_unknown_menu_facts(self):
+        facts = {
+            "results": [
+                {
+                    "name": "Ayam Geprek",
+                    "category": "Makanan",
+                    "tags": ["spicy"],
+                    "match_reasons": ["🌶️ Pedas"],
+                }
+            ]
+        }
+        self.assertFalse(
+            ConversationResponseService._valid_message(
+                "Nasi Padang sehat dan tersedia.",
+                facts,
+            )
+        )
+
+
+class GeminiAssistantToolTests(TestCase):
+    def setUp(self):
+        food = Category.objects.create(name="Makanan")
+        self.spicy = MenuTag.objects.create(
+            name="spicy",
+            display_name=TAG_LABELS["spicy"],
+        )
+        self.item = MenuItem.objects.create(
+            category=food,
+            name="Ayam Geprek",
+            price=Decimal("15000"),
+        )
+        self.item.tags.add(self.spicy)
+
+    def test_search_tool_returns_real_catalog_data_and_rejects_unknown_tags(self):
+        class FakeClient:
+            available = True
+
+        assistant = GeminiAssistant(
+            FakeClient(),
+            RecommendationService(),
+            TagExtractor(),
+        )
+        result = assistant._search_menu(
+            {
+                "required_tags": ["spicy"],
+                "excluded_tags": [],
+                "category": "Makanan",
+                "max_price": 20000,
+                "exclude_shown": False,
+            },
+            {"preferences": Preferences().to_dict(), "shown_ids": []},
+        )
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["items"][0]["id"], self.item.id)
+        invalid = assistant._search_menu(
+            {
+                "required_tags": ["not-a-real-tag"],
+                "excluded_tags": [],
+                "category": None,
+                "max_price": None,
+                "exclude_shown": False,
+            },
+            {"preferences": Preferences().to_dict(), "shown_ids": []},
+        )
+        self.assertFalse(invalid["ok"])
+
+    def test_search_tool_persists_explicit_menu_name_exclusions(self):
+        class FakeClient:
+            available = True
+
+        session = type("Session", (dict,), {"modified": False})()
+        assistant = GeminiAssistant(
+            FakeClient(),
+            RecommendationService(),
+            TagExtractor(),
+            session=session,
+        )
+        context = {
+            "preferences": Preferences().to_dict(),
+            "shown_ids": [self.item.id],
+        }
+        result = assistant._search_menu(
+            {
+                "required_tags": [],
+                "excluded_tags": ["Ayam Geprek"],
+                "excluded_item_ids": [],
+                "excluded_item_names": [],
+                "category": "Makanan",
+                "max_price": None,
+                "exclude_shown": True,
+            },
+            context,
+        )
+        self.assertTrue(result["ok"])
+        self.assertNotIn(self.item.id, [item["id"] for item in result["items"]])
+        self.assertEqual(session["recommendation_excluded_item_ids"], [self.item.id])
+
+    def test_persisted_item_exclusions_survive_a_later_unrestricted_search(self):
+        class FakeClient:
+            available = True
+
+        session = type("Session", (dict,), {"modified": False})()
+        assistant = GeminiAssistant(
+            FakeClient(),
+            RecommendationService(),
+            TagExtractor(),
+            session=session,
+        )
+        context = {
+            "preferences": Preferences().to_dict(),
+            "shown_ids": [],
+        }
+        first = assistant._search_menu(
+            {
+                "required_tags": [],
+                "excluded_tags": [],
+                "excluded_item_ids": [],
+                "excluded_item_names": ["Ayam Geprek"],
+                "category": "Makanan",
+                "max_price": None,
+                "exclude_shown": False,
+            },
+            context,
+        )
+        second = assistant._search_menu(
+            {
+                "required_tags": [],
+                "excluded_tags": [],
+                "category": "Makanan",
+                "max_price": None,
+                "exclude_shown": False,
+            },
+            context,
+        )
+        self.assertTrue(first["ok"])
+        self.assertTrue(second["ok"])
+        self.assertNotIn(self.item.id, [item["id"] for item in second["items"]])
+
+    def test_search_tool_returns_tag_only_and_unconstrained_catalog_results(self):
+        class FakeClient:
+            available = True
+
+        assistant = GeminiAssistant(
+            FakeClient(),
+            RecommendationService(),
+            TagExtractor(),
+        )
+        tag_only = assistant._search_menu(
+            {
+                "required_tags": ["spicy"],
+                "excluded_tags": [],
+                "category": None,
+                "max_price": None,
+                "exclude_shown": False,
+            },
+            {"preferences": Preferences().to_dict(), "shown_ids": []},
+        )
+        self.assertEqual([item["id"] for item in tag_only["items"]], [self.item.id])
+        self.assertEqual(tag_only["search_status"], "matches")
+
+        browse = assistant._search_menu(
+            {
+                "required_tags": [],
+                "excluded_tags": [],
+                "category": None,
+                "max_price": None,
+                "exclude_shown": False,
+            },
+            {"preferences": Preferences().to_dict(), "shown_ids": []},
+        )
+        self.assertEqual([item["id"] for item in browse["items"]], [self.item.id])
+        self.assertEqual(browse["constraints"]["category"], "Makanan")
+
+    def test_search_tool_rejects_unknown_categories(self):
+        class FakeClient:
+            available = True
+
+        assistant = GeminiAssistant(
+            FakeClient(),
+            RecommendationService(),
+            TagExtractor(),
+        )
+        result = assistant._search_menu(
+            {
+                "required_tags": [],
+                "excluded_tags": [],
+                "category": "Food",
+                "max_price": None,
+                "exclude_shown": False,
+            },
+            {"preferences": Preferences().to_dict(), "shown_ids": []},
+        )
+        self.assertFalse(result["ok"])
+        self.assertIn("category", result["error"].lower())
+
+    def test_empty_search_is_not_reported_as_empty_catalog(self):
+        class FakeClient:
+            available = True
+
+        assistant = GeminiAssistant(
+            FakeClient(),
+            RecommendationService(),
+            TagExtractor(),
+        )
+        result = assistant._search_menu(
+            {
+                "required_tags": ["sweet"],
+                "excluded_tags": [],
+                "category": None,
+                "max_price": None,
+                "exclude_shown": False,
+            },
+            {"preferences": Preferences().to_dict(), "shown_ids": []},
+        )
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["search_status"], "no_matches")
+        self.assertIn("does not prove", result["catalog_statement"])
+
+    def test_get_details_returns_only_requested_database_items(self):
+        class FakeClient:
+            available = True
+
+        assistant = GeminiAssistant(
+            FakeClient(),
+            RecommendationService(),
+            TagExtractor(),
+        )
+        result = assistant._get_menu_details({"item_ids": [self.item.id, 999999]})
+        self.assertTrue(result["ok"])
+        self.assertEqual([item["id"] for item in result["items"]], [self.item.id])
+
+
+# [OOP: Inheritance] Mewarisi TestCase (database uji terisolasi).
+# [OOP: Abstraction] Menguji RecommendationExplanationService lewat explain() dan explain_with_intro().
 class RecommendationExplanationServiceTests(TestCase):
     def test_intro_and_explanations_share_one_grounded_gemini_call(self):
         food = Category.objects.create(name="Makanan")
@@ -582,7 +955,11 @@ class RecommendationExplanationServiceTests(TestCase):
         self.assertIn("Pedas", service.fallback(matches[0]))
 
 
+# [OOP: Inheritance] Mewarisi TestCase.
+# [OOP: Association] Data uji (Category, MenuTag, MenuItem) saling berelasi di database uji.
 class RecommendationTests(TestCase):
+    # [OOP: Polymorphism] Meng-override setUp bawaan TestCase untuk membuat kategori, tag, dan menu uji.
+    # [OOP: Composition] Memiliki RecommendationService sebagai objek yang diuji.
     def setUp(self):
         self.food = Category.objects.create(name="Makanan")
         self.drinks = Category.objects.create(name="Minuman")
@@ -751,6 +1128,8 @@ class RecommendationTests(TestCase):
         )
 
 
+# [OOP: Inheritance] Mewarisi TestCase.
+# [OOP: Abstraction] Menjalankan seluruh proses seed lewat satu perintah, call_command("seed_demo").
 class DemoSeedTests(TestCase):
     def test_seed_demo_assigns_distinct_believable_tag_combinations(self):
         call_command("seed_demo", stdout=StringIO())
@@ -793,8 +1172,18 @@ class DemoSeedTests(TestCase):
         self.assertTrue(MenuItem.objects.filter(name="Jus Mangga").exists())
 
 
+# [OOP: Inheritance] Mewarisi TestCase dan memakai self.client untuk menguji alur dari HTTP sampai database.
+# [OOP: Encapsulation] Helper post_chat membungkus detail pengiriman JSON ke endpoint chat.
 class ChatbotIntegrationTests(TestCase):
+    # [OOP: Polymorphism] Meng-override setUp bawaan TestCase untuk menyiapkan menu, tag, varian, dan add-on.
     def setUp(self):
+        self.gemini_available_patch = patch(
+            "recommendation.services.gemini.GeminiClient.available",
+            new_callable=PropertyMock,
+            return_value=False,
+        )
+        self.gemini_available_patch.start()
+        self.addCleanup(self.gemini_available_patch.stop)
         self.gemini_patch = patch(
             "recommendation.services.gemini.GeminiClient.generate",
             return_value=None,
@@ -833,6 +1222,8 @@ class ChatbotIntegrationTests(TestCase):
         self.addon = AddOn.objects.create(name="Extra Sambal", price=Decimal("3000"))
         self.addon.menu_items.add(self.best)
 
+    # [OOP: Encapsulation] Helper yang dipakai ulang oleh banyak test agar tidak mengulang
+    # kode pemanggilan endpoint.
     def post_chat(self, message, action=None):
         import json
 
@@ -863,6 +1254,169 @@ class ChatbotIntegrationTests(TestCase):
         )
         self.assertTrue(rice.json()["recommendations"])
 
+    def test_gemini_tool_results_and_api_cards_share_the_same_items(self):
+        def fake_converse(
+            message,
+            system_instruction,
+            tool_declarations,
+            tool_handler,
+            before_request,
+            max_iterations,
+        ):
+            result = tool_handler(
+                "search_menu",
+                {
+                    "required_tags": ["spicy"],
+                    "excluded_tags": [],
+                    "category": None,
+                    "max_price": None,
+                    "exclude_shown": False,
+                },
+            )
+            return (
+                "Aku menemukan pilihan pedas yang cocok.",
+                [{"name": "search_menu", "result": result}],
+            )
+
+        with patch(
+            "recommendation.services.gemini.GeminiClient.available",
+            new_callable=PropertyMock,
+            return_value=True,
+        ), patch(
+            "recommendation.services.gemini.GeminiClient.converse",
+            side_effect=fake_converse,
+        ):
+            response = self.post_chat("Rekomendasi makanan pedas")
+
+        payload = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item["name"] for item in payload["recommendations"]],
+            ["Mie Pedas", "Ayam Geprek"],
+        )
+        self.assertIn("pedas", payload["message"])
+
+    def test_changed_tool_search_replaces_previous_api_cards(self):
+        nasi_uduk = MenuItem.objects.create(
+            category=self.best.category,
+            name="Nasi Uduk",
+            price=Decimal("14000"),
+        )
+        nasi_uduk.tags.add(self.rice)
+        nasi_goreng = MenuItem.objects.create(
+            category=self.best.category,
+            name="Nasi Goreng",
+            price=Decimal("15000"),
+        )
+        nasi_goreng.tags.add(self.rice)
+        calls = iter(
+            [
+                {
+                    "required_tags": ["spicy"],
+                    "excluded_tags": [],
+                    "category": None,
+                    "max_price": None,
+                    "exclude_shown": False,
+                },
+                {
+                    "required_tags": ["rice"],
+                    "excluded_tags": [],
+                    "category": None,
+                    "max_price": None,
+                    "exclude_shown": False,
+                },
+            ]
+        )
+
+        def fake_converse(
+            message,
+            system_instruction,
+            tool_declarations,
+            tool_handler,
+            before_request,
+            max_iterations,
+        ):
+            result = tool_handler("search_menu", next(calls))
+            return "Ini hasil pencarian terbaru.", [{"result": result}]
+
+        with patch(
+            "recommendation.services.gemini.GeminiClient.available",
+            new_callable=PropertyMock,
+            return_value=True,
+        ), patch(
+            "recommendation.services.gemini.GeminiClient.converse",
+            side_effect=fake_converse,
+        ):
+            first = self.post_chat("Cari yang pedas")
+            second = self.post_chat("Kalau nasi ada apa?")
+
+        self.assertEqual(
+            {item["name"] for item in first.json()["recommendations"]},
+            {"Ayam Geprek", "Mie Pedas"},
+        )
+        self.assertEqual(
+            {item["name"] for item in second.json()["recommendations"]},
+            {"Nasi Goreng", "Ayam Geprek", "Nasi Uduk"},
+        )
+
+    def test_explicitly_rejected_menu_names_are_absent_from_api_cards(self):
+        rejected_tofu = MenuItem.objects.create(
+            category=self.best.category,
+            name="Tahu Crispy",
+            price=Decimal("10000"),
+        )
+        rejected_tofu.tags.add(self.spicy)
+        rejected_banana = MenuItem.objects.create(
+            category=self.best.category,
+            name="Pisang Goreng",
+            price=Decimal("10000"),
+        )
+        remaining = MenuItem.objects.create(
+            category=self.best.category,
+            name="Tempe Mendoan",
+            price=Decimal("10000"),
+        )
+
+        def fake_converse(
+            message,
+            system_instruction,
+            tool_declarations,
+            tool_handler,
+            before_request,
+            max_iterations,
+        ):
+            result = tool_handler(
+                "search_menu",
+                {
+                    "required_tags": [],
+                    "excluded_tags": ["Tahu Crispy", "Pisang Goreng"],
+                    "excluded_item_ids": [],
+                    "excluded_item_names": [],
+                    "category": "Makanan",
+                    "max_price": None,
+                    "exclude_shown": False,
+                },
+            )
+            return "Tahu Crispy dan Pisang Goreng sudah dikeluarkan.", [
+                {"result": result}
+            ]
+
+        with patch(
+            "recommendation.services.gemini.GeminiClient.available",
+            new_callable=PropertyMock,
+            return_value=True,
+        ), patch(
+            "recommendation.services.gemini.GeminiClient.converse",
+            side_effect=fake_converse,
+        ):
+            response = self.post_chat("Aku tidak mau tahu crispy dan pisang goreng")
+
+        payload = response.json()
+        names = {item["name"] for item in payload["recommendations"]}
+        self.assertNotIn(rejected_tofu.name, names)
+        self.assertNotIn(rejected_banana.name, names)
+        self.assertIn(remaining.name, names)
+
     def test_cms_tag_alias_is_used_by_chatbot(self):
         smoky = MenuTag.objects.create(name="smoky", display_name="Berasap")
         MenuTagAlias.objects.create(tag=smoky, phrase="panggang asap")
@@ -885,13 +1439,20 @@ class ChatbotIntegrationTests(TestCase):
             {item["name"] for item in response.json()["recommendations"]},
         )
 
-    def test_deterministic_followups_do_not_call_gemini_to_rephrase_questions(self):
+    def test_followups_keep_server_options_while_allowing_gemini_wording(self):
         first = self.post_chat("Pengen pedas")
         self.assertEqual(first.json()["state"], "ASKING_FOLLOWUP")
         second = self.post_chat("Makanan berat")
         self.assertEqual(second.json()["state"], "ASKING_FOLLOWUP")
         self.assertIn("nasi atau mie", second.json()["message"])
-        self.gemini_generate.assert_not_called()
+        self.assertEqual(self.gemini_generate.call_count, 0)
+        self.assertEqual(
+            {
+                reply["value"]
+                for reply in second.json()["quick_replies"]
+            },
+            {"Pengen nasi", "Pengen mie", "Bebas aja"},
+        )
 
     def test_sufficient_food_context_recommends_without_extra_followup(self):
         response = self.post_chat("Aku mau ayam pedas pakai nasi")
