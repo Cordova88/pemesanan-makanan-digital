@@ -69,10 +69,7 @@ Folder `media/` tidak ikut GitHub. Foto awal tersedia di
 ```powershell
 New-Item -ItemType Directory -Path media/menu/detail -Force | Out-Null
 
-"ayam-geprek","nasi-goreng","kentang-goreng","es-jeruk" |
-  ForEach-Object {
-    Copy-Item "menu/assets/recovered-menu/$_.webp" "media/menu/"
-  }
+"ayam-geprek","nasi-goreng","kentang-goreng","es-jeruk" |ForEach-Object {Copy-Item "menu/assets/recovered-menu/$_.webp" "media/menu/"}
 
 Copy-Item "menu/assets/recovered-menu/ayam-detail.webp" "media/menu/detail/"
 ```
