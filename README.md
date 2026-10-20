@@ -175,6 +175,8 @@ otomatis mengirim pesan ke Gemini. Mode hybrid dijelaskan di
 
 ## Dokumentasi lanjutan
 
+- [Modul belajar OOP](docs/oop/README.md): konsep dasar, contoh proyek, dan latihan tim.
+- [Penjelasan sistem chatbot](docs/Chatbot.md): perjalanan pesan, konteks, budget, dan peran AI.
 - [Pengembangan](docs/PANDUAN_PENGEMBANGAN.md): struktur kode, model, endpoint,
   OOP, chatbot, dan cara mengubah fitur.
 - [Penggunaan](docs/PANDUAN_PENGGUNAAN.md): pelanggan, staf, kasir, akun, dan simulasi.

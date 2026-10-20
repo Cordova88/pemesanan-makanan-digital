@@ -6,6 +6,8 @@ Dokumentasi untuk branch **ahmad**. Pilih panduan sesuai tujuan:
 |---|---|
 | Baru clone dan ingin menjalankan web | [README proyek](../README.md) — lima langkah instalasi, foto, dan pembaruan. |
 | Memahami atau mengubah kode | [Pengembangan](PANDUAN_PENGEMBANGAN.md) — struktur, model, API, OOP, dan hybrid AI. |
+| Belajar konsep OOP dari contoh proyek | [Modul OOP](oop/README.md) — class/object sampai SOLID dan latihan. |
+| Memahami perjalanan pesan chatbot | [Sistem chatbot](Chatbot.md) — bahasa, konteks, budget, AI, respons, dan pengujian. |
 | Mencoba sebagai pelanggan/staf/kasir | [Penggunaan](PANDUAN_PENGGUNAAN.md) — akun, langkah operasional, dan simulasi. |
 | Memakai setiap form CMS | [CMS/Admin](PANDUAN_CMS_ADMIN.md). |
 | Menguji lokal atau Gemini opsional | [Pengujian lokal](PANDUAN_TESTING_LOKAL.md). |
