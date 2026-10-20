@@ -1,4 +1,5 @@
 """Existing order creation inputs, shared with session cart checkout."""
+
 from typing import NotRequired, TypedDict
 
 

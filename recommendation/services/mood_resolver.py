@@ -1,5 +1,7 @@
 from typing import ClassVar
 from collections.abc import Iterable
+
+
 class MoodResolver:
     """Translate detected situations into lower-weight menu characteristics."""
 
@@ -13,8 +15,14 @@ class MoodResolver:
     def resolve(self, moods: Iterable[str], *, explicit_tags: Iterable[str] = ()) -> set[str]:
         resolved = set().union(*(self.RESOLUTIONS.get(mood, set()) for mood in moods))
         explicit = set(explicit_tags)
+
         if explicit & {"warm", "hot", "warming"}:
             resolved.difference_update({"cold", "refreshing"})
-        if explicit & {"rice", "noodle", "heavy_meal", "chicken", "beef", "fish"} and "drink" not in explicit:
+
+        if (
+            explicit & {"rice", "noodle", "heavy_meal", "chicken", "beef", "fish"}
+            and "drink" not in explicit
+        ):
             resolved.difference_update({"drink", "cold", "refreshing"})
+
         return resolved

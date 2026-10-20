@@ -1,6 +1,7 @@
 # Acuan V1
 
-Folder `pemesanan-makanan-digital-v1` adalah proyek utama. Jalankan perintah
+Folder repository `pemesanan-makanan-digital` pada branch `ahmad` memakai
+baseline v1. Jalankan perintah
 dari folder ini, bukan folder arsip.
 
 - `manage.py` memakai `v1_settings` secara default: server lokal tanpa Gemini.
@@ -22,5 +23,6 @@ Panduan lengkap: [README](../README.md), [pengujian lokal](PANDUAN_TESTING_LOKAL
 [CMS/Admin](PANDUAN_CMS_ADMIN.md), dan [hosting](PANDUAN_VERIFIKASI_HOSTING.md).
 
 Catatan penyiapan awal, audit, fase implementasi, diagram, dan hasil pengujian
-historis disimpan di [arsip pengembangan](../../output/pengembangan/README.md).
+historis disimpan terpisah di `UTS/output/pengembangan/` pada workspace penulis;
+folder itu tidak diperlukan saat clone repository.
 Dokumen historis tidak menyatakan kondisi data atau kesiapan production saat ini.

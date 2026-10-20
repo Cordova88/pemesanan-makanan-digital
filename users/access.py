@@ -1,4 +1,5 @@
 """Existing staff access decisions, kept separate from HTTP and transactions."""
+
 from django.contrib.auth.models import AbstractUser, AnonymousUser
 
 
@@ -22,4 +23,5 @@ class StaffAccess:
     def home_route(self) -> str:
         if self._user.is_staff:
             return "staff:dashboard"
+
         return "kasir:dashboard" if self.is_cashier else "storefront"

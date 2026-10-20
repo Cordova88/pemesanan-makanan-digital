@@ -22,7 +22,8 @@ jika server memakai port lain, sesuaikan bagian alamatnya.
 
 ## 1. Memulai dan memilih panel
 
-Dari terminal folder pemesanan-makanan-digital-v1:
+Dari terminal folder repository `pemesanan-makanan-digital` dengan lingkungan
+Python proyek aktif:
 
 ```powershell
 .\start.ps1

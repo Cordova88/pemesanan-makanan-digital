@@ -137,9 +137,7 @@ MAILERS = {
     },
 }
 
-GEMINI_MAX_CALLS_PER_SESSION = int(
-    os.environ.get("GEMINI_MAX_CALLS_PER_SESSION", "50")
-)
+GEMINI_MAX_CALLS_PER_SESSION = int(os.environ.get("GEMINI_MAX_CALLS_PER_SESSION", "50"))
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
 LOGGING = {
@@ -168,26 +166,40 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 # Runtime opt-in; this does not load or modify a credential file.
 GEMINI_ENABLED = os.environ.get('GEMINI_ENABLED', 'false').lower() == 'true'
-CHATBOT_SEMANTIC_RERANKING_ENABLED = os.environ.get('CHATBOT_SEMANTIC_RERANKING_ENABLED', 'true').lower() == 'true'
+CHATBOT_SEMANTIC_RERANKING_ENABLED = (
+    os.environ.get('CHATBOT_SEMANTIC_RERANKING_ENABLED', 'true').lower() == 'true'
+)
 CHATBOT_AI_WORDING_ENABLED = os.environ.get('CHATBOT_AI_WORDING_ENABLED', 'false').lower() == 'true'
 # Opt-in expression task replaces ranking for subjective requests, never follows it.
 CHATBOT_AI_RESPONSE_MODE = os.environ.get('CHATBOT_AI_RESPONSE_MODE', 'ranking').lower()
 # Staged H3 wire contract; enable only after readiness review, not for live rollout.
-CHATBOT_PROPOSAL_V3_ENABLED = os.environ.get('CHATBOT_PROPOSAL_V3_ENABLED', 'false').lower() == 'true'
-CHATBOT_CONTEXT_SWITCHING_ENABLED = os.environ.get('CHATBOT_CONTEXT_SWITCHING_ENABLED', 'true').lower() == 'true'
+CHATBOT_PROPOSAL_V3_ENABLED = (
+    os.environ.get('CHATBOT_PROPOSAL_V3_ENABLED', 'false').lower() == 'true'
+)
+CHATBOT_CONTEXT_SWITCHING_ENABLED = (
+    os.environ.get('CHATBOT_CONTEXT_SWITCHING_ENABLED', 'true').lower() == 'true'
+)
 CHATBOT_CACHE_ALIAS = 'chatbot'
 CHATBOT_REQUIRE_SHARED_CACHE = not DEBUG
 _chatbot_redis_url = os.environ.get('CHATBOT_REDIS_URL', '')
+
 if _chatbot_redis_url:
     CACHES = {
         'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'},
-        'chatbot': {'BACKEND': 'django.core.cache.backends.redis.RedisCache', 'LOCATION': _chatbot_redis_url},
+        'chatbot': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': _chatbot_redis_url,
+        },
     }
 elif DEBUG:
     CACHES = {
         'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'},
-        'chatbot': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache', 'LOCATION': 'rasakita-chatbot-local'},
+        'chatbot': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'rasakita-chatbot-local',
+        },
     }
+
 # In production a missing shared alias makes chatbot guards fail closed.
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG

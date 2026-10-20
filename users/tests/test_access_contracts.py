@@ -15,6 +15,7 @@ class StaffAccessTests(TestCase):
             self.assertFalse(policy.can_use_cashier)
             self.assertFalse(policy.is_cashier)
             self.assertEqual(policy.home_route, "storefront")
+
             with self.assertRaises(PermissionDenied):
                 cashier_required(user)
 

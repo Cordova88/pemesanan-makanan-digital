@@ -1,4 +1,5 @@
 """V1 local development profile. Production uses config.settings explicitly."""
+
 from pathlib import Path
 from secrets import token_urlsafe
 import os
@@ -6,30 +7,54 @@ import os
 BASE_DIR = Path(__file__).resolve().parent
 # Persist a local-only key so login sessions survive development restarts.
 _key_path = BASE_DIR / '.local-secret-key'
+
 if not os.environ.get('DJANGO_SECRET_KEY') and not _key_path.exists():
     try:
         with _key_path.open('x', encoding='utf-8') as key_file:
             key_file.write(token_urlsafe(48))
     except FileExistsError:
         pass
+
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or _key_path.read_text(encoding='utf-8').strip()
 DEBUG = True
 ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver"]
 INSTALLED_APPS = [
-    "django.contrib.admin", "django.contrib.auth", "django.contrib.contenttypes",
-    "django.contrib.sessions", "django.contrib.messages", "django.contrib.staticfiles",
-    "menu", "cart", "orders", "users", "recommendation",
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "menu",
+    "cart",
+    "orders",
+    "users",
+    "recommendation",
 ]
 MIDDLEWARE = [
-    "django.middleware.security.SecurityMiddleware", "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.common.CommonMiddleware", "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware", "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 ROOT_URLCONF = "config.urls"
-TEMPLATES = [{"BACKEND": "django.template.backends.django.DjangoTemplates", "DIRS": [], "APP_DIRS": True,
-              "OPTIONS": {"context_processors": ["django.template.context_processors.request",
-                         "django.contrib.auth.context_processors.auth", "django.contrib.messages.context_processors.messages"]}}]
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ]
+        },
+    }
+]
 DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3"}}
 LANGUAGE_CODE = "id"
 TIME_ZONE = "Asia/Makassar"
@@ -44,7 +69,9 @@ GEMINI_API_KEY = ""
 GEMINI_ENABLED = False
 CHATBOT_SEMANTIC_RERANKING_ENABLED = True
 CHATBOT_AI_WORDING_ENABLED = False
-CHATBOT_CONTEXT_SWITCHING_ENABLED = os.environ.get('CHATBOT_CONTEXT_SWITCHING_ENABLED', 'true').lower() == 'true'
+CHATBOT_CONTEXT_SWITCHING_ENABLED = (
+    os.environ.get('CHATBOT_CONTEXT_SWITCHING_ENABLED', 'true').lower() == 'true'
+)
 
 GEMINI_MAX_CALLS_PER_SESSION = 8
 GEMINI_MODEL = 'gemini-2.0-flash'

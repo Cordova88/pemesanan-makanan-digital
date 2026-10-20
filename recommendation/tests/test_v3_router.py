@@ -1,4 +1,5 @@
 """Routing outcomes and provider trust boundaries, using synthetic catalog only."""
+
 from copy import deepcopy
 from decimal import Decimal
 import json
@@ -11,7 +12,10 @@ from menu.models import Category, MenuItem, MenuTag
 from ..services.budget import BudgetRequest
 from ..services.chatbot import ChatbotService
 from ..services.conversation_interpreter import (
-    ConversationInterpretation, ConversationInterpreter, ConversationIntent, PreferenceOperation,
+    ConversationInterpretation,
+    ConversationInterpreter,
+    ConversationIntent,
+    PreferenceOperation,
 )
 from ..services.conversation_session import ConversationSession
 from ..services.decision_router import DecisionRouter, RoutingDecision
@@ -19,11 +23,22 @@ from ..services.entity_resolver import EntityResolution
 
 
 def proposal(**changes: object) -> str:
-    data = dict(intent='RECOMMEND', add_tags=['drink'], remove_tags=[], excluded_tags=[],
-                soft_excluded_tags=[], moods=[], clear_moods=False, max_price=None,
-                prefer_affordable=None, clear_max_price=False, clear_prefer_affordable=False,
-                message_is_meaningful=True)
+    data = dict(
+        intent='RECOMMEND',
+        add_tags=['drink'],
+        remove_tags=[],
+        excluded_tags=[],
+        soft_excluded_tags=[],
+        moods=[],
+        clear_moods=False,
+        max_price=None,
+        prefer_affordable=None,
+        clear_max_price=False,
+        clear_prefer_affordable=False,
+        message_is_meaningful=True,
+    )
     data.update(changes)
+
     return json.dumps(data)
 
 
@@ -35,8 +50,10 @@ class FakeProvider:
 
     def generate(self, prompt: str) -> str | None:
         self.calls.append(prompt)
+
         if self.fails:
             raise TimeoutError('synthetic timeout')
+
         return self.raw
 
 
@@ -48,58 +65,100 @@ class DecisionRouterTests(SimpleTestCase):
                 self.assertEqual(DecisionRouter.decide(text, local).route, RoutingDecision.LOCAL)
 
     def test_subjective_examples_need_assistance_even_with_partial_local_tags(self) -> None:
-        for text in ('enak buat nemenin nugas', 'yang ringan tapi nggak bikin cepat lapar',
-                     'aku ingin yang nggak bikin eneg tapi cukup mengenyangkan'):
+        for text in (
+            'enak buat nemenin nugas',
+            'yang ringan tapi nggak bikin cepat lapar',
+            'aku ingin yang nggak bikin eneg tapi cukup mengenyangkan',
+        ):
             with self.subTest(text=text):
-                self.assertEqual(DecisionRouter.decide(text, ConversationInterpreter().interpret(text)).route,
-                                 RoutingDecision.AI_ASSISTED)
+                self.assertEqual(
+                    DecisionRouter.decide(text, ConversationInterpreter().interpret(text)).route,
+                    RoutingDecision.AI_ASSISTED,
+                )
 
     def test_known_entity_wins_over_generic_food_cues(self) -> None:
         entity = EntityResolution('Es Kelapa', 'IN_CATALOG', 'beverage', menu_ids=(7,))
-        self.assertEqual(DecisionRouter.decide('yang es kelapa', ConversationInterpretation('SELECT_RECOMMENDATION'),
-                                             entity=entity).route, RoutingDecision.LOCAL)
+        self.assertEqual(
+            DecisionRouter.decide(
+                'yang es kelapa', ConversationInterpretation('SELECT_RECOMMENDATION'), entity=entity
+            ).route,
+            RoutingDecision.LOCAL,
+        )
 
     def test_ambiguous_catalog_needs_clarification_without_provider(self) -> None:
         entity = EntityResolution('Es', 'AMBIGUOUS_CATALOG', 'beverage', menu_ids=(1, 2))
-        self.assertEqual(DecisionRouter.decide('es', ConversationInterpretation('UNKNOWN'), entity=entity).route,
-                         RoutingDecision.CLARIFY)
+        self.assertEqual(
+            DecisionRouter.decide('es', ConversationInterpretation('UNKNOWN'), entity=entity).route,
+            RoutingDecision.CLARIFY,
+        )
 
     def test_missing_antecedent_cannot_be_invented_by_ai(self) -> None:
-        local = ConversationInterpretation('UNKNOWN', contextual_reference='first', contextual_revision=True)
-        self.assertEqual(DecisionRouter.decide('yang tadi terlalu berat', local).reason, 'missing_reference')
+        local = ConversationInterpretation(
+            'UNKNOWN', contextual_reference='first', contextual_revision=True
+        )
+        self.assertEqual(
+            DecisionRouter.decide('yang tadi terlalu berat', local).reason, 'missing_reference'
+        )
 
     def test_valid_antecedent_allows_unresolved_revision_assistance(self) -> None:
-        local = ConversationInterpretation('UNKNOWN', contextual_reference='first', contextual_revision=True)
-        self.assertEqual(DecisionRouter.decide('yang tadi terlalu berat', local, has_reference=True).route,
-                         RoutingDecision.AI_ASSISTED)
+        local = ConversationInterpretation(
+            'UNKNOWN', contextual_reference='first', contextual_revision=True
+        )
+        self.assertEqual(
+            DecisionRouter.decide('yang tadi terlalu berat', local, has_reference=True).route,
+            RoutingDecision.AI_ASSISTED,
+        )
 
     def test_conflicting_money_cannot_be_repaired_by_ai(self) -> None:
         budget = BudgetRequest(clarification='Batas bertentangan')
-        self.assertEqual(DecisionRouter.decide('enak buat nugas', ConversationInterpretation('UNKNOWN'),
-                                             budget=budget).reason, 'budget_conflict')
+        self.assertEqual(
+            DecisionRouter.decide(
+                'enak buat nugas', ConversationInterpretation('UNKNOWN'), budget=budget
+            ).reason,
+            'budget_conflict',
+        )
 
     def test_unresolved_entity_uses_only_classification_task(self) -> None:
         entity = EntityResolution('xyz', 'AMBIGUOUS_REQUEST', 'unknown')
-        decision = DecisionRouter.decide('mau xyz', ConversationInterpretation('UNKNOWN'), entity=entity)
-        self.assertEqual((decision.route, decision.task), (RoutingDecision.AI_ASSISTED, 'classify_entity'))
+        decision = DecisionRouter.decide(
+            'mau xyz', ConversationInterpretation('UNKNOWN'), entity=entity
+        )
+        self.assertEqual(
+            (decision.route, decision.task), (RoutingDecision.AI_ASSISTED, 'classify_entity')
+        )
 
     def test_gibberish_needs_clarification_without_spending_calls(self) -> None:
-        self.assertEqual(DecisionRouter.decide('asdfgh', ConversationInterpretation('UNKNOWN')).route,
-                         RoutingDecision.CLARIFY)
+        self.assertEqual(
+            DecisionRouter.decide('asdfgh', ConversationInterpretation('UNKNOWN')).route,
+            RoutingDecision.CLARIFY,
+        )
 
     def test_shared_contract_rejects_operation_injection_and_inconsistent_delta(self) -> None:
         local = ConversationInterpretation('UNKNOWN')
-        for operations in ([PreferenceOperation('EXECUTE')], [PreferenceOperation('ADD', ('spicy',))]):
-            ai = ConversationInterpretation('RECOMMEND', source='gemini', tags={'drink'}, operations=operations)
-            self.assertFalse(DecisionRouter.accepts_proposal(ai, allowed_tags={'drink', 'spicy'}, local=local,
-                                                           hard_exclusions=set()))
+
+        for operations in (
+            [PreferenceOperation('EXECUTE')],
+            [PreferenceOperation('ADD', ('spicy',))],
+        ):
+            ai = ConversationInterpretation(
+                'RECOMMEND', source='gemini', tags={'drink'}, operations=operations
+            )
+            self.assertFalse(
+                DecisionRouter.accepts_proposal(
+                    ai, allowed_tags={'drink', 'spicy'}, local=local, hard_exclusions=set()
+                )
+            )
 
 
 class RoutingIntegrationTests(TestCase):
     def setUp(self) -> None:
         category = Category.objects.create(name='Minuman')
-        self.item = MenuItem.objects.create(name='Es Kelapa', price=Decimal('10000'), category=category)
-        self.other = MenuItem.objects.create(name='Es Jeruk', price=Decimal('12000'), category=category)
+        self.item = MenuItem.objects.create(
+            name='Es Kelapa', price=Decimal('10000'), category=category
+        )
+        self.other = MenuItem.objects.create(
+            name='Es Jeruk', price=Decimal('12000'), category=category
+        )
         self.item.tags.add(MenuTag.objects.create(name='drink'))
         self.other.tags.add(MenuTag.objects.get(name='drink'))
         self.session = SessionStore()
@@ -109,15 +168,32 @@ class RoutingIntegrationTests(TestCase):
         return ChatbotService(self.session, gemini_client=self.provider).reply(text)
 
     def business(self) -> dict:
-        keys = (ConversationSession.STATE_KEY, ConversationSession.SEARCH_KEY, ConversationSession.FOCUS_KEY,
-                ConversationSession.CANDIDATES_KEY, ConversationSession.REJECTED_KEY,
-                ConversationSession.SHOWN_KEY, 'last_recommendations', 'last_question')
+        keys = (
+            ConversationSession.STATE_KEY,
+            ConversationSession.SEARCH_KEY,
+            ConversationSession.FOCUS_KEY,
+            ConversationSession.CANDIDATES_KEY,
+            ConversationSession.REJECTED_KEY,
+            ConversationSession.SHOWN_KEY,
+            'last_recommendations',
+            'last_question',
+        )
+
         return {key: deepcopy(self.session.get(key)) for key in keys}
 
     def test_clear_catalog_budget_and_dialog_never_call_provider(self) -> None:
-        for text in ('halo', 'minuman 10k', 'yang es kelapa', 'yang pertama', 'yang lain', 'jangan pedas',
-                     'pilihan minuman apa aja?', 'mulai lagi'):
+        for text in (
+            'halo',
+            'minuman 10k',
+            'yang es kelapa',
+            'yang pertama',
+            'yang lain',
+            'jangan pedas',
+            'pilihan minuman apa aja?',
+            'mulai lagi',
+        ):
             self.reply(text)
+
         self.assertEqual(self.provider.calls, [])
 
     def test_valid_interpretation_proposal_reuses_existing_local_filter(self) -> None:
@@ -152,9 +228,16 @@ class RoutingIntegrationTests(TestCase):
     def test_invalid_wire_output_cannot_corrupt_business_state(self) -> None:
         self.reply('yang es kelapa')
         saved = self.business()
-        for raw in ('{', proposal(target_menu_id=999), proposal(intent='RESET'),
-                    proposal(add_tags=['not_in_catalog']), proposal(max_price=True),
-                    proposal(stock='available'), proposal(add_tags='drink')):
+
+        for raw in (
+            '{',
+            proposal(target_menu_id=999),
+            proposal(intent='RESET'),
+            proposal(add_tags=['not_in_catalog']),
+            proposal(max_price=True),
+            proposal(stock='available'),
+            proposal(add_tags='drink'),
+        ):
             with self.subTest(raw=raw):
                 self.provider.raw = raw
                 result = self.reply('menu yang cocok dengan suasana santai')
@@ -164,9 +247,12 @@ class RoutingIntegrationTests(TestCase):
     def test_ai_cannot_invent_or_clear_money_even_when_schema_valid(self) -> None:
         self.reply('minuman 10k')
         saved = self.business()
+
         for raw in (proposal(max_price=20000), proposal(clear_max_price=True)):
             self.provider.raw = raw
-            self.assertEqual(self.reply('menu yang cocok dengan suasana santai')['recommendations'], [])
+            self.assertEqual(
+                self.reply('menu yang cocok dengan suasana santai')['recommendations'], []
+            )
             self.assertEqual(self.business(), saved)
 
     def test_ai_cannot_relax_saved_hard_exclusion(self) -> None:
@@ -199,10 +285,21 @@ class RoutingIntegrationTests(TestCase):
         self.assertEqual(len(self.provider.calls), 1)
 
     def test_shared_contract_defense_rejects_internal_fabricated_id(self) -> None:
-        ai = ConversationInterpretation('RECOMMEND', source='gemini', target_menu_id=999,
-                                        tags={'drink'}, operations=[PreferenceOperation('ADD', ('drink',))])
-        with patch('recommendation.services.ai.GeminiInterpreter.GeminiInterpreter.interpret', return_value=ai):
-            self.assertEqual(self.reply('menu yang cocok dengan suasana santai')['recommendations'], [])
+        ai = ConversationInterpretation(
+            'RECOMMEND',
+            source='gemini',
+            target_menu_id=999,
+            tags={'drink'},
+            operations=[PreferenceOperation('ADD', ('drink',))],
+        )
+
+        with patch(
+            'recommendation.services.ai.GeminiInterpreter.GeminiInterpreter.interpret',
+            return_value=ai,
+        ):
+            self.assertEqual(
+                self.reply('menu yang cocok dengan suasana santai')['recommendations'], []
+            )
 
     def test_single_candidate_subjective_budget_skips_provider(self) -> None:
         self.provider.raw = proposal()

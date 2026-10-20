@@ -23,7 +23,9 @@ class CashierAreaTests(TestCase):
         self.assertRedirects(r, reverse("staff:login") + "?next=" + reverse("kasir:dashboard"))
 
     def test_cashier_login_goes_to_cashier_area(self):
-        r = self.client.post(reverse("staff:login"), {"username": "kasir1", "password": "pw12345!x"})
+        r = self.client.post(
+            reverse("staff:login"), {"username": "kasir1", "password": "pw12345!x"}
+        )
         self.assertRedirects(r, reverse("kasir:dashboard"))
 
     def test_admin_login_goes_to_cms(self):
@@ -50,12 +52,16 @@ class CashierAreaTests(TestCase):
 
     def test_detail_shows_customer(self):
         self.client.force_login(self.cashier)
-        self.assertContains(self.client.get(reverse("kasir:order", args=[self.order.public_id])), "Budi")
+        self.assertContains(
+            self.client.get(reverse("kasir:order", args=[self.order.public_id])), "Budi"
+        )
 
     def test_unknown_id_goes_back_to_search(self):
         self.client.force_login(self.cashier)
         r = self.client.get(reverse("kasir:order", args=["ZZZZZZZZ"]))
-        self.assertRedirects(r, reverse("kasir:dashboard") + "?q=ZZZZZZZZ", fetch_redirect_response=False)
+        self.assertRedirects(
+            r, reverse("kasir:dashboard") + "?q=ZZZZZZZZ", fetch_redirect_response=False
+        )
 
     def test_cashier_cannot_open_admin_cms(self):
         self.client.force_login(self.cashier)

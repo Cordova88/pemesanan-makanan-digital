@@ -1,4 +1,5 @@
 """Phase 6 conversation continuity, references and quota-safe dialog reset."""
+
 import json
 from decimal import Decimal
 
@@ -18,6 +19,7 @@ class MemoryGenerator(TextGenerator):
 
     def generate(self, prompt: str) -> str | None:
         self.calls += 1
+
         return None
 
 
@@ -28,6 +30,7 @@ class MemoryStateTests(SimpleTestCase):
         session['cart'] = ['sentinel']
         session['_auth_user_id'] = 'sentinel'
         self.assertTrue(state.consume_gemini_call(1))
+
         for _ in range(3):
             state.set_entity_ids([1])
             state.remember_rejected([2])
@@ -49,7 +52,9 @@ class MemoryStateTests(SimpleTestCase):
         self.assertEqual(len(state.get_last_recommendation_ids()), 100)
         self.assertEqual(len(state.get_shown_ids()), 100)
         self.assertEqual(len(state.get_explicit_rejections()), 100)
-        self.assertTrue(all(type(value) is int and value > 0 for value in state.get_explicit_rejections()))
+        self.assertTrue(
+            all(type(value) is int and value > 0 for value in state.get_explicit_rejections())
+        )
         state.allow_requested([199])
         self.assertNotIn(199, state.get_explicit_rejections())
 
@@ -68,8 +73,12 @@ class ConversationMemoryTests(TestCase):
     def setUp(self) -> None:
         food = Category.objects.create(name='Makanan')
         drink = Category.objects.create(name='Minuman')
-        tags = {name: MenuTag.objects.create(name=name) for name in ('rice', 'chicken', 'beef', 'spicy', 'drink', 'warm', 'filling')}
+        tags = {
+            name: MenuTag.objects.create(name=name)
+            for name in ('rice', 'chicken', 'beef', 'spicy', 'drink', 'warm', 'filling')
+        }
         self.items = {}
+
         for name, price, category, names in (
             ('Ayam A', 12000, food, ('rice', 'chicken')),
             ('Ayam B', 14000, food, ('rice', 'chicken', 'spicy')),
@@ -82,6 +91,7 @@ class ConversationMemoryTests(TestCase):
             item = MenuItem.objects.create(name=name, price=Decimal(price), category=category)
             item.tags.add(*(tags[tag] for tag in names))
             self.items[name] = item
+
         self.session = SessionStore()
         self.generator = MemoryGenerator()
 
@@ -107,7 +117,12 @@ class ConversationMemoryTests(TestCase):
         result = self.reply('tapi jangan pedas')
         self.assertEqual(result['active_search']['category'], 'Makanan')
         self.assertIn('chicken', result['active_search']['required_tags'])
-        self.assertTrue(all('spicy' not in set(m.item.tags.values_list('name', flat=True)) for m in result['recommendations']))
+        self.assertTrue(
+            all(
+                'spicy' not in set(m.item.tags.values_list('name', flat=True))
+                for m in result['recommendations']
+            )
+        )
 
     def test_additional_base_followup_preserves_protein_and_range(self) -> None:
         self.reply('ayam budget 12-25 ribu')
@@ -157,7 +172,10 @@ class ConversationMemoryTests(TestCase):
         latest = self.reply('ada sapi a?')
         self.assertIsNone(self.session.get('last_question'))
         chosen = self.reply('yang pertama')
-        self.assertEqual([m.item.pk for m in chosen['recommendations']], [m.item.pk for m in latest['recommendations']])
+        self.assertEqual(
+            [m.item.pk for m in chosen['recommendations']],
+            [m.item.pk for m in latest['recommendations']],
+        )
         corrected = self.reply('yang tadi jangan pedas')
         self.assertIn('spicy', corrected['active_search']['excluded_tags'])
         self.assertEqual([m.item.name for m in corrected['recommendations']], ['Sapi A'])
@@ -202,7 +220,12 @@ class ConversationMemoryTests(TestCase):
         result = self.reply('nasi')
         self.assertTrue(result['recommendations'])
         self.assertIsNone(result['active_search']['max_price'])
-        self.assertEqual(self.session[ConversationSession.CONTEXTS_KEY]['previous'][-1]['constraints']['budget']['maximum'], '20000')
+        self.assertEqual(
+            self.session[ConversationSession.CONTEXTS_KEY]['previous'][-1]['constraints']['budget'][
+                'maximum'
+            ],
+            '20000',
+        )
         self.assertNotEqual(result['active_search']['category'], 'Minuman')
         self.assertNotIn('drink', result['active_search']['required_tags'])
 

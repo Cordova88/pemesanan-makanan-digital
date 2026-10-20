@@ -1,4 +1,5 @@
 """User-selected budget replacement and named references from local feedback."""
+
 from decimal import Decimal
 import re
 from unittest.mock import patch
@@ -19,12 +20,20 @@ class BudgetReplacementRegressionTests(TestCase):
         cold = MenuTag.objects.create(name='cold')
         sweet = MenuTag.objects.create(name='sweet')
         self.items: dict[str, MenuItem] = {}
+
         for name, price, category in (
-            ('Air Putih', 3000, drinks), ('Es Jeruk', 10000, drinks),
-            ('Es Kelapa', 10000, drinks), ('Minuman Mahal', 25000, drinks),
-            ('Makanan Hemat', 3000, food), ('Ayam Geprek', 18000, food), ('Nasi Goreng', 20000, food),
+            ('Air Putih', 3000, drinks),
+            ('Es Jeruk', 10000, drinks),
+            ('Es Kelapa', 10000, drinks),
+            ('Minuman Mahal', 25000, drinks),
+            ('Makanan Hemat', 3000, food),
+            ('Ayam Geprek', 18000, food),
+            ('Nasi Goreng', 20000, food),
         ):
-            self.items[name] = MenuItem.objects.create(name=name, price=Decimal(price), category=category)
+            self.items[name] = MenuItem.objects.create(
+                name=name, price=Decimal(price), category=category
+            )
+
         self.items['Es Jeruk'].tags.add(cold, sweet)
         self.items['Es Kelapa'].tags.add(sweet)
         self.session = SessionStore()
@@ -39,24 +48,34 @@ class BudgetReplacementRegressionTests(TestCase):
         self.assertIsNone(lower['active_search']['budget']['maximum'])
         self.assertEqual(lower['active_search']['budget']['minimum'], '5000')
         self.assertFalse(lower['active_search']['budget']['minimum_inclusive'])
-        self.assertIn(self.items['Minuman Mahal'].pk, {match.item.pk for match in lower['recommendations']})
+        self.assertIn(
+            self.items['Minuman Mahal'].pk, {match.item.pk for match in lower['recommendations']}
+        )
         cap = self.reply('minuman 10k')
         self.assertIsNone(cap['active_search']['budget']['minimum'])
         self.assertEqual(cap['active_search']['budget']['maximum'], '10000')
-        self.assertEqual({match.item.name for match in cap['recommendations']}, {'Air Putih', 'Es Jeruk', 'Es Kelapa'})
+        self.assertEqual(
+            {match.item.name for match in cap['recommendations']},
+            {'Air Putih', 'Es Jeruk', 'Es Kelapa'},
+        )
 
     def test_new_food_budget_does_not_inherit_the_previous_minimum(self) -> None:
         self.reply('minuman diatas 5.000')
         result = self.reply('makanan maksimal 20.000')
         self.assertIsNone(result['active_search']['budget']['minimum'])
-        self.assertEqual({match.item.name for match in result['recommendations']}, {'Makanan Hemat', 'Ayam Geprek', 'Nasi Goreng'})
+        self.assertEqual(
+            {match.item.name for match in result['recommendations']},
+            {'Makanan Hemat', 'Ayam Geprek', 'Nasi Goreng'},
+        )
 
     def test_explicit_range_in_one_message_keeps_both_bounds(self) -> None:
         self.reply('minimal 30 ribu')
         result = self.reply('minuman antara 5 ribu sampai 10 ribu')
         self.assertEqual(result['active_search']['budget']['minimum'], '5000')
         self.assertEqual(result['active_search']['budget']['maximum'], '10000')
-        self.assertEqual({match.item.name for match in result['recommendations']}, {'Es Jeruk', 'Es Kelapa'})
+        self.assertEqual(
+            {match.item.name for match in result['recommendations']}, {'Es Jeruk', 'Es Kelapa'}
+        )
 
     def test_named_followup_selects_kelapa_not_generic_cold_jeruk(self) -> None:
         self.reply('makanan maksimal 20.000')
@@ -75,7 +94,10 @@ class BudgetReplacementRegressionTests(TestCase):
         self.reply('minuman maksimal 10 ribu')
         cold = self.reply('yang dingin')
         self.assertEqual([match.item.name for match in cold['recommendations']], ['Es Jeruk'])
-        self.assertEqual([match.item.name for match in self.reply('yang terakhir')['recommendations']], ['Es Jeruk'])
+        self.assertEqual(
+            [match.item.name for match in self.reply('yang terakhir')['recommendations']],
+            ['Es Jeruk'],
+        )
 
     def test_drink_summary_does_not_duplicate_category_name(self) -> None:
         result = self.reply('minuman 10k')
@@ -90,9 +112,19 @@ class BudgetReplacementRegressionTests(TestCase):
 
     def test_http_payload_uses_replaced_bounds_and_exact_name(self) -> None:
         with patch('recommendation.services.gemini.GeminiClient.generate', return_value=None):
-            for message in ('minuman maksimal 15000', 'diatas 5000', 'minuman 10k', 'yang es kelapa'):
-                response = self.client.post('/api/recommendation/chat/', {'message': message}, content_type='application/json')
+            for message in (
+                'minuman maksimal 15000',
+                'diatas 5000',
+                'minuman 10k',
+                'yang es kelapa',
+            ):
+                response = self.client.post(
+                    '/api/recommendation/chat/',
+                    {'message': message},
+                    content_type='application/json',
+                )
                 self.assertEqual(response.status_code, 200)
+
         body = response.json()
         self.assertEqual([item['name'] for item in body['recommendations']], ['Es Kelapa'])
         self.assertIsNone(body['active_search']['budget']['minimum'])

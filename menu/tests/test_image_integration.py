@@ -12,11 +12,18 @@ from recommendation.views import _item
 class DynamicPhotoContractTests(TestCase):
     def setUp(self):
         self.category = Category.objects.create(name="Makanan")
-        self.item = MenuItem.objects.create(category=self.category, name="Sate Ayam", price=24000, image="menu/sate-first.webp")
+        self.item = MenuItem.objects.create(
+            category=self.category, name="Sate Ayam", price=24000, image="menu/sate-first.webp"
+        )
 
     def add_to_cart(self):
-        response = self.client.post("/api/cart/add/", json.dumps({"menu_item_id": self.item.pk, "quantity": 2, "note": "Pisahkan bumbu"}), content_type="application/json")
+        response = self.client.post(
+            "/api/cart/add/",
+            json.dumps({"menu_item_id": self.item.pk, "quantity": 2, "note": "Pisahkan bumbu"}),
+            content_type="application/json",
+        )
         self.assertEqual(response.status_code, 200)
+
         return response.json()
 
     def test_new_menu_photo_is_consistent_without_name_mapping(self):
@@ -27,7 +34,13 @@ class DynamicPhotoContractTests(TestCase):
         self.assertEqual(cart["menu_item_id"], self.item.pk)
         self.assertEqual(cart["note"], "Pisahkan bumbu")
         self.assertEqual(cart["line_total"], "48000.00")
-        order = create_order({"customer_name": "Uji", "order_type": "TAKEAWAY", "items": [{"menu_item_id": self.item.pk, "quantity": 2}]})
+        order = create_order(
+            {
+                "customer_name": "Uji",
+                "order_type": "TAKEAWAY",
+                "items": [{"menu_item_id": self.item.pk, "quantity": 2}],
+            }
+        )
         serialized = _order(order)["items"][0]
         self.assertEqual(serialized["image_url"], self.item.image.url)
         self.assertEqual(serialized["menu_item_id"], self.item.pk)
@@ -44,12 +57,20 @@ class DynamicPhotoContractTests(TestCase):
 
     def test_rename_and_replacement_use_current_url_and_preserve_order_snapshot(self):
         self.add_to_cart()
-        order = create_order({"customer_name": "Uji", "order_type": "TAKEAWAY", "items": [{"menu_item_id": self.item.pk, "quantity": 1}]})
+        order = create_order(
+            {
+                "customer_name": "Uji",
+                "order_type": "TAKEAWAY",
+                "items": [{"menu_item_id": self.item.pk, "quantity": 1}],
+            }
+        )
         self.item.image = "menu/sate-second.webp"
         self.item.name = "Sate Ayam Spesial"
         self.item.price = 30000
         self.item.save()
-        self.assertEqual(self.client.get("/api/cart/").json()["items"][0]["image_url"], self.item.image.url)
+        self.assertEqual(
+            self.client.get("/api/cart/").json()["items"][0]["image_url"], self.item.image.url
+        )
         rendered = _order(order)["items"][0]
         self.assertEqual(rendered["name"], "Sate Ayam")
         self.assertEqual(rendered["line_total"], "24000.00")

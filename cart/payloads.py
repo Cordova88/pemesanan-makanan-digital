@@ -1,4 +1,5 @@
 """Typing schemas for existing session/API dictionaries; no runtime conversion."""
+
 from typing import NotRequired, TypedDict
 
 

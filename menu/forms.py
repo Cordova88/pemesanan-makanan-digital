@@ -9,14 +9,21 @@ from .widgets import MenuPhotoWidget
 class MenuPhotoForm(forms.ModelForm):
     # Validate dimensions before Pillow decodes the full uploaded image.
     image = forms.FileField(
-        required=False, label="Gambar menu", help_text=HELP_TEXT,
-        widget=MenuPhotoWidget(attrs={"accept": "image/jpeg,image/png,image/webp", "data-menu-image-input": ""}),
+        required=False,
+        label="Gambar menu",
+        help_text=HELP_TEXT,
+        widget=MenuPhotoWidget(
+            attrs={"accept": "image/jpeg,image/png,image/webp", "data-menu-image-input": ""}
+        ),
         error_messages={"empty": "Foto kosong. Pilih foto lain."},
     )
     detail_image = forms.FileField(
-        required=False, label="Foto lama (arsip opsional)",
+        required=False,
+        label="Foto lama (arsip opsional)",
         help_text="Foto arsip tidak digunakan pada halaman pelanggan. Beranda dan pilihan menu memakai Gambar menu dengan blob otomatis. JPEG, PNG, WebP; maksimal 10 MB dan 20 juta piksel.",
-        widget=MenuPhotoWidget(attrs={"accept": "image/jpeg,image/png,image/webp", "data_photo_kind": "detail"}),
+        widget=MenuPhotoWidget(
+            attrs={"accept": "image/jpeg,image/png,image/webp", "data_photo_kind": "detail"}
+        ),
         error_messages={"empty": "Foto kosong. Pilih foto lain."},
     )
 
@@ -37,6 +44,8 @@ class MenuPhotoForm(forms.ModelForm):
 
     def _clean_photo(self, field_name: str) -> File | bool | None:
         image = self.cleaned_data.get(field_name)
+
         if not image or not hasattr(image, "content_type"):
             return image
+
         return prepare_photo(image)

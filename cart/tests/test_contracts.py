@@ -12,7 +12,9 @@ class CartIsolationTests(TestCase):
         category = Category.objects.create(name="Food")
         self.item = MenuItem.objects.create(category=category, name="Rice", price=Decimal("10.50"))
         group = VariantGroup.objects.create(menu_item=self.item, name="Size")
-        self.option = VariantOption.objects.create(group=group, name="Large", price_adjustment=Decimal("2.25"))
+        self.option = VariantOption.objects.create(
+            group=group, name="Large", price_adjustment=Decimal("2.25")
+        )
         self.session = SessionStore()
         self.cart = CartService(self.session)
 
@@ -35,4 +37,6 @@ class CartIsolationTests(TestCase):
         rendered = self.cart.get_items()
         rendered[0]["variant_ids"].clear()
         self.assertEqual(self.cart.checkout_items()[0]["quantity"], 2)
-        self.assertEqual(CartService(self.session).checkout_items()[0]["variant_ids"], [self.option.pk])
+        self.assertEqual(
+            CartService(self.session).checkout_items()[0]["variant_ids"], [self.option.pk]
+        )

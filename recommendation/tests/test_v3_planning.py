@@ -1,4 +1,5 @@
 """Verified response plans, local variants and optional grounded expression."""
+
 from copy import deepcopy
 from decimal import Decimal
 import json
@@ -28,37 +29,59 @@ class FakeExpression:
 
     def generate(self, prompt: str) -> str:
         self.calls.append(prompt)
+
         if prompt.startswith('Rank the supplied'):
             if self.on_ranking is not None:
                 self.on_ranking()
-            return json.dumps({'ranked_candidates': [{'id': identifier, 'score': 1 - index / 10}
-                                                     for index, identifier in enumerate(self.ids)]})
+
+            return json.dumps(
+                {
+                    'ranked_candidates': [
+                        {'id': identifier, 'score': 1 - index / 10}
+                        for index, identifier in enumerate(self.ids)
+                    ]
+                }
+            )
+
         if self.on_wording is not None:
             self.on_wording()
+
         if self.raw is not None:
             return self.raw
+
         return json.dumps({'intro': self.intro, 'explanations': []})
 
 
 class ResponsePlanningTests(TestCase):
     def setUp(self) -> None:
         self.category = Category.objects.create(name='Minuman')
-        self.a = MenuItem.objects.create(name='Es Alpha', category=self.category, price=Decimal('10000'),
-                                        description='DESCRIPTION_PRIVATE')
-        self.b = MenuItem.objects.create(name='Es Beta', category=self.category, price=Decimal('15000'))
+        self.a = MenuItem.objects.create(
+            name='Es Alpha',
+            category=self.category,
+            price=Decimal('10000'),
+            description='DESCRIPTION_PRIVATE',
+        )
+        self.b = MenuItem.objects.create(
+            name='Es Beta', category=self.category, price=Decimal('15000')
+        )
         tag = MenuTag.objects.create(name='drink')
         self.a.tags.add(tag)
         self.b.tags.add(tag)
         self.preferences = Preferences(tags={'drink'})
-        self.constraints = SearchConstraints(required_tags=frozenset({'drink'}), category='Minuman',
-                                            budget=BudgetConstraint(maximum=Decimal('20000')))
+        self.constraints = SearchConstraints(
+            required_tags=frozenset({'drink'}),
+            category='Minuman',
+            budget=BudgetConstraint(maximum=Decimal('20000')),
+        )
         self.matches = RecommendationService().rank(self.preferences, constraints=self.constraints)
         self.session = SessionStore()
         self.provider = FakeExpression()
         self.provider.ids = [self.b.pk, self.a.pk]
 
     def plan(self, **kwargs: object) -> ResponsePlan:
-        return ResponsePlan('recommendation', self.matches, self.preferences, constraints=self.constraints, **kwargs)
+        return ResponsePlan(
+            'recommendation', self.matches, self.preferences, constraints=self.constraints, **kwargs
+        )
 
     def test_plan_separates_facts_intent_style_and_claims(self) -> None:
         plan = self.plan(intent='RECOMMEND', tone='concise')
@@ -84,21 +107,31 @@ class ResponsePlanningTests(TestCase):
     def test_unsupported_purpose_and_tone_are_rejected(self) -> None:
         with self.assertRaises(ValueError):
             self.plan(tone='invented')
+
         with self.assertRaises(ValueError):
             ResponsePlan('checkout', [], Preferences())
 
     def test_clarification_is_required_literal_text_and_never_ai(self) -> None:
-        plan = ResponsePlan('clarification', self.matches, self.preferences,
-                            required_clarification='Menu yang mana?')
+        plan = ResponsePlan(
+            'clarification',
+            self.matches,
+            self.preferences,
+            required_clarification='Menu yang mana?',
+        )
         self.assertEqual(LocalResponseComposer(self.session).compose(plan), 'Menu yang mana?')
-        self.assertEqual(RecommendationExplanationService(self.provider).from_plan(plan, self.matches, self.preferences),
-                         (None, {}))
+        self.assertEqual(
+            RecommendationExplanationService(self.provider).from_plan(
+                plan, self.matches, self.preferences
+            ),
+            (None, {}),
+        )
         self.assertEqual(self.provider.calls, [])
 
     def test_local_openings_vary_without_repeating_category(self) -> None:
         composer = LocalResponseComposer(self.session)
         messages = [composer.compose(self.plan()) for _ in range(4)]
         self.assertEqual(len(set(message.split('\n')[0] for message in messages)), 4)
+
         for message in messages:
             self.assertEqual(message.casefold().count('minuman'), 1)
             self.assertIn('Rp20.000', message)
@@ -107,21 +140,29 @@ class ResponsePlanningTests(TestCase):
 
     def test_local_selection_and_switching_include_exact_current_name(self) -> None:
         composer = LocalResponseComposer(self.session)
+
         for switching in (True, False):
             values = [composer.selection('Nama Baru', switching=switching) for _ in range(3)]
             self.assertEqual(len(set(values)), 3)
             self.assertTrue(all('Nama Baru' in value for value in values))
 
     def test_plan_rejects_mismatched_expression_ids_before_provider(self) -> None:
-        self.assertEqual(RecommendationExplanationService(self.provider).from_plan(self.plan(), [], self.preferences),
-                         (None, {}))
+        self.assertEqual(
+            RecommendationExplanationService(self.provider).from_plan(
+                self.plan(), [], self.preferences
+            ),
+            (None, {}),
+        )
         self.assertEqual(self.provider.calls, [])
 
     def test_live_chat_constructs_plan_without_exposing_it_on_wire(self) -> None:
         bot = ChatbotService(self.session, gemini_client=self.provider)
         result = bot.reply('minuman 20k')
         self.assertEqual(bot.response_plan.purpose, 'budget')
-        self.assertEqual(bot.response_plan.selected_menu_ids, tuple(match.item.pk for match in result['recommendations']))
+        self.assertEqual(
+            bot.response_plan.selected_menu_ids,
+            tuple(match.item.pk for match in result['recommendations']),
+        )
         self.assertEqual(bot.response_plan.quick_replies, result['quick_replies'])
         self.assertNotIn('response_plan', result)
         self.assertNotIn('allowed_claims', result)
@@ -136,11 +177,15 @@ class ResponsePlanningTests(TestCase):
         self.assertEqual(self.provider.calls, [])
 
     def test_local_greetings_nonfood_and_clarification_have_plans(self) -> None:
-        for message, purpose in [('halo', 'greeting'), ('aku mau motor', 'nonfood'),
-                                 ('yang pertama', 'clarification')]:
+        for message, purpose in [
+            ('halo', 'greeting'),
+            ('aku mau motor', 'nonfood'),
+            ('yang pertama', 'clarification'),
+        ]:
             bot = ChatbotService(SessionStore(), gemini_client=self.provider)
             bot.reply(message)
             self.assertEqual(bot.response_plan.purpose, purpose)
+
         self.assertEqual(self.provider.calls, [])
 
     def test_empathy_tone_does_not_export_emotion_or_raw_message(self) -> None:
@@ -152,14 +197,19 @@ class ResponsePlanningTests(TestCase):
         self.assertEqual(self.provider.calls, [])
 
     def test_unscored_fallback_does_not_assert_subjective_suitability(self) -> None:
-        matches = RecommendationService().rank(Preferences(), constraints=SearchConstraints(), include_unscored=True)
+        matches = RecommendationService().rank(
+            Preferences(), constraints=SearchConstraints(), include_unscored=True
+        )
         text = RecommendationExplanationService.fallback(matches[0])
         self.assertIn('katalog', text)
         self.assertNotIn('sesuai dengan preferensimu', text)
 
 
-@override_settings(CHATBOT_AI_WORDING_ENABLED=True, CHATBOT_SEMANTIC_RERANKING_ENABLED=True,
-                   GEMINI_MAX_CALLS_PER_SESSION=50)
+@override_settings(
+    CHATBOT_AI_WORDING_ENABLED=True,
+    CHATBOT_SEMANTIC_RERANKING_ENABLED=True,
+    GEMINI_MAX_CALLS_PER_SESSION=50,
+)
 class OptionalExpressionTests(TestCase):
     setUp = ResponsePlanningTests.setUp
     plan = ResponsePlanningTests.plan
@@ -174,7 +224,8 @@ class OptionalExpressionTests(TestCase):
     def expression(self) -> tuple:
         # Keep unit coverage of the dormant validator separate from reply routing.
         return RecommendationExplanationService(self.provider).from_plan(
-            self.plan(), self.matches, self.preferences)
+            self.plan(), self.matches, self.preferences
+        )
 
     def test_wording_cannot_spend_a_second_call_after_ranking(self) -> None:
         result = self.reply()
@@ -188,6 +239,7 @@ class OptionalExpressionTests(TestCase):
     def test_wording_is_off_by_default_and_does_not_change_rank(self) -> None:
         with override_settings(CHATBOT_AI_WORDING_ENABLED=False):
             result = self.reply()
+
         self.assertEqual(len(self.provider.calls), 1)
         self.assertEqual(self.ids(result), [self.b.pk, self.a.pk])
 
@@ -197,10 +249,20 @@ class OptionalExpressionTests(TestCase):
         self.assertEqual(self.provider.calls, [])
 
     def test_invalid_wording_preserves_selected_ids_constraints_and_cards(self) -> None:
-        for intro in ('Harga Rp1', 'Stok tersedia', 'Siap dalam dua menit', 'Menu aman untuk alergi',
-                      'Pembayaran berhasil', 'Pesanan sudah dikirim', 'Sushi Istimewa cocok',
-                      '<b>Ini pilihan</b>', 'Lihat https://example.invalid', 'Ini pilihan\x00',
-                      'Ini pilihan\u202e', 'Ini pilihan\ud800'):
+        for intro in (
+            'Harga Rp1',
+            'Stok tersedia',
+            'Siap dalam dua menit',
+            'Menu aman untuk alergi',
+            'Pembayaran berhasil',
+            'Pesanan sudah dikirim',
+            'Sushi Istimewa cocok',
+            '<b>Ini pilihan</b>',
+            'Lihat https://example.invalid',
+            'Ini pilihan\x00',
+            'Ini pilihan\u202e',
+            'Ini pilihan\ud800',
+        ):
             with self.subTest(intro=repr(intro)):
                 self.provider.intro = intro
                 self.assertEqual(self.expression(), (None, {}))
@@ -211,8 +273,11 @@ class OptionalExpressionTests(TestCase):
                 self.assertEqual(result['recommendations'][0].item.price, Decimal('15000'))
 
     def test_raw_invalid_json_and_duplicate_keys_are_never_displayed(self) -> None:
-        for raw in ('{RAW_CANARY', '{"intro":"RAW_CANARY","intro":"Ini pilihan","explanations":[]}',
-                    '{"intro":"Ini pilihan","explanations":[],"action":"checkout"}'):
+        for raw in (
+            '{RAW_CANARY',
+            '{"intro":"RAW_CANARY","intro":"Ini pilihan","explanations":[]}',
+            '{"intro":"Ini pilihan","explanations":[],"action":"checkout"}',
+        ):
             self.provider.raw = raw
             self.assertEqual(self.expression(), (None, {}))
             result = self.reply()
@@ -222,6 +287,7 @@ class OptionalExpressionTests(TestCase):
     def test_provider_timeout_uses_local_expression_with_same_selection(self) -> None:
         def timeout() -> None:
             raise TimeoutError('PRIVATE_PROVIDER_ERROR')
+
         self.provider.on_wording = timeout
         self.assertEqual(self.expression(), (None, {}))
         result = self.reply()
@@ -231,6 +297,7 @@ class OptionalExpressionTests(TestCase):
     def test_wording_quota_refusal_keeps_semantic_order(self) -> None:
         with override_settings(GEMINI_MAX_CALLS_PER_SESSION=1):
             result = self.reply()
+
         self.assertEqual(len(self.provider.calls), 1)
         self.assertEqual(self.ids(result), [self.b.pk, self.a.pk])
 
@@ -241,12 +308,25 @@ class OptionalExpressionTests(TestCase):
         self.assertEqual(self.ids(result), [self.a.pk, self.b.pk])
 
     def test_expression_component_payload_excludes_raw_chat_history_and_description(self) -> None:
-        self.session.update({'cart': {'secret': 'CART_PRIVATE'}, '_auth_user_id': 'AUTH_PRIVATE',
-                             'chatbot_client_id': 'NONCE_PRIVATE'})
+        self.session.update(
+            {
+                'cart': {'secret': 'CART_PRIVATE'},
+                '_auth_user_id': 'AUTH_PRIVATE',
+                'chatbot_client_id': 'NONCE_PRIVATE',
+            }
+        )
         self.expression()
         prompt = self.provider.calls[-1]
-        for value in ('CART_PRIVATE', 'AUTH_PRIVATE', 'NONCE_PRIVATE', 'DESCRIPTION_PRIVATE', 'nugas'):
+
+        for value in (
+            'CART_PRIVATE',
+            'AUTH_PRIVATE',
+            'NONCE_PRIVATE',
+            'DESCRIPTION_PRIVATE',
+            'nugas',
+        ):
             self.assertNotIn(value, prompt)
+
         self.assertIn('selected_menu_ids', prompt)
         self.assertIn('allowed_claims', prompt)
 
@@ -260,14 +340,18 @@ class OptionalExpressionTests(TestCase):
         self.assertEqual(self.ids(first), self.ids(second))
 
     def test_catalog_change_during_only_call_refilters_before_local_wording(self) -> None:
-        self.provider.on_ranking = lambda: MenuItem.objects.filter(pk=self.b.pk).update(price=Decimal('25000'))
+        self.provider.on_ranking = lambda: MenuItem.objects.filter(pk=self.b.pk).update(
+            price=Decimal('25000')
+        )
         result = self.reply()
         self.assertEqual(self.ids(result), [self.a.pk])
         self.assertFalse(result['message'].startswith(self.provider.intro))
         self.assertEqual(self.session['last_recommendations'], [self.a.pk])
 
     def test_current_price_is_used_after_in_range_change(self) -> None:
-        self.provider.on_ranking = lambda: MenuItem.objects.filter(pk=self.b.pk).update(price=Decimal('16000'))
+        self.provider.on_ranking = lambda: MenuItem.objects.filter(pk=self.b.pk).update(
+            price=Decimal('16000')
+        )
         result = self.reply()
         self.assertEqual(self.ids(result), [self.a.pk, self.b.pk])
         self.assertEqual(result['recommendations'][1].item.price, Decimal('16000'))
@@ -281,8 +365,9 @@ class OptionalExpressionTests(TestCase):
         self.assertEqual(self.provider.calls, [])
 
     def test_unknown_id_explanation_rejects_generated_intro_as_well(self) -> None:
-        self.provider.raw = json.dumps({'intro': self.provider.intro,
-                                        'explanations': [{'id': 99999, 'text': 'Menu palsu'}]})
+        self.provider.raw = json.dumps(
+            {'intro': self.provider.intro, 'explanations': [{'id': 99999, 'text': 'Menu palsu'}]}
+        )
         self.assertEqual(self.expression(), (None, {}))
         result = self.reply()
         self.assertFalse(result['message'].startswith(self.provider.intro))

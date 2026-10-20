@@ -1,4 +1,5 @@
 """Preference delta and session persistence regression contracts."""
+
 import json
 
 from django.contrib.sessions.backends.signed_cookies import SessionStore
@@ -13,23 +14,40 @@ from ..services.tag_extractor import Preferences
 
 class PreferenceDeltaTests(SimpleTestCase):
     def test_add_remove_soft_remove_and_replace_preserve_unrelated_preferences(self) -> None:
-        preferences = Preferences(tags={"rice"}, excluded_tags={"chicken"}, soft_excluded_tags={"spicy"})
-        preferences.apply_interpretation(ConversationInterpretation("RECOMMEND", operations=[
-            PreferenceOperation("ADD", ("chicken", "spicy")),
-            PreferenceOperation("REMOVE", ("spicy",)),
-            PreferenceOperation("SOFT_REMOVE", ("chicken",)),
-            PreferenceOperation("REPLACE", ("fish",), ("chicken",)),
-        ]), MoodResolver())
+        preferences = Preferences(
+            tags={"rice"}, excluded_tags={"chicken"}, soft_excluded_tags={"spicy"}
+        )
+        preferences.apply_interpretation(
+            ConversationInterpretation(
+                "RECOMMEND",
+                operations=[
+                    PreferenceOperation("ADD", ("chicken", "spicy")),
+                    PreferenceOperation("REMOVE", ("spicy",)),
+                    PreferenceOperation("SOFT_REMOVE", ("chicken",)),
+                    PreferenceOperation("REPLACE", ("fish",), ("chicken",)),
+                ],
+            ),
+            MoodResolver(),
+        )
         self.assertEqual(preferences.tags, {"rice", "fish"})
         self.assertEqual(preferences.excluded_tags, {"spicy"})
         self.assertEqual(preferences.soft_excluded_tags, set())
 
     def test_clear_then_add_and_unknown_operation_keep_original_order(self) -> None:
-        preferences = Preferences(tags={"rice"}, max_price=10000, moods={"tired"}, prefer_affordable=True)
-        preferences.apply_interpretation(ConversationInterpretation("RECOMMEND", operations=[
-            PreferenceOperation("CLEAR"), PreferenceOperation("ADD", ("fish",)),
-            PreferenceOperation("UNRECOGNIZED", ("spicy",)),
-        ]), MoodResolver())
+        preferences = Preferences(
+            tags={"rice"}, max_price=10000, moods={"tired"}, prefer_affordable=True
+        )
+        preferences.apply_interpretation(
+            ConversationInterpretation(
+                "RECOMMEND",
+                operations=[
+                    PreferenceOperation("CLEAR"),
+                    PreferenceOperation("ADD", ("fish",)),
+                    PreferenceOperation("UNRECOGNIZED", ("spicy",)),
+                ],
+            ),
+            MoodResolver(),
+        )
         self.assertEqual(preferences.tags, {"fish"})
         self.assertEqual(preferences.moods, set())
         self.assertEqual(preferences.mood_tags, set())
@@ -37,12 +55,22 @@ class PreferenceDeltaTests(SimpleTestCase):
         self.assertFalse(preferences.prefer_affordable)
 
     def test_mood_clear_new_mood_and_budget_flags_keep_existing_precedence(self) -> None:
-        preferences = Preferences(tags={"rice"}, max_price=20000, moods={"tired"}, prefer_affordable=True)
-        preferences.apply_interpretation(ConversationInterpretation(
-            "UPDATE_PREFERENCES", moods={"hot_thirsty"}, clear_moods=True,
-            max_price=15000, clear_max_price=True, prefer_affordable=True,
-            clear_prefer_affordable=True, category="Minuman",
-        ), MoodResolver())
+        preferences = Preferences(
+            tags={"rice"}, max_price=20000, moods={"tired"}, prefer_affordable=True
+        )
+        preferences.apply_interpretation(
+            ConversationInterpretation(
+                "UPDATE_PREFERENCES",
+                moods={"hot_thirsty"},
+                clear_moods=True,
+                max_price=15000,
+                clear_max_price=True,
+                prefer_affordable=True,
+                clear_prefer_affordable=True,
+                category="Minuman",
+            ),
+            MoodResolver(),
+        )
         self.assertEqual(preferences.moods, {"hot_thirsty"})
         self.assertEqual(preferences.mood_tags, {"cold", "refreshing", "drink"})
         self.assertEqual(preferences.tags, {"rice"})
@@ -51,8 +79,14 @@ class PreferenceDeltaTests(SimpleTestCase):
         self.assertEqual(preferences.category, "Minuman")
 
     def test_omitted_context_keeps_mood_and_affordable_but_clears_transient_filters(self) -> None:
-        preferences = Preferences(tags={"rice"}, excluded_tags={"rice"}, max_price=20000,
-                                  category="Makanan", moods={"tired"}, prefer_affordable=True)
+        preferences = Preferences(
+            tags={"rice"},
+            excluded_tags={"rice"},
+            max_price=20000,
+            category="Makanan",
+            moods={"tired"},
+            prefer_affordable=True,
+        )
         preferences.apply_interpretation(ConversationInterpretation("RECOMMEND"), MoodResolver())
         self.assertEqual(preferences.tags, set())
         self.assertEqual(preferences.moods, {"tired"})
@@ -91,11 +125,19 @@ class ConversationSessionTests(SimpleTestCase):
         self.assertTrue(self.session.modified)
 
     def test_legacy_constraints_fallback_and_new_filter_precedence(self) -> None:
-        self.session["recommendation_state"] = Preferences(max_price=20000, category="Makanan", moods={"tired"}).to_dict()
+        self.session["recommendation_state"] = Preferences(
+            max_price=20000, category="Makanan", moods={"tired"}
+        ).to_dict()
         self.session["recommendation_required_tags"] = ["rice"]
-        self.assertEqual(self.state.load_constraints(), SearchConstraints(
-            frozenset({"rice"}), category="Makanan", max_price=20000, moods=frozenset({"tired"}),
-        ))
+        self.assertEqual(
+            self.state.load_constraints(),
+            SearchConstraints(
+                frozenset({"rice"}),
+                category="Makanan",
+                max_price=20000,
+                moods=frozenset({"tired"}),
+            ),
+        )
         constraints = SearchConstraints(frozenset({"fish"}), max_price=12000)
         self.state.save_search(constraints)
         self.assertEqual(self.state.load_constraints(), constraints)
@@ -123,7 +165,9 @@ class ConversationSessionTests(SimpleTestCase):
         self.assertEqual(self.state.get_rejected_ids(), [3])
         self.assertFalse(self.state.last_result_empty())
 
-    def test_call_limit_counts_only_accepted_calls_and_reset_preserves_other_session_data(self) -> None:
+    def test_call_limit_counts_only_accepted_calls_and_reset_preserves_other_session_data(
+        self,
+    ) -> None:
         self.session["cart"] = [{"menu_item_id": 4}]
         self.session["recommendation_context"] = {"legacy": True}
         self.state.set_last_question("base")

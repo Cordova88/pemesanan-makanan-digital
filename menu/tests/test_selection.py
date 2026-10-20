@@ -15,7 +15,9 @@ class MenuSelectionTests(TestCase):
         category = Category.objects.create(name="Food")
         self.item = MenuItem.objects.create(category=category, name="Rice", price=Decimal("10.50"))
         self.group = VariantGroup.objects.create(menu_item=self.item, name="Size", is_required=True)
-        self.option = VariantOption.objects.create(group=self.group, name="Large", price_adjustment=Decimal("2.25"))
+        self.option = VariantOption.objects.create(
+            group=self.group, name="Large", price_adjustment=Decimal("2.25")
+        )
         self.addon = AddOn.objects.create(name="Sauce", price=Decimal("0.75"))
         self.addon.menu_items.add(self.item)
 
@@ -24,6 +26,7 @@ class MenuSelectionTests(TestCase):
         self.assertEqual(selection.unit_price, Decimal("13.50"))
         self.assertEqual(selection.options, (self.option,))
         self.assertEqual(selection.addons, (self.addon,))
+
         with self.assertRaises(AttributeError):
             selection.options = ()
 
@@ -40,30 +43,40 @@ class MenuSelectionTests(TestCase):
         ):
             with self.subTest(ids=ids), self.assertRaises(ValidationError) as raised:
                 MenuSelection.from_ids(self.item, ids)
+
             self.assertEqual(raised.exception.messages, [message])
 
     def test_multiple_options_per_group_and_inactive_addons_are_rejected(self) -> None:
         second = VariantOption.objects.create(group=self.group, name="Small")
+
         with self.assertRaises(ValidationError):
             MenuSelection.from_ids(self.item, [self.option.pk, second.pk])
+
         self.addon.is_active = False
         self.addon.save()
+
         with self.assertRaises(ValidationError) as raised:
             MenuSelection.from_ids(self.item, [self.option.pk], [self.addon.pk])
+
         self.assertEqual(raised.exception.messages, ["Invalid add-on selection."])
 
     def test_cart_keeps_its_original_localized_error_contract(self) -> None:
         with self.assertRaises(ValidationError) as raised:
             CartService(SessionStore()).add_item(self.item.pk, 1)
+
         self.assertEqual(raised.exception.messages, ["Pilih satu opsi untuk setiap varian wajib."])
+
         with self.assertRaises(ValidationError) as raised:
             CartService(SessionStore()).add_item(self.item.pk, 1, [self.option.pk], [999999])
+
         self.assertEqual(raised.exception.messages, ["Tambahan tidak tersedia untuk menu ini."])
 
 
 class PreparedPhotoConstructorTests(SimpleTestCase):
     def test_constructor_preserves_file_behavior_original_metadata_and_idempotency(self) -> None:
-        photo = PreparedPhoto(b"processed", "photo.webp", original_bytes=b"original", original_name="photo.png")
+        photo = PreparedPhoto(
+            b"processed", "photo.webp", original_bytes=b"original", original_name="photo.png"
+        )
         self.assertEqual(photo.read(), b"processed")
         self.assertEqual(photo.size, 9)
         self.assertEqual(photo.original_bytes, b"original")

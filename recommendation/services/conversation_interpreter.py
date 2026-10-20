@@ -7,7 +7,6 @@ from .language import normalize_text
 from .mood_extractor import MoodExtractor
 from .tag_extractor import Preferences, TagExtractor
 
-
 # Preserve the distinction between an omitted collection and explicit None.
 _COLLECTION_DEFAULT: object = object()
 
@@ -64,8 +63,11 @@ class PreferenceOperation:
     def __eq__(self, other: object) -> bool | NotImplementedType:
         if not isinstance(other, PreferenceOperation) or type(self) is not type(other):
             return NotImplemented
+
         return (self.action, self.tags, self.remove_tags) == (
-            other.action, other.tags, other.remove_tags,
+            other.action,
+            other.tags,
+            other.remove_tags,
         )
 
     def __hash__(self) -> int:
@@ -82,18 +84,33 @@ class ConversationInterpretation:
     """Mutable interpreter result with independent default collections."""
 
     __match_args__: ClassVar[tuple[str, ...]] = (
-        "intent", "operations", "tags", "excluded_tags", "soft_excluded_tags",
-        "moods", "max_price", "category", "prefer_affordable", "last_question",
-        "contextual_reference", "message_is_meaningful", "follow_up",
-        "clear_moods", "clear_max_price", "clear_prefer_affordable",
-        "contextual_revision", "catalog_tags",
+        "intent",
+        "operations",
+        "tags",
+        "excluded_tags",
+        "soft_excluded_tags",
+        "moods",
+        "max_price",
+        "category",
+        "prefer_affordable",
+        "last_question",
+        "contextual_reference",
+        "message_is_meaningful",
+        "follow_up",
+        "clear_moods",
+        "clear_max_price",
+        "clear_prefer_affordable",
+        "contextual_revision",
+        "catalog_tags",
     )
     __hash__ = None
 
     def __init__(
         self,
         intent: str,
-        operations: list[PreferenceOperation] = cast(list[PreferenceOperation], _COLLECTION_DEFAULT),
+        operations: list[PreferenceOperation] = cast(
+            list[PreferenceOperation], _COLLECTION_DEFAULT
+        ),
         tags: set[str] = cast(set[str], _COLLECTION_DEFAULT),
         excluded_tags: set[str] = cast(set[str], _COLLECTION_DEFAULT),
         soft_excluded_tags: set[str] = cast(set[str], _COLLECTION_DEFAULT),
@@ -113,13 +130,21 @@ class ConversationInterpretation:
         target_menu_id: int | None = None,
         rejected_menu_ids: tuple[int, ...] = (),
         source: str = 'local',
-        *, context_action: str | None = None, constraint_scope: str | None = None,
+        *,
+        context_action: str | None = None,
+        constraint_scope: str | None = None,
     ) -> None:
         self.intent: str = intent
-        self.operations: list[PreferenceOperation] = [] if operations is _COLLECTION_DEFAULT else operations
+        self.operations: list[PreferenceOperation] = (
+            [] if operations is _COLLECTION_DEFAULT else operations
+        )
         self.tags: set[str] = set() if tags is _COLLECTION_DEFAULT else tags
-        self.excluded_tags: set[str] = set() if excluded_tags is _COLLECTION_DEFAULT else excluded_tags
-        self.soft_excluded_tags: set[str] = set() if soft_excluded_tags is _COLLECTION_DEFAULT else soft_excluded_tags
+        self.excluded_tags: set[str] = (
+            set() if excluded_tags is _COLLECTION_DEFAULT else excluded_tags
+        )
+        self.soft_excluded_tags: set[str] = (
+            set() if soft_excluded_tags is _COLLECTION_DEFAULT else soft_excluded_tags
+        )
         self.moods: set[str] = set() if moods is _COLLECTION_DEFAULT else moods
         self.max_price: int | None = max_price
         self.category: str | None = category
@@ -133,53 +158,107 @@ class ConversationInterpretation:
         self.clear_prefer_affordable: bool = clear_prefer_affordable
         self.contextual_revision: bool = contextual_revision
         self.catalog_tags: set[str] = set() if catalog_tags is _COLLECTION_DEFAULT else catalog_tags
+
         if target_menu_id is not None and (type(target_menu_id) is not int or target_menu_id <= 0):
             raise ValueError('Invalid catalog target')
-        if source not in {'local', 'gemini'} or any(type(value) is not int or value <= 0 for value in rejected_menu_ids):
+
+        if source not in {'local', 'gemini'} or any(
+            type(value) is not int or value <= 0 for value in rejected_menu_ids
+        ):
             raise ValueError('Invalid interpretation metadata')
+
         self.target_menu_id: int | None = target_menu_id
         self.rejected_menu_ids: tuple[int, ...] = tuple(dict.fromkeys(rejected_menu_ids))
         self.source: str = source
-        if context_action is not None and context_action not in {'CONTINUE_CONTEXT', 'SWITCH_CONTEXT', 'NEW_REQUEST', 'ADD_TO_CONTEXT', 'CORRECT_PREVIOUS', 'REFER_TO_PREVIOUS', 'CLARIFY'}:
+
+        if context_action is not None and context_action not in {
+            'CONTINUE_CONTEXT',
+            'SWITCH_CONTEXT',
+            'NEW_REQUEST',
+            'ADD_TO_CONTEXT',
+            'CORRECT_PREVIOUS',
+            'REFER_TO_PREVIOUS',
+            'CLARIFY',
+        }:
             raise ValueError('Invalid context action')
-        if constraint_scope is not None and constraint_scope not in {'CURRENT_SEARCH', 'SPECIFIC_ITEM', 'PLAN_TOTAL', 'SAFETY_RESTRICTION'}:
+
+        if constraint_scope is not None and constraint_scope not in {
+            'CURRENT_SEARCH',
+            'SPECIFIC_ITEM',
+            'PLAN_TOTAL',
+            'SAFETY_RESTRICTION',
+        }:
             raise ValueError('Invalid constraint scope')
+
         self.context_action: str | None = context_action
         self.constraint_scope: str | None = constraint_scope
 
     def __eq__(self, other: object) -> bool | NotImplementedType:
         if not isinstance(other, ConversationInterpretation) or type(self) is not type(other):
             return NotImplemented
-        return all(getattr(self, name) == getattr(other, name) for name in self.__match_args__) and (
-            self.target_menu_id, self.rejected_menu_ids, self.source, self.context_action, self.constraint_scope,
-        ) == (other.target_menu_id, other.rejected_menu_ids, other.source, other.context_action, other.constraint_scope)
+
+        return all(
+            getattr(self, name) == getattr(other, name) for name in self.__match_args__
+        ) and (
+            self.target_menu_id,
+            self.rejected_menu_ids,
+            self.source,
+            self.context_action,
+            self.constraint_scope,
+        ) == (
+            other.target_menu_id,
+            other.rejected_menu_ids,
+            other.source,
+            other.context_action,
+            other.constraint_scope,
+        )
 
     def __repr__(self) -> str:
         fields = ", ".join(f"{name}={getattr(self, name)!r}" for name in self.__match_args__)
+
         return f"{type(self).__qualname__}({fields})"
 
 
 class ConversationInterpreter:
     @staticmethod
-    def context_operation(text: str, *, category: str | None, previous_category: str | None,
-                          has_active: bool, has_target: bool, plan_active: bool = False) -> tuple[str, str | None]:
+    def context_operation(
+        text: str,
+        *,
+        category: str | None,
+        previous_category: str | None,
+        has_active: bool,
+        has_target: bool,
+        plan_active: bool = False,
+    ) -> tuple[str, str | None]:
         """Semantic transition policy; catalog identity/category are supplied by backend."""
         normalized = normalize_text(text)
+
         if re.search(r'\b(?:balik|kembali)\s+(?:ke\s+)?', normalized):
             reference = 'first' if re.search(r'\b(?:awal|pertama)\b', normalized) else category
+
             return 'REFER_TO_PREVIOUS', reference
+
         if re.search(r'\b(?:sekalian|tambahkan|tambah(?:in)?|juga)\b', normalized):
             return 'ADD_TO_CONTEXT', None
-        correction = bool(re.search(r'\b(?:eh|maksudku|maksudnya|koreksi|bukan|ganti|tidak jadi)\b', normalized))
+
+        correction = bool(
+            re.search(r'\b(?:eh|maksudku|maksudnya|koreksi|bukan|ganti|tidak jadi)\b', normalized)
+        )
+
         if correction:
             return 'CORRECT_PREVIOUS', None
+
         if category and previous_category and category.casefold() != previous_category.casefold():
             return 'SWITCH_CONTEXT', None
+
         if has_target and re.search(r'\b(?:sekarang|permintaan baru)\b', normalized):
             return 'NEW_REQUEST', None
+
         if not has_active:
             return 'NEW_REQUEST', None
+
         return 'CONTINUE_CONTEXT', None
+
     RESET_PHRASES: ClassVar[set[str]] = {
         "reset",
         "mulai lagi",
@@ -190,8 +269,22 @@ class ConversationInterpreter:
         "hapus semua pilihan",
         "hapus pilihan",
     }
-    GREETING_PHRASES: ClassVar[tuple[str, ...]] = ("halo", "hai", "permisi", "hi", "selamat pagi", "selamat siang", "selamat sore")
-    HELP_PHRASES: ClassVar[tuple[str, ...]] = ("cara memakai", "cara pakai", "bisa bantu apa", "mau ngomong apa", "gimana caranya")
+    GREETING_PHRASES: ClassVar[tuple[str, ...]] = (
+        "halo",
+        "hai",
+        "permisi",
+        "hi",
+        "selamat pagi",
+        "selamat siang",
+        "selamat sore",
+    )
+    HELP_PHRASES: ClassVar[tuple[str, ...]] = (
+        "cara memakai",
+        "cara pakai",
+        "bisa bantu apa",
+        "mau ngomong apa",
+        "gimana caranya",
+    )
     REJECT_PHRASES: ClassVar[tuple[str, ...]] = (
         "nggak cocok",
         "tidak cocok",
@@ -236,7 +329,7 @@ class ConversationInterpreter:
         "buatkan code",
     )
 
-    def __init__(self, tag_extractor: TagExtractor | None=None) -> None:
+    def __init__(self, tag_extractor: TagExtractor | None = None) -> None:
         self.tag_extractor: TagExtractor = tag_extractor or TagExtractor()
         self.mood_extractor: MoodExtractor = MoodExtractor()
 
@@ -249,6 +342,7 @@ class ConversationInterpreter:
     ) -> ConversationInterpretation:
         normalized = normalize_text(text or "")
         last_recommendations = last_recommendations or []
+
         if not normalized:
             return ConversationInterpretation(
                 intent=ConversationIntent.UNKNOWN,
@@ -275,6 +369,7 @@ class ConversationInterpreter:
             )
 
         tag_revision = self._tag_revision(normalized)
+
         if tag_revision is not None:
             return tag_revision
 
@@ -284,6 +379,7 @@ class ConversationInterpreter:
                 message_is_meaningful=True,
                 operations=[PreferenceOperation(action="KEEP")],
             )
+
         if any(self._contains_phrase(normalized, phrase) for phrase in self.ALTERNATIVE_PHRASES):
             return ConversationInterpretation(
                 intent=ConversationIntent.REQUEST_ALTERNATIVES,
@@ -292,6 +388,7 @@ class ConversationInterpreter:
             )
 
         reference = self._pick_reference(normalized)
+
         if reference:
             if self._is_contextual_revision(normalized):
                 return ConversationInterpretation(
@@ -300,6 +397,7 @@ class ConversationInterpreter:
                     contextual_revision=bool(last_recommendations or last_question),
                     contextual_reference=reference,
                 )
+
             return ConversationInterpretation(
                 intent=(
                     ConversationIntent.SELECT_RECOMMENDATION
@@ -312,6 +410,7 @@ class ConversationInterpreter:
 
         if self._is_no_results_challenge(normalized, last_result_empty):
             extracted = self.tag_extractor.extract(normalized)
+
             if extracted.tags:
                 return ConversationInterpretation(
                     intent=ConversationIntent.RETRY_SEARCH,
@@ -347,6 +446,7 @@ class ConversationInterpreter:
 
         extracted = self._extract_preferences(normalized)
         tags = set(extracted.tags)
+
         if self._is_catalog_question(normalized) and tags:
             return ConversationInterpretation(
                 intent=ConversationIntent.CATALOG_QUESTION,
@@ -366,19 +466,17 @@ class ConversationInterpreter:
             "sekarang" in normalized
             and bool(tags.intersection({"refreshing", "cold", "hot", "warm", "warming"}))
         )
+
         if clear_moods:
             moods.discard("tired")
 
         excluded = set(extracted.excluded_tags)
         soft = set(extracted.soft_excluded_tags)
-        max_price = (
-            extracted.max_price
-            if self._has_explicit_budget(normalized)
-            else None
-        )
+        max_price = extracted.max_price if self._has_explicit_budget(normalized) else None
 
         replacement = self._replacement_tags(normalized)
         intent = ConversationIntent.UPDATE_PREFERENCES
+
         if replacement:
             old_tags, new_tags = replacement
             operations = [
@@ -393,15 +491,20 @@ class ConversationInterpreter:
             soft = set()
             intent = ConversationIntent.REPLACE_PREFERENCES
         elif excluded or soft:
-            operations = [
-                PreferenceOperation(action="REMOVE", tags=tuple(sorted(excluded)))
-            ] if excluded else []
+            operations = (
+                [PreferenceOperation(action="REMOVE", tags=tuple(sorted(excluded)))]
+                if excluded
+                else []
+            )
+
             if soft:
                 operations.append(
                     PreferenceOperation(action="SOFT_REMOVE", tags=tuple(sorted(soft)))
                 )
+
             if tags:
                 operations.append(PreferenceOperation(action="ADD", tags=tuple(sorted(tags))))
+
             intent = ConversationIntent.REMOVE_PREFERENCES
         elif tags:
             operations = [PreferenceOperation(action="ADD", tags=tuple(sorted(tags)))]
@@ -417,6 +520,7 @@ class ConversationInterpreter:
             or extracted.prefer_affordable
             or extracted.category
         )
+
         if not has_new_preference:
             return ConversationInterpretation(
                 intent=ConversationIntent.UNKNOWN,
@@ -434,6 +538,7 @@ class ConversationInterpreter:
             )
 
         answer_removals = self._contextual_answer_removals(tags, last_question)
+
         if answer_removals and tags and not excluded and not soft and not replacement:
             operations = [
                 PreferenceOperation(
@@ -444,17 +549,12 @@ class ConversationInterpreter:
             ]
             intent = ConversationIntent.REPLACE_PREFERENCES
 
-        is_explicit_correction = any(
-            cue in normalized for cue in self.PREFERENCE_CORRECTION_CUES
-        )
+        is_explicit_correction = any(cue in normalized for cue in self.PREFERENCE_CORRECTION_CUES)
+
         if is_explicit_correction and not replacement:
             operations = [
                 PreferenceOperation(action="CLEAR"),
-                *(
-                    operation
-                    for operation in operations
-                    if operation.action != "KEEP"
-                ),
+                *(operation for operation in operations if operation.action != "KEEP"),
             ]
             intent = ConversationIntent.REPLACE_PREFERENCES
 
@@ -471,59 +571,86 @@ class ConversationInterpreter:
             message_is_meaningful=True,
             follow_up=self._detect_follow_up(normalized),
             clear_moods=clear_moods,
-            contextual_revision=bool(excluded or soft or replacement or re.match(r"^(?:yang|tapi|namun)\b", normalized)),
+            contextual_revision=bool(
+                excluded or soft or replacement or re.match(r"^(?:yang|tapi|namun)\b", normalized)
+            ),
         )
 
     def _tag_revision(self, text: str) -> ConversationInterpretation | None:
         """Targeted local edits do not erase unrelated tags or monetary bounds."""
+
         if re.fullmatch(r"(?:hapus|bersihkan|reset) (?:semua )?(?:tag|selera)(?: makanan)?", text):
             return ConversationInterpretation(
                 ConversationIntent.REMOVE_PREFERENCES,
                 operations=[PreferenceOperation("CLEAR_TAGS")],
-                message_is_meaningful=True, contextual_revision=True,
+                message_is_meaningful=True,
+                contextual_revision=True,
             )
+
         match = re.fullmatch(r"(?:hapus|buang|lupakan) (?:preferensi |tag )?(.+?)(?: saja)?", text)
         action = "DROP"
+
         if not match:
-            match = re.fullmatch(r"(?:yang\s+)?(.+?)\s+(?:nanti(?:\s+(?:aja|saja))?|ditunda(?:\s+dulu)?)", text)
+            match = re.fullmatch(
+                r"(?:yang\s+)?(.+?)\s+(?:nanti(?:\s+(?:aja|saja))?|ditunda(?:\s+dulu)?)", text
+            )
+
         if not match and not re.search(r"\b(?:mau|ingin)\b", text):
-            match = re.fullmatch(r"(?:tidak jadi|gajadi|gak jadi|ga jadi|nggak jadi|enggak jadi)\s+([^,;]+)", text)
+            match = re.fullmatch(
+                r"(?:tidak jadi|gajadi|gak jadi|ga jadi|nggak jadi|enggak jadi)\s+([^,;]+)", text
+            )
+
         if not match:
             match = re.fullmatch(r"(?:boleh|boleh pakai|tidak apa-apa pakai) (.+?)(?: lagi)?", text)
             action = "RELAX"
+
         if not match:
             match = re.fullmatch(r"(?:sekarang\s+)?(.+?)\s+(?:sudah\s+)?boleh(?:\s+lagi)?", text)
             action = "RELAX"
+
         if not match:
             match = re.fullmatch(r"sekarang\s+boleh(?:\s+pakai)?\s+(.+)", text)
             action = "RELAX"
+
         if match:
             tags = self.tag_extractor.extract(match.group(1)).tags
+
             if tags:
                 return ConversationInterpretation(
                     ConversationIntent.REMOVE_PREFERENCES,
                     operations=[PreferenceOperation(action, tuple(sorted(tags)))],
-                    message_is_meaningful=True, contextual_revision=True,
+                    message_is_meaningful=True,
+                    contextual_revision=True,
                 )
+
         # A reference with a catalog-specific tag has enough local evidence.
         # Keep legacy ambiguous references delegated rather than guessing tags.
         extracted = self._extract_preferences(text)
-        dynamic = (extracted.tags | extracted.excluded_tags | extracted.soft_excluded_tags) - set(TagExtractor.ALIASES)
+        dynamic = (extracted.tags | extracted.excluded_tags | extracted.soft_excluded_tags) - set(
+            TagExtractor.ALIASES
+        )
+
         if self._pick_reference(text) and (dynamic or extracted.excluded_tags):
             return ConversationInterpretation(
                 ConversationIntent.REMOVE_PREFERENCES,
-                operations=[PreferenceOperation("REMOVE", tuple(sorted(extracted.excluded_tags))),
-                            PreferenceOperation("SOFT_REMOVE", tuple(sorted(extracted.soft_excluded_tags))),
-                            PreferenceOperation("ADD", tuple(sorted(extracted.tags)))],
-                tags=set(extracted.tags), excluded_tags=set(extracted.excluded_tags),
+                operations=[
+                    PreferenceOperation("REMOVE", tuple(sorted(extracted.excluded_tags))),
+                    PreferenceOperation("SOFT_REMOVE", tuple(sorted(extracted.soft_excluded_tags))),
+                    PreferenceOperation("ADD", tuple(sorted(extracted.tags))),
+                ],
+                tags=set(extracted.tags),
+                excluded_tags=set(extracted.excluded_tags),
                 soft_excluded_tags=set(extracted.soft_excluded_tags),
-                message_is_meaningful=True, contextual_revision=True,
+                message_is_meaningful=True,
+                contextual_revision=True,
             )
+
         return None
 
     def _extract_preferences(self, text: str) -> Preferences:
         extracted = self.tag_extractor.extract(text)
         context = self.mood_extractor.extract_context(text)
+
         # Negating a physical condition is not a permanent food prohibition.
         for condition, tag, explicit in (
             ('thirsty', 'drink', r'\b(?:minum|minuman)\b'),
@@ -532,16 +659,26 @@ class ConversationInterpreter:
             if condition in context.cleared_physical and not re.search(explicit, text):
                 extracted.excluded_tags.discard(tag)
                 extracted.soft_excluded_tags.discard(tag)
+
         return extracted
 
     @staticmethod
     def _pick_reference(normalized: str) -> str | None:
-        if any(phrase in normalized for phrase in ("yang pertama", "menu pertama", "nomor satu", "yang 1")):
+        if any(
+            phrase in normalized
+            for phrase in ("yang pertama", "menu pertama", "nomor satu", "yang 1")
+        ):
             return "first"
-        if any(phrase in normalized for phrase in ("yang kedua", "menu kedua", "nomor dua", "yang 2", "nomor 2")):
+
+        if any(
+            phrase in normalized
+            for phrase in ("yang kedua", "menu kedua", "nomor dua", "yang 2", "nomor 2")
+        ):
             return "second"
+
         if any(phrase in normalized for phrase in ("yang terakhir", "menu terakhir", "yang tadi")):
             return "last"
+
         return None
 
     @staticmethod
@@ -556,6 +693,7 @@ class ConversationInterpreter:
             "tapi",
             "namun",
         )
+
         return any(cue in text for cue in revision_cues)
 
     @staticmethod
@@ -573,9 +711,8 @@ class ConversationInterpreter:
             "serius gak ada",
             "serius nggak ada",
         )
-        return last_result_empty and any(
-            cue in text for cue in challenge_cues
-        )
+
+        return last_result_empty and any(cue in text for cue in challenge_cues)
 
     @staticmethod
     def _contains_phrase(text: str, phrase: str) -> bool:
@@ -603,24 +740,28 @@ class ConversationInterpreter:
                 "hemat",
                 "mahal",
             )
-        ) or any(
-            re.fullmatch(r"\d+(?:k|rb)", token) is not None
-            for token in text.split()
-        )
+        ) or any(re.fullmatch(r"\d+(?:k|rb)", token) is not None for token in text.split())
 
     def _replacement_tags(self, text: str) -> tuple[set[str], set[str]] | None:
         match = re.search(
             r"\b(?:ganti|ubah)\s+(?:yang\s+)?(.+?)\s+(?:jadi|menjadi|ke)\s+(.+)$",
             text,
         )
+
         if not match:
-            match = re.search(r"\b(?:tidak jadi|gajadi)\s+(.+?)[,;]?\s+(?:aku\s+)?(?:mau|ingin)\s+(.+)$", text)
+            match = re.search(
+                r"\b(?:tidak jadi|gajadi)\s+(.+?)[,;]?\s+(?:aku\s+)?(?:mau|ingin)\s+(.+)$", text
+            )
+
         if not match:
             return None
+
         old_tags = self.tag_extractor.extract(match.group(1)).tags
         new_tags = self.tag_extractor.extract(match.group(2)).tags
+
         if not old_tags or not new_tags:
             return None
+
         return old_tags, new_tags
 
     @staticmethod
@@ -631,8 +772,10 @@ class ConversationInterpreter:
             "protein": {"chicken", "beef", "seafood", "shrimp", "fish", "egg", "tofu", "tempeh"},
         }
         dimension = dimensions.get(last_question)
+
         if not dimension or not tags.intersection(dimension):
             return set()
+
         return dimension - tags
 
     @staticmethod
@@ -652,10 +795,13 @@ class ConversationInterpreter:
     @staticmethod
     def _detect_follow_up(text: str) -> str | None:
         normalized = normalize_text(text)
+
         if "makanan berat" in normalized or "makanan yang berat" in normalized:
             return "meal_type"
+
         if "nasi" in normalized or "mie" in normalized:
             return "base"
+
         return None
 
     @staticmethod
@@ -673,6 +819,7 @@ class ConversationInterpreter:
             "ada nggak",
             "ada tidak",
         )
+
         return any(cue in text for cue in explicit_question_cues) or (
             "pilihan" in text and ("apa" in text or "?" in text)
         )

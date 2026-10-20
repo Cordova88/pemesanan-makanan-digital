@@ -1,5 +1,9 @@
 # Panduan pengujian lokal RasaKita V1
 
+> Untuk instalasi baru branch `ahmad`, mulai dari [README proyek](../README.md).
+> Runner di folder `output/` pada panduan ini adalah alat workspace penulis;
+> folder itu tidak ikut clone GitHub dan tidak diperlukan untuk menjalankan web.
+
 Disusun 18 Oktober 2026. Tujuan: memeriksa fitur dan perubahan kode sebelum
 hosting, dengan membedakan pengujian tanpa API dari percobaan Gemini nyata.
 Panduan ini bukan catatan bahwa semua langkah manual di bawah sudah dijalankan.

@@ -1,4 +1,5 @@
 """Contract and consumer tests for interchangeable text generators."""
+
 from decimal import Decimal
 import json
 from typing import override
@@ -25,6 +26,7 @@ class RecordingGenerator(TextGenerator):
     @override
     def generate(self, prompt: str) -> str | None:
         self.prompts.append(prompt)
+
         return self.response
 
     def __bool__(self) -> bool:
@@ -49,25 +51,44 @@ class TextGeneratorContractTests(SimpleTestCase):
 
         with patch("recommendation.services.gemini.os.getenv", return_value=None):
             gemini = GeminiClient()
+
         self.assertIsInstance(gemini, TextGenerator)
         self.assertIsNone(gemini.generate("prompt"))
         gemini.client = type("Provider", (), {"models": FakeModels()})()
         generators: list[TextGenerator] = [gemini, RecordingGenerator("response")]
+
         for generator in generators:
             self.assertEqual(generator.generate("prompt"), "response")
+
         self.assertIsNone(RecordingGenerator(None).generate("prompt"))
 
     def test_interpreter_uses_falsey_generator_and_maps_valid_response(self) -> None:
-        generator = RecordingGenerator(json.dumps({
-            "intent": "RECOMMEND", "add_tags": ["rice"], "remove_tags": [],
-            "excluded_tags": [], "soft_excluded_tags": [], "moods": [],
-            "clear_moods": False, "max_price": None, "prefer_affordable": None,
-            "clear_max_price": False, "clear_prefer_affordable": False,
-            "message_is_meaningful": True,
-        }))
-        with patch("recommendation.services.ai.GeminiInterpreter.GeminiClient", side_effect=AssertionError("Unexpected default provider")):
+        generator = RecordingGenerator(
+            json.dumps(
+                {
+                    "intent": "RECOMMEND",
+                    "add_tags": ["rice"],
+                    "remove_tags": [],
+                    "excluded_tags": [],
+                    "soft_excluded_tags": [],
+                    "moods": [],
+                    "clear_moods": False,
+                    "max_price": None,
+                    "prefer_affordable": None,
+                    "clear_max_price": False,
+                    "clear_prefer_affordable": False,
+                    "message_is_meaningful": True,
+                }
+            )
+        )
+
+        with patch(
+            "recommendation.services.ai.GeminiInterpreter.GeminiClient",
+            side_effect=AssertionError("Unexpected default provider"),
+        ):
             interpreter = GeminiInterpreter(generator)
             result = interpreter.interpret("mau nasi")
+
         self.assertIs(interpreter.gemini_client, generator)
         self.assertEqual(result.tags, {"rice"})
         self.assertEqual(result.operations[0].tags, ("rice",))
@@ -94,18 +115,29 @@ class TextGeneratorConsumerTests(TestCase):
         category = Category.objects.create(name="Makanan")
         tag = MenuTag.objects.create(name="rice", display_name="Nasi")
         self.item: MenuItem = MenuItem.objects.create(
-            name="Nasi", category=category, price=Decimal("10000"),
+            name="Nasi",
+            category=category,
+            price=Decimal("10000"),
         )
         self.item.tags.add(tag)
 
     def test_explanation_service_delegates_and_validates_using_falsey_generator(self) -> None:
-        generator = RecordingGenerator(json.dumps({
-            "explanations": [{"id": self.item.pk, "text": "Nasi sesuai nasi."}],
-        }))
-        with patch("recommendation.services.ai.explanations.GeminiClient", side_effect=AssertionError("Unexpected default provider")):
+        generator = RecordingGenerator(
+            json.dumps(
+                {
+                    "explanations": [{"id": self.item.pk, "text": "Nasi sesuai nasi."}],
+                }
+            )
+        )
+
+        with patch(
+            "recommendation.services.ai.explanations.GeminiClient",
+            side_effect=AssertionError("Unexpected default provider"),
+        ):
             service = RecommendationExplanationService(generator)
             matches = [RecommendationMatch(self.item, 4, ("Nasi",), ("Nasi",))]
             explanations = service.explain(matches, Preferences(tags={"rice"}))
+
         self.assertIs(service.gemini_client, generator)
         self.assertEqual(explanations, {self.item.pk: "Nasi sesuai nasi."})
         self.assertEqual(len(generator.prompts), 1)
@@ -115,22 +147,35 @@ class TextGeneratorConsumerTests(TestCase):
         for response in (None, "invalid-json"):
             with self.subTest(response=response):
                 generator = RecordingGenerator(response)
-                with patch("recommendation.services.chatbot.GeminiClient", side_effect=AssertionError("Unexpected default provider")):
+
+                with patch(
+                    "recommendation.services.chatbot.GeminiClient",
+                    side_effect=AssertionError("Unexpected default provider"),
+                ):
                     chatbot = ChatbotService(SessionStore(), gemini_client=generator)
                     result = chatbot.reply("mau nasi")
+
                 self.assertIs(chatbot.gemini_client, generator)
                 boundary = chatbot.gemini_interpreter.gemini_client
                 self.assertIs(boundary.provider, generator)
                 self.assertIs(chatbot.explanation_service.gemini_client, boundary)
                 self.assertIs(chatbot.semantic_reranker.generator, boundary)
-                self.assertEqual([match.item.pk for match in result["recommendations"]], [self.item.pk])
-                self.assertEqual(result["explanations"][self.item.pk], "Dipilih karena cocok dengan: 🍚 Nasi.")
+                self.assertEqual(
+                    [match.item.pk for match in result["recommendations"]], [self.item.pk]
+                )
+                self.assertEqual(
+                    result["explanations"][self.item.pk], "Dipilih karena cocok dengan: 🍚 Nasi."
+                )
                 self.assertEqual(len(generator.prompts), 0)
 
     def test_default_chatbot_constructs_only_one_shared_provider(self) -> None:
         generator = RecordingGenerator(None)
-        with patch("recommendation.services.chatbot.GeminiClient", return_value=generator) as constructor:
+
+        with patch(
+            "recommendation.services.chatbot.GeminiClient", return_value=generator
+        ) as constructor:
             chatbot = ChatbotService(SessionStore())
+
         constructor.assert_called_once_with()
         boundary = chatbot.gemini_interpreter.gemini_client
         self.assertIs(boundary.provider, generator)

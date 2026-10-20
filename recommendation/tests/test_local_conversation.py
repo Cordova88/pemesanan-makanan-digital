@@ -1,4 +1,5 @@
 """Regressions from the user's local, no-Gemini conversation screenshots."""
+
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -20,6 +21,7 @@ class OfflineGenerator(TextGenerator):
 
     def generate(self, prompt: str) -> str | None:
         self.calls += 1
+
         return None
 
 
@@ -27,9 +29,12 @@ class LocalConversationRegressionTests(TestCase):
     def setUp(self) -> None:
         food = Category.objects.create(name='Makanan')
         drinks = Category.objects.create(name='Minuman')
-        tags = {name: MenuTag.objects.create(name=name) for name in
-                ('rice', 'fried_rice', 'chicken', 'drink', 'filling', 'spicy')}
+        tags = {
+            name: MenuTag.objects.create(name=name)
+            for name in ('rice', 'fried_rice', 'chicken', 'drink', 'filling', 'spicy')
+        }
         self.items: dict[str, MenuItem] = {}
+
         for name, price, category, names in (
             ('Nasi Goreng', 20000, food, ('rice', 'fried_rice', 'filling')),
             ('Ayam Geprek', 18000, food, ('chicken', 'spicy')),
@@ -38,6 +43,7 @@ class LocalConversationRegressionTests(TestCase):
             item = MenuItem.objects.create(name=name, price=Decimal(price), category=category)
             item.tags.add(*(tags[name] for name in names))
             self.items[name] = item
+
         self.session = SessionStore()
         self.generator = OfflineGenerator()
 
@@ -46,6 +52,7 @@ class LocalConversationRegressionTests(TestCase):
 
     def test_compound_purchase_verbs_identify_the_object_offline(self) -> None:
         resolver = EntityResolver(())
+
         for text, entity, status in (
             ('aku mau beli mobil', 'mobil', 'NON_FOOD_OUT_OF_SCOPE'),
             ('mau beli mobil', 'mobil', 'NON_FOOD_OUT_OF_SCOPE'),
@@ -61,15 +68,22 @@ class LocalConversationRegressionTests(TestCase):
         resolver = EntityResolver(((123, 'Tepung'), (456, 'Bantal')))
         self.assertEqual(resolver.resolve('aku mau beli tepung').menu_ids, (123,))
         self.assertEqual(resolver.resolve('ada bantal?').menu_ids, (456,))
-        self.assertEqual(EntityResolver(()).resolve('ada glorp?').domain_status, 'AMBIGUOUS_REQUEST')
+        self.assertEqual(
+            EntityResolver(()).resolve('ada glorp?').domain_status, 'AMBIGUOUS_REQUEST'
+        )
 
     def test_known_out_of_scope_objects_do_not_need_provider_classification(self) -> None:
-        for text, entity in (('aku ingin motor', 'motor'), ('mau beli mobil', 'mobil'), ('ada bantal?', 'bantal')):
+        for text, entity in (
+            ('aku ingin motor', 'motor'),
+            ('mau beli mobil', 'mobil'),
+            ('ada bantal?', 'bantal'),
+        ):
             with self.subTest(text=text):
                 result = self.reply(text)
                 self.assertIn(entity, result['message'].lower())
                 self.assertNotIn('Boleh jelaskan', result['message'])
                 self.assertFalse(result['recommendations'])
+
         self.assertEqual(self.generator.calls, 0)
 
     def test_reopening_existing_session_greets_without_clearing_budget_or_references(self) -> None:
@@ -82,7 +96,9 @@ class LocalConversationRegressionTests(TestCase):
         self.assertIn('menu', result['message'].lower())
         self.assertEqual(self.session[ConversationSession.SEARCH_KEY], search)
         self.assertEqual(self.session.get('last_recommendations', []), ids)
-        self.assertEqual(result['preferences']['tags'], self.session[ConversationSession.STATE_KEY]['tags'])
+        self.assertEqual(
+            result['preferences']['tags'], self.session[ConversationSession.STATE_KEY]['tags']
+        )
 
     def test_new_drink_scope_archives_food_budget_and_local_exclusion(self) -> None:
         self.reply('nasi maksimal 20 ribu')
@@ -136,16 +152,35 @@ class LocalConversationRegressionTests(TestCase):
 
     def test_http_sequence_exposes_current_chips_and_explains_no_more_cards(self) -> None:
         with patch('recommendation.services.gemini.GeminiClient.generate', return_value=None):
-            for text in ('', 'halo', 'hi', 'makan dengan budget 20000', 'budget 1 rupiah',
-                         'aku ingin motor', 'aku mau beli tepung', 'mau beli mobil',
-                         'ada bantal?', 'jangan pedas', '10 ribu ayam', 'sekarang cari minuman'):
-                response = self.client.post('/api/recommendation/chat/', {'message': text}, content_type='application/json')
+            for text in (
+                '',
+                'halo',
+                'hi',
+                'makan dengan budget 20000',
+                'budget 1 rupiah',
+                'aku ingin motor',
+                'aku mau beli tepung',
+                'mau beli mobil',
+                'ada bantal?',
+                'jangan pedas',
+                '10 ribu ayam',
+                'sekarang cari minuman',
+            ):
+                response = self.client.post(
+                    '/api/recommendation/chat/', {'message': text}, content_type='application/json'
+                )
                 self.assertEqual(response.status_code, 200, text)
+
             body = response.json()
             self.assertEqual([item['name'] for item in body['recommendations']], ['Es Jeruk'])
             self.assertEqual(body['preferences']['tags'], [tag_label('drink')])
             self.assertIsNone(body['active_search']['max_price'])
-            response = self.client.post('/api/recommendation/chat/', {'message': 'yang lain'}, content_type='application/json')
+            response = self.client.post(
+                '/api/recommendation/chat/',
+                {'message': 'yang lain'},
+                content_type='application/json',
+            )
+
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.json()['recommendations'])
         self.assertIn('belum ada menu lain', response.json()['message'].lower())

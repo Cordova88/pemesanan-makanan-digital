@@ -1,4 +1,5 @@
 """Small provider-independent contract shared by the AI consumers."""
+
 from abc import ABC, abstractmethod
 
 
@@ -10,4 +11,5 @@ class TextGenerator(ABC):
         Provider adapters handle their own provider/network failures. Consumers
         remain responsible for parsing and validating the returned text.
         """
+
         raise NotImplementedError

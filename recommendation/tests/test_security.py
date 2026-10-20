@@ -1,4 +1,5 @@
 """Phase7 bounded inputs, isolated cache guards, fake SDK metrics and privacy."""
+
 import json
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
@@ -25,15 +26,39 @@ class ChatBoundaryTests(TestCase):
         self.factory = RequestFactory()
         self.session = SessionStore()
 
-    def send(self, data: object, *, raw: bytes | str | None = None, session: SessionStore | None = None, **meta: str) -> object:
+    def send(
+        self,
+        data: object,
+        *,
+        raw: bytes | str | None = None,
+        session: SessionStore | None = None,
+        **meta: str
+    ) -> object:
         meta.setdefault('CONTENT_TYPE', 'application/json')
-        request = self.factory.post('/api/recommendation/chat/', data=json.dumps(data) if raw is None else raw, content_type='application/json', **meta)
+        request = self.factory.post(
+            '/api/recommendation/chat/',
+            data=json.dumps(data) if raw is None else raw,
+            content_type='application/json',
+            **meta
+        )
         request.session = session if session is not None else self.session
+
         return chat(request)
 
     def test_malformed_shapes_types_unknown_fields_and_actions_are_client_errors(self) -> None:
-        for value in ([], None, 3, {'message': 3}, {'message': []}, {'message': {}}, {'message': None},
-                      {'action': None}, {'action': True}, {'action': 'purchase'}, {'message': 'hi', 'extra': 'PRIVATE_CANARY'}):
+        for value in (
+            [],
+            None,
+            3,
+            {'message': 3},
+            {'message': []},
+            {'message': {}},
+            {'message': None},
+            {'action': None},
+            {'action': True},
+            {'action': 'purchase'},
+            {'message': 'hi', 'extra': 'PRIVATE_CANARY'},
+        ):
             with self.subTest(value=value), patch('recommendation.views.ChatbotService') as service:
                 response = self.send(value)
                 self.assertEqual(response.status_code, 400)
@@ -41,7 +66,14 @@ class ChatBoundaryTests(TestCase):
                 self.assertNotIn('PRIVATE_CANARY', response.content.decode())
 
     def test_invalid_json_duplicate_keys_utf8_surrogates_and_depth_fail_safely(self) -> None:
-        for raw in ('{', '', '{"message":"a","message":"b"}', '{"message":"\\ud800"}', '[' * 1500 + ']' * 1500, b'\xff'):
+        for raw in (
+            '{',
+            '',
+            '{"message":"a","message":"b"}',
+            '{"message":"\\ud800"}',
+            '[' * 1500 + ']' * 1500,
+            b'\xff',
+        ):
             response = self.send({}, raw=raw)
             self.assertEqual(response.status_code, 400)
 
@@ -50,21 +82,31 @@ class ChatBoundaryTests(TestCase):
             with patch('recommendation.views.ChatbotService') as service:
                 self.assertEqual(self.send({}, raw=raw).status_code, 413)
                 service.assert_not_called()
+
         self.assertEqual(self.send({'message': 'x' * 500}).status_code, 200)
 
     def test_content_type_and_method_are_checked(self) -> None:
-        request = self.factory.post('/api/recommendation/chat/', data='{}', content_type='text/plain')
+        request = self.factory.post(
+            '/api/recommendation/chat/', data='{}', content_type='text/plain'
+        )
         request.session = self.session
         self.assertEqual(chat(request).status_code, 415)
         self.assertEqual(chat(self.factory.get('/api/recommendation/chat/')).status_code, 405)
 
     def test_empty_greeting_more_and_reset_are_valid(self) -> None:
-        for payload in ({}, {'message': ''}, {'message': 'halo'}, {'message': '', 'action': 'more'}, {'message': 'mulai lagi', 'action': 'reset'}):
+        for payload in (
+            {},
+            {'message': ''},
+            {'message': 'halo'},
+            {'message': '', 'action': 'more'},
+            {'message': 'mulai lagi', 'action': 'reset'},
+        ):
             self.assertEqual(self.send(payload).status_code, 200)
 
     def test_request_identifiers_are_server_generated_and_response_is_not_cacheable(self) -> None:
         with self.assertLogs('recommendation.services.gemini', level='INFO') as logs:
             response = self.send({'message': 'halo'}, HTTP_X_REQUEST_ID='PRIVATE_CANARY')
+
         self.assertRegex(response['X-Request-ID'], r'^[0-9a-f]{32}$')
         self.assertIn('no-store', response['Cache-Control'])
         self.assertEqual(request_context.get(), {})
@@ -83,24 +125,48 @@ class ChatBoundaryTests(TestCase):
     @override_settings(CHATBOT_REQUESTS_CLIENT_PER_MINUTE=2)
     def test_new_sessions_do_not_bypass_client_limit(self) -> None:
         for _ in range(2):
-            self.assertEqual(self.send({'message': 'halo'}, session=SessionStore(), HTTP_X_FORWARDED_FOR='192.0.2.' + str(_)).status_code, 200)
-        self.assertEqual(self.send({'message': 'halo'}, session=SessionStore(), HTTP_X_FORWARDED_FOR='192.0.2.99').status_code, 429)
+            self.assertEqual(
+                self.send(
+                    {'message': 'halo'},
+                    session=SessionStore(),
+                    HTTP_X_FORWARDED_FOR='192.0.2.' + str(_),
+                ).status_code,
+                200,
+            )
+
+        self.assertEqual(
+            self.send(
+                {'message': 'halo'}, session=SessionStore(), HTTP_X_FORWARDED_FOR='192.0.2.99'
+            ).status_code,
+            429,
+        )
 
     @override_settings(CHATBOT_REQUESTS_GLOBAL_PER_MINUTE=1)
     def test_global_limit_applies_across_distinct_clients(self) -> None:
         self.assertEqual(self.send({'message': 'halo'}, REMOTE_ADDR='192.0.2.1').status_code, 200)
-        self.assertEqual(self.send({'message': 'halo'}, REMOTE_ADDR='192.0.2.2', session=SessionStore()).status_code, 429)
+        self.assertEqual(
+            self.send(
+                {'message': 'halo'}, REMOTE_ADDR='192.0.2.2', session=SessionStore()
+            ).status_code,
+            429,
+        )
 
     def test_cache_failure_and_internal_error_have_generic_response(self) -> None:
         guard = UsageGuard()
         guard.cache = Mock()
         guard.cache.add.side_effect = RuntimeError('PRIVATE_CANARY')
+
         with patch('recommendation.views.UsageGuard', return_value=guard):
             response = self.send({'message': 'halo'})
+
         self.assertEqual(response.status_code, 503)
         self.assertNotIn('PRIVATE_CANARY', response.content.decode())
-        with patch('recommendation.views.ChatbotService', side_effect=RuntimeError('PRIVATE_CANARY')), self.assertLogs('recommendation.views', level='WARNING') as logs:
+
+        with patch(
+            'recommendation.views.ChatbotService', side_effect=RuntimeError('PRIVATE_CANARY')
+        ), self.assertLogs('recommendation.views', level='WARNING') as logs:
             response = self.send({'message': 'halo'})
+
         self.assertEqual(response.status_code, 503)
         self.assertNotIn('PRIVATE_CANARY', str(logs.output))
 
@@ -110,19 +176,32 @@ class ChatBoundaryTests(TestCase):
 
     def test_csrf_middleware_rejects_missing_token_and_allows_valid_token(self) -> None:
         client = Client(enforce_csrf_checks=True)
-        self.assertEqual(client.post('/api/recommendation/chat/', data='{}', content_type='application/json').status_code, 403)
+        self.assertEqual(
+            client.post(
+                '/api/recommendation/chat/', data='{}', content_type='application/json'
+            ).status_code,
+            403,
+        )
         from django.middleware.csrf import _get_new_csrf_string
+
         token = _get_new_csrf_string()
         client.cookies['csrftoken'] = token
-        response = client.post('/api/recommendation/chat/', data='{}', content_type='application/json', HTTP_X_CSRFTOKEN=token)
+        response = client.post(
+            '/api/recommendation/chat/',
+            data='{}',
+            content_type='application/json',
+            HTTP_X_CSRFTOKEN=token,
+        )
         self.assertEqual(response.status_code, 200)
 
     def test_ai_notice_matches_enabled_flag_without_constructing_provider(self) -> None:
         with patch('recommendation.services.gemini.genai.Client') as sdk:
             with override_settings(GEMINI_ENABLED=False):
                 self.assertContains(self.client.get('/chatbot/'), 'Mode lokal aktif')
+
             with override_settings(GEMINI_ENABLED=True):
                 self.assertContains(self.client.get('/chatbot/'), 'Google Gemini')
+
             sdk.assert_not_called()
 
 
@@ -132,17 +211,24 @@ class UsageGuardTests(SimpleTestCase):
 
     def test_concurrent_atomic_local_counter_never_exceeds_limit(self) -> None:
         guard = UsageGuard(cache)
-        with patch('recommendation.services.security.time.time', return_value=1000), ThreadPoolExecutor(max_workers=8) as pool:
+
+        with patch(
+            'recommendation.services.security.time.time', return_value=1000
+        ), ThreadPoolExecutor(max_workers=8) as pool:
             allowed = list(pool.map(lambda _: guard.consume('concurrent-test', 7, 60), range(40)))
+
         self.assertEqual(sum(allowed), 7)
 
     def test_window_rolls_over_and_invalid_limit_fails_closed(self) -> None:
         guard = UsageGuard(cache)
+
         with patch('recommendation.services.security.time.time', return_value=1000):
             self.assertTrue(guard.consume('window-test', 1, 60))
             self.assertFalse(guard.consume('window-test', 1, 60))
+
         with patch('recommendation.services.security.time.time', return_value=1060):
             self.assertTrue(guard.consume('window-test', 1, 60))
+
         self.assertFalse(guard.consume('invalid', 0, 60))
         self.assertFalse(guard.consume('invalid', 1, 0))
 
@@ -159,23 +245,29 @@ class UsageGuardTests(SimpleTestCase):
         session['gemini_calls'] = 8
         session['chatbot_client_id'] = 'a' * 32
         session['_auth_user_id'] = 'sentinel'
+
         with patch('recommendation.services.conversation_session.time', return_value=1000):
             state.expire_dialog()
+
         with patch('recommendation.services.conversation_session.time', return_value=2800):
             state.expire_dialog()
+
         self.assertFalse(state.load_preferences().tags)
         self.assertEqual(session['gemini_calls'], 8)
         self.assertEqual(session['chatbot_client_id'], 'a' * 32)
         self.assertEqual(session['_auth_user_id'], 'sentinel')
         state.save_preferences(Preferences(tags={'rice'}), 'RECOMMENDING')
         session[state.LAST_ACTIVE_KEY] = 1000
+
         with patch('recommendation.services.conversation_session.time', return_value=2800):
             state.expire_dialog(touch=False)
+
         self.assertFalse(state.load_preferences().tags)
 
     def test_usage_snapshot_and_command_are_aggregate_not_billing(self) -> None:
         from io import StringIO
         from django.core.management import call_command
+
         guard = UsageGuard()
         self.assertTrue(guard.consume('provider:global', 2, 86400))
         snapshot = guard.snapshot()
@@ -198,24 +290,38 @@ class ProviderSafetyTests(SimpleTestCase):
     def setUp(self) -> None:
         cache.clear()
         self.calls = []
-        self.metadata = SimpleNamespace(prompt_token_count=100, candidates_token_count=30, thoughts_token_count=10, cached_content_token_count=20, total_token_count=140)
+        self.metadata = SimpleNamespace(
+            prompt_token_count=100,
+            candidates_token_count=30,
+            thoughts_token_count=10,
+            cached_content_token_count=20,
+            total_token_count=140,
+        )
         self.response = SimpleNamespace(text='valid output', usage_metadata=self.metadata)
         self.client = GeminiClient()
         self.client.client = SimpleNamespace(models=SimpleNamespace(generate_content=self.generate))
 
     def generate(self, **kwargs: object) -> object:
         self.calls.append(kwargs)
+
         return self.response
 
     def test_builtin_and_sdk_timeouts_have_safe_failure_category(self) -> None:
         import httpx
+
         for exc in (TimeoutError('PRIVATE_TIMEOUT'), httpx.ReadTimeout('PRIVATE_TIMEOUT')):
             with self.subTest(kind=type(exc).__name__):
                 generate = Mock(side_effect=exc)
                 self.client.client.models.generate_content = generate
+
                 with self.assertLogs('recommendation.services.gemini', level='WARNING') as logs:
                     self.assertIsNone(self.client.generate('PRIVATE_PROMPT'))
-                failure = next(json.loads(r.getMessage()) for r in logs.records if json.loads(r.getMessage())['event'] == 'provider_failure')
+
+                failure = next(
+                    json.loads(r.getMessage())
+                    for r in logs.records
+                    if json.loads(r.getMessage())['event'] == 'provider_failure'
+                )
                 self.assertEqual(failure['category'], 'timeout')
                 self.assertIsNone(failure['http_status'])
                 self.assertFalse(failure['usage_available'])
@@ -226,11 +332,23 @@ class ProviderSafetyTests(SimpleTestCase):
 
     def test_transport_failure_does_not_leak_request_url(self) -> None:
         import httpx
-        generate = Mock(side_effect=httpx.ConnectError('PRIVATE_ERROR', request=httpx.Request('GET', 'https://example.invalid/?key=PRIVATE_KEY')))
+
+        generate = Mock(
+            side_effect=httpx.ConnectError(
+                'PRIVATE_ERROR',
+                request=httpx.Request('GET', 'https://example.invalid/?key=PRIVATE_KEY'),
+            )
+        )
         self.client.client.models.generate_content = generate
+
         with self.assertLogs('recommendation.services.gemini', level='WARNING') as logs:
             self.assertIsNone(self.client.generate('PRIVATE_PROMPT'))
-        failure = next(json.loads(r.getMessage()) for r in logs.records if json.loads(r.getMessage())['event'] == 'provider_failure')
+
+        failure = next(
+            json.loads(r.getMessage())
+            for r in logs.records
+            if json.loads(r.getMessage())['event'] == 'provider_failure'
+        )
         self.assertEqual(failure['category'], 'transport')
         self.assertNotIn('PRIVATE_', str(logs.output))
         self.assertNotIn('example.invalid', str(logs.output))
@@ -238,40 +356,73 @@ class ProviderSafetyTests(SimpleTestCase):
 
     def test_api_status_is_classified_without_logging_error_body(self) -> None:
         from google.genai.errors import APIError
-        cases = ((400, 'invalid_request'), (401, 'authentication'), (403, 'authentication'),
-                 (429, 'rate_limited'), (500, 'upstream'), (503, 'upstream'), (418, 'api_error'))
+
+        cases = (
+            (400, 'invalid_request'),
+            (401, 'authentication'),
+            (403, 'authentication'),
+            (429, 'rate_limited'),
+            (500, 'upstream'),
+            (503, 'upstream'),
+            (418, 'api_error'),
+        )
+
         for status, category in cases:
             with self.subTest(status=status):
-                generate = Mock(side_effect=APIError(status, {'error': {'message': 'PRIVATE_BODY'}}))
+                generate = Mock(
+                    side_effect=APIError(status, {'error': {'message': 'PRIVATE_BODY'}})
+                )
                 self.client.client.models.generate_content = generate
+
                 with self.assertLogs('recommendation.services.gemini', level='WARNING') as logs:
                     self.assertIsNone(self.client.generate('PRIVATE_PROMPT'))
-                failure = next(json.loads(r.getMessage()) for r in logs.records if json.loads(r.getMessage())['event'] == 'provider_failure')
+
+                failure = next(
+                    json.loads(r.getMessage())
+                    for r in logs.records
+                    if json.loads(r.getMessage())['event'] == 'provider_failure'
+                )
                 self.assertEqual(failure['category'], category)
                 self.assertEqual(failure['http_status'], status)
                 self.assertNotIn('PRIVATE_', str(logs.output))
                 generate.assert_called_once()
 
     def test_unexpected_provider_exception_has_generic_category(self) -> None:
-        self.client.client.models.generate_content = Mock(side_effect=RuntimeError('PRIVATE_KEY PRIVATE_PROMPT'))
+        self.client.client.models.generate_content = Mock(
+            side_effect=RuntimeError('PRIVATE_KEY PRIVATE_PROMPT')
+        )
+
         with self.assertLogs('recommendation.services.gemini', level='WARNING') as logs:
             self.assertIsNone(self.client.generate('PRIVATE_PROMPT'))
-        failure = next(json.loads(r.getMessage()) for r in logs.records if json.loads(r.getMessage())['event'] == 'provider_failure')
+
+        failure = next(
+            json.loads(r.getMessage())
+            for r in logs.records
+            if json.loads(r.getMessage())['event'] == 'provider_failure'
+        )
         self.assertEqual(failure['category'], 'unexpected')
         self.assertIsNone(failure['http_status'])
         self.assertNotIn('PRIVATE_', str(logs.output))
 
     def test_failure_metadata_rejects_uncontrolled_values(self) -> None:
         from ..services.telemetry import provider_failure_event
-        for category, status in (('PRIVATE_BODY', None), ('upstream', '503 PRIVATE_BODY'),
-                                 ('api_error', True), ('api_error', 999)):
+
+        for category, status in (
+            ('PRIVATE_BODY', None),
+            ('upstream', '503 PRIVATE_BODY'),
+            ('api_error', True),
+            ('api_error', 999),
+        ):
             with self.subTest(category=category, status=status), self.assertRaises(ValueError):
                 provider_failure_event(category, status)
 
     def test_success_has_no_failure_diagnostic_or_extra_provider_dispatch(self) -> None:
         with self.assertLogs('recommendation.services.gemini', level='INFO') as logs:
             self.assertEqual(self.client.generate('test'), 'valid output')
-        self.assertEqual([json.loads(r.getMessage())['event'] for r in logs.records], ['provider_attempt'])
+
+        self.assertEqual(
+            [json.loads(r.getMessage())['event'] for r in logs.records], ['provider_attempt']
+        )
         self.assertEqual(len(self.calls), 1)
 
     @override_settings(GEMINI_ENABLED=False)
@@ -284,8 +435,18 @@ class ProviderSafetyTests(SimpleTestCase):
     def test_sdk_metadata_logged_without_prompt_response_or_identity(self) -> None:
         with self.assertLogs('recommendation.services.gemini', level='INFO') as logs:
             self.assertEqual(self.client.generate('PRIVATE_PROMPT'), 'valid output')
+
         event = self.client.last_event
-        self.assertEqual((event['input_tokens'], event['output_tokens'], event['thinking_tokens'], event['cached_tokens'], event['total_tokens']), (100, 30, 10, 20, 140))
+        self.assertEqual(
+            (
+                event['input_tokens'],
+                event['output_tokens'],
+                event['thinking_tokens'],
+                event['cached_tokens'],
+                event['total_tokens'],
+            ),
+            (100, 30, 10, 20, 140),
+        )
         self.assertIsNone(event['estimated_cost'])
         self.assertNotIn('PRIVATE_PROMPT', str(logs.output))
         self.assertNotIn('valid output', str(logs.output))
@@ -295,7 +456,9 @@ class ProviderSafetyTests(SimpleTestCase):
         self.response.usage_metadata = None
         self.client.generate('test')
         self.assertIsNone(self.client.last_event['input_tokens'])
-        self.assertIsNone(token_count(SimpleNamespace(prompt_token_count=True), 'prompt_token_count'))
+        self.assertIsNone(
+            token_count(SimpleNamespace(prompt_token_count=True), 'prompt_token_count')
+        )
         self.assertIsNone(token_count(SimpleNamespace(prompt_token_count=-1), 'prompt_token_count'))
 
     @override_settings(GEMINI_GLOBAL_CALLS_PER_DAY=1)
@@ -309,21 +472,27 @@ class ProviderSafetyTests(SimpleTestCase):
     @override_settings(GEMINI_CLIENT_CALLS_PER_DAY=1)
     def test_client_provider_budget_spans_sessions(self) -> None:
         first = request_context.set({'client': 'client-id', 'session': 'session-a'})
+
         try:
             self.assertEqual(self.client.generate('first'), 'valid output')
         finally:
             request_context.reset(first)
+
         second = request_context.set({'client': 'client-id', 'session': 'session-b'})
+
         try:
             self.assertIsNone(self.client.generate('second'))
         finally:
             request_context.reset(second)
+
         self.assertEqual(len(self.calls), 1)
 
     def test_timeout_error_empty_and_oversized_output_have_safe_fallback(self) -> None:
         self.client.client.models.generate_content = Mock(side_effect=TimeoutError('PRIVATE_ERROR'))
+
         with self.assertLogs('recommendation.services.gemini', level='WARNING') as logs:
             self.assertIsNone(self.client.generate('PRIVATE_PROMPT'))
+
         self.assertNotIn('PRIVATE_ERROR', str(logs.output))
         self.client.client.models.generate_content = self.generate
         self.response.text = 'x' * 16001

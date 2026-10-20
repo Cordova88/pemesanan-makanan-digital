@@ -25,13 +25,25 @@ class SharedSelectionOrderTests(TestCase):
         category = Category.objects.create(name="Food")
         item = MenuItem.objects.create(category=category, name="Rice", price=Decimal("10.50"))
         group = VariantGroup.objects.create(menu_item=item, name="Size", is_required=True)
-        option = VariantOption.objects.create(group=group, name="Large", price_adjustment=Decimal("2.25"))
+        option = VariantOption.objects.create(
+            group=group, name="Large", price_adjustment=Decimal("2.25")
+        )
         addon = AddOn.objects.create(name="Sauce", price=Decimal("0.75"))
         addon.menu_items.add(item)
-        order = create_order({
-            "customer_name": "Test", "order_type": "TAKEAWAY",
-            "items": [{"menu_item_id": item.pk, "quantity": 2, "variant_ids": [option.pk] * 2, "addon_ids": [addon.pk]}],
-        })
+        order = create_order(
+            {
+                "customer_name": "Test",
+                "order_type": "TAKEAWAY",
+                "items": [
+                    {
+                        "menu_item_id": item.pk,
+                        "quantity": 2,
+                        "variant_ids": [option.pk] * 2,
+                        "addon_ids": [addon.pk],
+                    }
+                ],
+            }
+        )
         line = order.items.get()
         self.assertEqual(line.unit_price, Decimal("13.50"))
         self.assertEqual(order.total, Decimal("27.00"))

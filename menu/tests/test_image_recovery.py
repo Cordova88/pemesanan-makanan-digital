@@ -18,17 +18,23 @@ class RecoveredAssetTests(SimpleTestCase):
     def test_four_photos_are_valid_transparent_and_smaller(self):
         entries = json.loads((ASSET_ROOT / "manifest.json").read_text(encoding="utf-8"))["photos"]
         self.assertEqual(len(entries), 4)
+
         for entry in entries:
             with self.subTest(name=entry["name"]):
                 raw = (ASSET_ROOT / entry["source_png"]).read_bytes()
                 self.assertEqual(hashlib.sha256(raw).hexdigest(), entry["source_sha256"])
-                with Image.open(io.BytesIO(raw)) as original, Image.open(ASSET_ROOT / entry["webp"]) as photo:
+
+                with Image.open(io.BytesIO(raw)) as original, Image.open(
+                    ASSET_ROOT / entry["webp"]
+                ) as photo:
                     self.assertEqual(original.size, (1254, 1254))
                     self.assertEqual(photo.format, "WEBP")
                     self.assertEqual(photo.size, (960, 960))
                     self.assertEqual(photo.mode, "RGBA")
                     original.thumbnail((960, 960), Image.Resampling.LANCZOS)
-                    self.assertEqual(photo.getchannel("A").tobytes(), original.getchannel("A").tobytes())
+                    self.assertEqual(
+                        photo.getchannel("A").tobytes(), original.getchannel("A").tobytes()
+                    )
                     self.assertLess(entry["webp_bytes"], len(raw))
 
 
@@ -45,6 +51,7 @@ class BackfillPhotoTests(TestCase):
     def run_command(self, **options):
         output = io.StringIO()
         call_command("backfill_menu_images", stdout=output, stderr=output, **options)
+
         return output.getvalue()
 
     def test_default_is_read_only(self):
@@ -84,8 +91,12 @@ class BackfillPhotoTests(TestCase):
         self.assertFalse(self.item.image)
 
     def test_storage_failure_is_reported_without_database_update(self):
-        with patch("django.db.models.fields.files.FieldFile.save", side_effect=OSError("storage unavailable")):
+        with patch(
+            "django.db.models.fields.files.FieldFile.save",
+            side_effect=OSError("storage unavailable"),
+        ):
             with self.assertRaises(CommandError):
                 self.run_command(apply=True)
+
         self.item.refresh_from_db()
         self.assertFalse(self.item.image)

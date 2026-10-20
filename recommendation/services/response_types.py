@@ -1,4 +1,5 @@
 """Typing schemas for existing internal chatbot dictionaries (no new wire fields)."""
+
 from typing import NotRequired, TypedDict
 
 from .recommendation import RecommendationMatch, SearchConstraintsPayload

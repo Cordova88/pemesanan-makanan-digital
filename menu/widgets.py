@@ -17,4 +17,5 @@ class MenuPhotoWidget(forms.ClearableFileInput):
     ) -> dict[str, object]:
         context = super().get_context(name, value, attrs)
         context["widget"]["photo_url"] = value.url if value and hasattr(value, "url") else ""
+
         return context

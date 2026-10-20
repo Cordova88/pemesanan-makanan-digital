@@ -1,4 +1,5 @@
 """V3.2 Phase 1 catalog identities/categories, without live provider or customer data."""
+
 from copy import deepcopy
 from unittest.mock import patch
 
@@ -18,7 +19,8 @@ class PartialIdentityTests(SimpleTestCase):
     def setUp(self) -> None:
         self.resolver = EntityResolver(
             ((1, 'Es Kelapa'), (2, 'Es Jeruk'), (3, 'Jus Jeruk'), (4, 'Ayam Geprek')),
-            ('ayam', 'es', 'minuman', 'pedas'), aliases=((1, 'kelapa muda segar'),),
+            ('ayam', 'es', 'minuman', 'pedas'),
+            aliases=((1, 'kelapa muda segar'),),
         )
 
     def test_unique_partial_and_full_names_are_catalog_grounded(self) -> None:
@@ -37,7 +39,9 @@ class PartialIdentityTests(SimpleTestCase):
     def test_generic_terms_and_unknown_compounds_do_not_select_partial(self) -> None:
         self.assertIsNone(self.resolver.resolve('mau ayam'))
         self.assertIsNone(self.resolver.resolve('yang tadi'))
-        self.assertEqual(self.resolver.resolve('mau kelapa quantum').domain_status, 'AMBIGUOUS_REQUEST')
+        self.assertEqual(
+            self.resolver.resolve('mau kelapa quantum').domain_status, 'AMBIGUOUS_REQUEST'
+        )
 
     def test_past_consumption_negation_and_correction_keep_clause_roles(self) -> None:
         self.assertIsNone(self.resolver.resolve('aku sudah makan kelapa'))
@@ -51,8 +55,10 @@ class PartialIdentityTests(SimpleTestCase):
         self.assertEqual(resolver.resolve('mau arunika').menu_ids, (8,))
 
     def test_same_alias_on_two_items_requires_clarification(self) -> None:
-        resolver = EntityResolver(((1, 'Es Kelapa'), (2, 'Es Jeruk')),
-                                  aliases=((1, 'pilihan taman'), (2, 'pilihan taman')))
+        resolver = EntityResolver(
+            ((1, 'Es Kelapa'), (2, 'Es Jeruk')),
+            aliases=((1, 'pilihan taman'), (2, 'pilihan taman')),
+        )
         self.assertEqual(resolver.resolve('mau pilihan taman').domain_status, 'AMBIGUOUS_CATALOG')
 
     def test_exact_canonical_name_precedes_conflicting_alias(self) -> None:
@@ -64,8 +70,14 @@ class PartialIdentityTests(SimpleTestCase):
         self.assertEqual(self.resolver.resolve('kalau glorp?').domain_status, 'AMBIGUOUS_REQUEST')
 
     def test_catalog_existence_questions_resolve_unique_identity(self) -> None:
-        for text in ('Kelapa ada?', 'Ada kelapa?', 'Es kelapa tersedia?',
-                     'Jual es kelapa?', 'Punya kelapa?', 'Apakah kelapa tersedia?'):
+        for text in (
+            'Kelapa ada?',
+            'Ada kelapa?',
+            'Es kelapa tersedia?',
+            'Jual es kelapa?',
+            'Punya kelapa?',
+            'Apakah kelapa tersedia?',
+        ):
             with self.subTest(text=text):
                 result = self.resolver.resolve(text)
                 self.assertIsNotNone(result)
@@ -79,29 +91,44 @@ class PartialIdentityTests(SimpleTestCase):
         self.assertEqual(set(result.menu_ids), {2, 3})
 
     def test_existence_questions_use_dynamic_names_and_aliases(self) -> None:
-        resolver = EntityResolver(((8, 'Teh Arunika'), (9, 'Roti Senja')),
-                                  aliases=((8, 'embun pagi'),))
+        resolver = EntityResolver(
+            ((8, 'Teh Arunika'), (9, 'Roti Senja')), aliases=((8, 'embun pagi'),)
+        )
+
         for text in ('Arunika tersedia?', 'Embun pagi ada?', 'Punya arunika?'):
             with self.subTest(text=text):
                 result = resolver.resolve(text)
                 self.assertIsNotNone(result)
                 self.assertEqual(result.menu_ids, (8,))
-        conflicting = EntityResolver(((1, 'Es Kelapa'), (2, 'Es Jeruk')),
-                                     aliases=((2, 'es kelapa'),))
+
+        conflicting = EntityResolver(
+            ((1, 'Es Kelapa'), (2, 'Es Jeruk')), aliases=((2, 'es kelapa'),)
+        )
         self.assertEqual(conflicting.resolve('Es kelapa tersedia?').menu_ids, (1,))
 
     def test_existence_question_does_not_accept_unknown_compounds_or_negation(self) -> None:
-        for text in ('kelapa quantum ada?', 'kelapa quantum tersedia?',
-                     'kelapa tidak tersedia?', 'aku sudah minum kelapa',
-                     'aku sudah minum kelapa tersedia?', 'kelapanya ada?'):
+        for text in (
+            'kelapa quantum ada?',
+            'kelapa quantum tersedia?',
+            'kelapa tidak tersedia?',
+            'aku sudah minum kelapa',
+            'aku sudah minum kelapa tersedia?',
+            'kelapanya ada?',
+        ):
             with self.subTest(text=text):
                 result = self.resolver.resolve(text)
                 self.assertTrue(result is None or result.domain_status != 'IN_CATALOG')
+
         self.assertEqual(self.resolver.resolve('jangan kelapa').rejected_menu_ids, (1,))
 
     def test_partial_question_control_paraphrases_still_resolve(self) -> None:
-        for text in ('Mau kelapa.', 'Yang kelapa.', 'Pengen kelapa.',
-                     'Kelapa aja deh.', 'kelapa muda segar'):
+        for text in (
+            'Mau kelapa.',
+            'Yang kelapa.',
+            'Pengen kelapa.',
+            'Kelapa aja deh.',
+            'kelapa muda segar',
+        ):
             with self.subTest(text=text):
                 self.assertEqual(self.resolver.resolve(text).menu_ids, (1,))
 
@@ -116,8 +143,12 @@ class CatalogLanguageIntegrationTests(TestCase):
         self.jeruk = MenuItem.objects.create(name='Es Jeruk', category=self.drinks, price=10000)
         self.jus = MenuItem.objects.create(name='Jus Jeruk', category=self.drinks, price=12000)
         self.ayam = MenuItem.objects.create(name='Ayam Geprek', category=self.food, price=18000)
-        self.kentang = MenuItem.objects.create(name='Kentang Panggang', category=self.snacks, price=8000)
-        self.puding = MenuItem.objects.create(name='Puding Mangga', category=self.desserts, price=7000)
+        self.kentang = MenuItem.objects.create(
+            name='Kentang Panggang', category=self.snacks, price=8000
+        )
+        self.puding = MenuItem.objects.create(
+            name='Puding Mangga', category=self.desserts, price=7000
+        )
         snack = MenuTag.objects.create(name='snack')
         self.kentang.tags.add(snack)
         self.session = SessionStore()
@@ -135,14 +166,20 @@ class CatalogLanguageIntegrationTests(TestCase):
         self.assertEqual(self.generator.prompts, [])
 
     def test_existence_questions_return_current_catalog_price_without_provider(self) -> None:
-        for text in ('Kelapa ada?', 'Ada kelapa?', 'Es kelapa tersedia?',
-                     'Jual es kelapa?', 'Punya kelapa?'):
+        for text in (
+            'Kelapa ada?',
+            'Ada kelapa?',
+            'Es kelapa tersedia?',
+            'Jual es kelapa?',
+            'Punya kelapa?',
+        ):
             with self.subTest(text=text):
                 self.session = SessionStore()
                 response = self.reply(text)
                 self.assertEqual(self.ids(response), {self.kelapa.pk})
                 self.assertEqual(response['recommendations'][0].item.price, self.kelapa.price)
                 self.assertNotIn('cart', self.session)
+
         self.assertEqual(self.generator.prompts, [])
 
     def test_ambiguous_existence_question_preserves_business_search(self) -> None:
@@ -158,8 +195,11 @@ class CatalogLanguageIntegrationTests(TestCase):
         self.assertEqual(self.generator.prompts, [])
 
     def test_existence_questions_do_not_override_availability_or_local_budget(self) -> None:
-        for obj, field in ((self.kelapa, 'is_active'), (self.kelapa, 'is_available'),
-                           (self.drinks, 'is_active')):
+        for obj, field in (
+            (self.kelapa, 'is_active'),
+            (self.kelapa, 'is_available'),
+            (self.drinks, 'is_active'),
+        ):
             with self.subTest(field=field, kind=type(obj).__name__):
                 setattr(obj, field, False)
                 obj.save(update_fields=[field])
@@ -167,6 +207,7 @@ class CatalogLanguageIntegrationTests(TestCase):
                 self.assertFalse(self.reply('Kelapa ada?')['recommendations'])
                 setattr(obj, field, True)
                 obj.save(update_fields=[field])
+
         self.session = SessionStore()
         self.reply('minuman maksimal 5000')
         self.assertFalse(self.reply('Kelapa ada?')['recommendations'])
@@ -193,6 +234,7 @@ class CatalogLanguageIntegrationTests(TestCase):
     def test_alias_collision_is_clarified(self) -> None:
         for item in (self.kelapa, self.jeruk):
             MenuItemAlias.objects.create(menu_item=item, phrase='pilihan taman')
+
         response = self.reply('mau pilihan taman')
         self.assertFalse(response['recommendations'])
         self.assertIn('Es Kelapa', response['message'])
@@ -200,8 +242,13 @@ class CatalogLanguageIntegrationTests(TestCase):
 
     def test_inactive_alias_item_and_category_cannot_produce_cards(self) -> None:
         alias = MenuItemAlias.objects.create(menu_item=self.kelapa, phrase='pilihan taman')
-        for obj, field in ((alias, 'is_active'), (self.kelapa, 'is_active'),
-                           (self.drinks, 'is_active'), (self.kelapa, 'is_available')):
+
+        for obj, field in (
+            (alias, 'is_active'),
+            (self.kelapa, 'is_active'),
+            (self.drinks, 'is_active'),
+            (self.kelapa, 'is_available'),
+        ):
             with self.subTest(field=field, kind=type(obj).__name__):
                 setattr(obj, field, False)
                 obj.save(update_fields=[field])
@@ -211,12 +258,16 @@ class CatalogLanguageIntegrationTests(TestCase):
                 obj.save(update_fields=[field])
 
     def test_general_requests_use_current_catalog_categories(self) -> None:
-        for text, expected in (('aku mau makan', {self.ayam.pk}),
-                               ('aku mau minum', {self.kelapa.pk, self.jeruk.pk, self.jus.pk}),
-                               ('mau ngemil', {self.kentang.pk}), ('mau dessert', {self.puding.pk})):
+        for text, expected in (
+            ('aku mau makan', {self.ayam.pk}),
+            ('aku mau minum', {self.kelapa.pk, self.jeruk.pk, self.jus.pk}),
+            ('mau ngemil', {self.kentang.pk}),
+            ('mau dessert', {self.puding.pk}),
+        ):
             with self.subTest(text=text):
                 self.session = SessionStore()
                 self.assertEqual(self.ids(self.reply(text)), expected)
+
         self.assertEqual(self.generator.prompts, [])
 
     def test_new_category_and_alias_do_not_require_code_changes(self) -> None:
@@ -242,7 +293,12 @@ class CatalogLanguageIntegrationTests(TestCase):
     def test_object_followups_and_unknown_objects_do_not_mutate_search(self) -> None:
         self.reply('mau ayam geprek')
         old = dict(self.session['recommendation_search'])
-        for text, obj in (('ada bantal?', 'bantal'), ('kalau guling?', 'guling'), ('mau glorp', 'glorp')):
+
+        for text, obj in (
+            ('ada bantal?', 'bantal'),
+            ('kalau guling?', 'guling'),
+            ('mau glorp', 'glorp'),
+        ):
             response = self.reply(text)
             self.assertIn(obj, response['message'].casefold())
             self.assertFalse(response['recommendations'])
@@ -259,8 +315,10 @@ class CatalogLanguageIntegrationTests(TestCase):
 
     def _archive_candidate_only_kelapa(self, budget: str = '10k') -> None:
         for index in range(1, 4):
-            MenuItem.objects.get_or_create(name=f'Air Kebun {index}', category=self.drinks,
-                                           defaults={'price': index * 1000})
+            MenuItem.objects.get_or_create(
+                name=f'Air Kebun {index}', category=self.drinks, defaults={'price': index * 1000}
+            )
+
         self.reply('minuman ' + budget)
         state = ConversationSession(self.session)
         self.assertIn(self.kelapa.pk, state.get_candidates())
@@ -273,8 +331,10 @@ class CatalogLanguageIntegrationTests(TestCase):
         self.assertEqual(self.ids(result), {self.kelapa.pk})
         self.assertEqual(self.session['recommendation_search']['budget']['maximum'], '10000')
         self.assertEqual(ConversationSession(self.session).get_focus(), self.kelapa.pk)
-        self.assertEqual(self.session[ConversationSession.CONTEXTS_KEY]['transition']['action'],
-                         'REFER_TO_PREVIOUS')
+        self.assertEqual(
+            self.session[ConversationSession.CONTEXTS_KEY]['transition']['action'],
+            'REFER_TO_PREVIOUS',
+        )
         self.assertNotIn('cart', self.session)
         self.assertEqual(self.generator.prompts, [])
 
@@ -320,8 +380,11 @@ class CatalogLanguageIntegrationTests(TestCase):
         self.assertEqual(self.session[ConversationSession.CONTEXTS_KEY]['plan']['entries'], [])
 
     def test_unavailable_named_reference_does_not_restore_different_drink(self) -> None:
-        for obj, field in ((self.kelapa, 'is_available'), (self.kelapa, 'is_active'),
-                           (self.drinks, 'is_active')):
+        for obj, field in (
+            (self.kelapa, 'is_available'),
+            (self.kelapa, 'is_active'),
+            (self.drinks, 'is_active'),
+        ):
             with self.subTest(field=field, kind=type(obj).__name__):
                 self.session = SessionStore()
                 self._archive_candidate_only_kelapa()
@@ -329,10 +392,13 @@ class CatalogLanguageIntegrationTests(TestCase):
                 old_plan = deepcopy(self.session[ConversationSession.CONTEXTS_KEY]['plan'])
                 setattr(obj, field, False)
                 obj.save(update_fields=[field])
+
                 try:
                     self.assertFalse(self.reply('balik ke kelapa deh')['recommendations'])
                     self.assertEqual(self.session['recommendation_search'], old_search)
-                    self.assertEqual(self.session[ConversationSession.CONTEXTS_KEY]['plan'], old_plan)
+                    self.assertEqual(
+                        self.session[ConversationSession.CONTEXTS_KEY]['plan'], old_plan
+                    )
                     self.assertEqual(ConversationSession(self.session).get_focus(), self.ayam.pk)
                 finally:
                     setattr(obj, field, True)
@@ -376,6 +442,7 @@ class CatalogLanguageIntegrationTests(TestCase):
 
     def test_alias_matching_does_not_swallow_existing_tag_alias(self) -> None:
         from menu.models import MenuTagAlias
+
         smoky = MenuTag.objects.create(name='smoky')
         MenuTagAlias.objects.create(tag=smoky, phrase='panggang asap')
         item = MenuItem.objects.create(name='Sate Asap', category=self.food, price=9000)
@@ -394,16 +461,28 @@ class CatalogLanguageIntegrationTests(TestCase):
         for phrase in ('   ', 'x' * 101):
             with self.assertRaises(ValidationError):
                 MenuItemAlias.objects.create(menu_item=self.kelapa, phrase=phrase)
+
         MenuItemAlias.objects.create(menu_item=self.kelapa, phrase='Pilihan Taman')
+
         with self.assertRaises(IntegrityError), transaction.atomic():
             MenuItemAlias.objects.create(menu_item=self.kelapa, phrase='  pilihan taman ')
+
         from django.contrib import admin
+
         self.assertIn(MenuItemAlias, admin.site._registry)
 
     def test_http_contract_and_no_transaction_side_effects(self) -> None:
         with patch('recommendation.services.gemini.GeminiClient.generate', return_value=None):
-            response = self.client.post('/api/recommendation/chat/', {'message': 'yang kelapa'}, content_type='application/json')
+            response = self.client.post(
+                '/api/recommendation/chat/',
+                {'message': 'yang kelapa'},
+                content_type='application/json',
+            )
+
         self.assertEqual(response.status_code, 200)
-        self.assertEqual([card['id'] for card in response.json()['recommendations']], [self.kelapa.pk])
+        self.assertEqual(
+            [card['id'] for card in response.json()['recommendations']], [self.kelapa.pk]
+        )
         from orders.models import Order
+
         self.assertEqual(Order.objects.count(), 0)

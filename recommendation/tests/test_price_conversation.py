@@ -1,4 +1,5 @@
 """Price formats through the real conversation pipeline, not just the parser."""
+
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -16,12 +17,14 @@ from .test_local_conversation import OfflineGenerator
 class PriceContextRegressionTests(SimpleTestCase):
     def test_plain_rupiah_amount_in_food_context_is_a_budget(self) -> None:
         parser = IndonesianPriceParser()
+
         for text in ('minuman 10000', 'aku mau minuman 10000', 'menu 10000', 'es jeruk 10000'):
             with self.subTest(text=text):
                 self.assertEqual(parser.parse_maximum(text), 10000)
 
     def test_price_is_not_part_of_generic_or_exact_requested_entity(self) -> None:
         resolver = EntityResolver(((1, 'Es Jeruk'),), ('minuman', 'drink'))
+
         for price in ('10k', '10 ribu', '10000', '10.000', 'Rp10.000', '10 rupiah'):
             with self.subTest(price=price):
                 self.assertIsNone(resolver.resolve('aku mau minuman ' + price))
@@ -29,10 +32,18 @@ class PriceContextRegressionTests(SimpleTestCase):
 
     def test_nonmoney_numbers_remain_nonmoney_in_food_context(self) -> None:
         parser = IndonesianPriceParser()
-        for text in ('minuman 10000 ml', 'menu rating 4.5', 'minuman jam 20:30',
-                     'minuman meja 10000', 'minuman nomor 10000', 'menu ke 2'):
+
+        for text in (
+            'minuman 10000 ml',
+            'menu rating 4.5',
+            'minuman jam 20:30',
+            'minuman meja 10000',
+            'minuman nomor 10000',
+            'menu ke 2',
+        ):
             with self.subTest(text=text):
                 self.assertIsNone(parser.parse(text).constraint)
+
         self.assertEqual(parser.parse_maximum('minuman 10 rupiah'), 10)
 
 
@@ -43,11 +54,15 @@ class PriceConversationRegressionTests(TestCase):
         drink_tag = MenuTag.objects.create(name='drink')
         rice_tag = MenuTag.objects.create(name='rice')
         self.drinks: list[MenuItem] = []
+
         for name in ('Es Jeruk', 'Es Kelapa'):
             item = MenuItem.objects.create(name=name, price=Decimal(10000), category=drinks)
             item.tags.add(drink_tag)
             self.drinks.append(item)
-        expensive = MenuItem.objects.create(name='Minuman Mahal', price=Decimal(15000), category=drinks)
+
+        expensive = MenuItem.objects.create(
+            name='Minuman Mahal', price=Decimal(15000), category=drinks
+        )
         expensive.tags.add(drink_tag)
         rice = MenuItem.objects.create(name='Nasi Goreng', price=Decimal(20000), category=food)
         rice.tags.add(rice_tag)
@@ -58,7 +73,10 @@ class PriceConversationRegressionTests(TestCase):
         return ChatbotService(self.session, gemini_client=self.generator).reply(text)
 
     def assert_two_drinks(self, result: dict) -> None:
-        self.assertEqual({match.item.pk for match in result['recommendations']}, {item.pk for item in self.drinks})
+        self.assertEqual(
+            {match.item.pk for match in result['recommendations']},
+            {item.pk for item in self.drinks},
+        )
         self.assertEqual(result['active_search']['budget']['maximum'], '10000')
 
     def test_all_ten_thousand_formats_recommend_both_equal_price_drinks(self) -> None:
@@ -79,9 +97,17 @@ class PriceConversationRegressionTests(TestCase):
         self.assertFalse(first['recommendations'])
         self.assertEqual(first['active_search']['max_price'], 10000)
         result = self.reply('kalau gitu minuman aja')
-        self.assertEqual({match.item.name for match in result['recommendations']}, {'Es Jeruk', 'Es Kelapa', 'Minuman Mahal'})
+        self.assertEqual(
+            {match.item.name for match in result['recommendations']},
+            {'Es Jeruk', 'Es Kelapa', 'Minuman Mahal'},
+        )
         self.assertIsNone(result['active_search']['max_price'])
-        self.assertEqual(self.session[ConversationSession.CONTEXTS_KEY]['previous'][-1]['constraints']['budget']['maximum'], '10000')
+        self.assertEqual(
+            self.session[ConversationSession.CONTEXTS_KEY]['previous'][-1]['constraints']['budget'][
+                'maximum'
+            ],
+            '10000',
+        )
 
     def test_exact_name_with_price_and_then_generic_drink_clears_identity_scope(self) -> None:
         first = self.reply('aku mau es jeruk 10.000')
@@ -107,12 +133,16 @@ class PriceConversationRegressionTests(TestCase):
         with patch('recommendation.services.gemini.GeminiClient.generate', return_value=None):
             for price in ('10k', '10 rupiah', '10000', '10.000'):
                 with self.subTest(price=price):
-                    response = self.client.post('/api/recommendation/chat/',
-                                                {'message': 'aku mau minuman ' + price},
-                                                content_type='application/json')
+                    response = self.client.post(
+                        '/api/recommendation/chat/',
+                        {'message': 'aku mau minuman ' + price},
+                        content_type='application/json',
+                    )
                     self.assertEqual(response.status_code, 200)
                     body = response.json()
                     expected_max = 10 if price == '10 rupiah' else 10000
                     self.assertEqual(body['active_search']['max_price'], expected_max)
                     expected_names = set() if price == '10 rupiah' else {'Es Jeruk', 'Es Kelapa'}
-                    self.assertEqual({item['name'] for item in body['recommendations']}, expected_names)
+                    self.assertEqual(
+                        {item['name'] for item in body['recommendations']}, expected_names
+                    )

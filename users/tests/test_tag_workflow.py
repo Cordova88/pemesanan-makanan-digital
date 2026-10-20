@@ -10,7 +10,9 @@ class CMSTagWorkflowTests(TestCase):
         self.client.force_login(get_user_model().objects.create_user('tag-review', is_staff=True))
         category = Category.objects.create(name='Makanan')
         self.first = MenuItem.objects.create(category=category, name='Ayam', price=20000)
-        self.second = MenuItem.objects.create(category=category, name='Sup', price=15000, is_active=False)
+        self.second = MenuItem.objects.create(
+            category=category, name='Sup', price=15000, is_active=False
+        )
         self.outside = MenuItem.objects.create(category=category, name='Nasi', price=5000)
         self.tag = MenuTag.objects.create(name='spicy', display_name='Pedas')
         self.other = MenuTag.objects.create(name='savory', display_name='Gurih')
@@ -29,26 +31,42 @@ class CMSTagWorkflowTests(TestCase):
             self.assertEqual(response.context['tags'][0].menu_count, 2)
             self.assertEqual(response.context['tag_total'], 2)
             self.assertContains(response, 'Reset')
-        self.assertContains(self.client.get(self.url, {'q': 'tidak-ada'}), 'Tidak ada tag yang cocok')
+
+        self.assertContains(
+            self.client.get(self.url, {'q': 'tidak-ada'}), 'Tidak ada tag yang cocok'
+        )
         self.assertEqual(len(self.client.get(self.url).context['tags']), 2)
 
     def test_create_and_duplicate_invalid_code_preserve_search_context(self):
-        self.assertRedirects(self.client.post(self.url, {'name': 'fresh', 'display_name': ''}), self.url)
+        self.assertRedirects(
+            self.client.post(self.url, {'name': 'fresh', 'display_name': ''}), self.url
+        )
         self.assertEqual(str(MenuTag.objects.get(name='fresh')), 'fresh')
+
         for code in ('spicy', 'kode tidak valid'):
-            response = self.client.post(self.url + '?q=Pedas', {'name': code, 'display_name': 'Uji'})
+            response = self.client.post(
+                self.url + '?q=Pedas', {'name': code, 'display_name': 'Uji'}
+            )
             self.assertEqual(response.status_code, 200)
             self.assertIn('name', response.context['form'].errors)
             self.assertContains(response, 'Tag belum disimpan')
             self.assertEqual(response.context['query'], 'Pedas')
+
         self.assertEqual(MenuTag.objects.count(), 3)
 
     def test_edit_detaches_only_unchecked_menu_and_preserves_other_data(self):
         response = self.client.get(self.edit)
         self.assertContains(response, 'Pemakaian pada 2 menu')
         self.assertContains(response, 'href="' + self.url + '"')
-        self.assertEqual(set(response.context['form'].fields['menus'].queryset), {self.first, self.second})
-        self.assertRedirects(self.client.post(self.edit, {'name': 'hot', 'display_name': 'Pedas Baru', 'menus': [self.first.pk]}), self.url)
+        self.assertEqual(
+            set(response.context['form'].fields['menus'].queryset), {self.first, self.second}
+        )
+        self.assertRedirects(
+            self.client.post(
+                self.edit, {'name': 'hot', 'display_name': 'Pedas Baru', 'menus': [self.first.pk]}
+            ),
+            self.url,
+        )
         self.tag.refresh_from_db()
         self.assertEqual(self.tag.name, 'hot')
         self.assertEqual(list(self.tag.menu_items.all()), [self.first])
@@ -70,7 +88,10 @@ class CMSTagWorkflowTests(TestCase):
             self.assertEqual(self.tag.menu_items.count(), 2)
 
     def test_clear_all_usage_keeps_tag_and_menus(self):
-        self.assertRedirects(self.client.post(self.edit, {'name': 'spicy', 'display_name': 'Pedas', 'menus': []}), self.url)
+        self.assertRedirects(
+            self.client.post(self.edit, {'name': 'spicy', 'display_name': 'Pedas', 'menus': []}),
+            self.url,
+        )
         self.assertFalse(self.tag.menu_items.exists())
         self.assertTrue(MenuTag.objects.filter(pk=self.tag.pk).exists())
         self.assertEqual(MenuItem.objects.count(), 3)
@@ -102,8 +123,10 @@ class CMSTagWorkflowTests(TestCase):
 
     def test_non_staff_cannot_read_or_change_tags(self):
         self.client.force_login(get_user_model().objects.create_user('tag-ordinary'))
+
         for url in (self.url, self.edit, self.delete):
             self.assertEqual(self.client.get(url).status_code, 302)
             self.assertEqual(self.client.post(url, {'confirm_detach': 'yes'}).status_code, 302)
+
         self.assertTrue(MenuTag.objects.filter(pk=self.tag.pk).exists())
         self.assertEqual(self.tag.menu_items.count(), 2)

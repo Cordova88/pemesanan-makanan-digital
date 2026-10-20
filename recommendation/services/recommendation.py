@@ -49,8 +49,12 @@ class RecommendationMatch:
     def __eq__(self, other: object) -> bool | NotImplementedType:
         if not isinstance(other, RecommendationMatch) or type(self) is not type(other):
             return NotImplemented
+
         return (self.item, self.score, self.match_reasons, self.labels) == (
-            other.item, other.score, other.match_reasons, other.labels,
+            other.item,
+            other.score,
+            other.match_reasons,
+            other.labels,
         )
 
     def __hash__(self) -> int:
@@ -76,9 +80,21 @@ class SearchConstraintsPayload(TypedDict, total=False):
 class SearchConstraints:
     """Read-only filters for the active search, separate from saved preferences."""
 
-    __slots__ = ("__required_tags", "__excluded_tags", "__category", "__max_price", "__moods", "__budget", "__soft_target")
+    __slots__ = (
+        "__required_tags",
+        "__excluded_tags",
+        "__category",
+        "__max_price",
+        "__moods",
+        "__budget",
+        "__soft_target",
+    )
     __match_args__: ClassVar[tuple[str, ...]] = (
-        "required_tags", "excluded_tags", "category", "max_price", "moods",
+        "required_tags",
+        "excluded_tags",
+        "category",
+        "max_price",
+        "moods",
     )
 
     def __init__(
@@ -88,7 +104,8 @@ class SearchConstraints:
         category: str | None = None,
         max_price: int | None = None,
         moods: frozenset[str] = frozenset(),
-        *, budget: BudgetConstraint | None = None,
+        *,
+        budget: BudgetConstraint | None = None,
         soft_target: Decimal | None = None,
     ) -> None:
         self.__required_tags: frozenset[str] = required_tags
@@ -97,8 +114,10 @@ class SearchConstraints:
         self.__max_price: int | None = max_price
         self.__moods: frozenset[str] = moods
         self.__budget: BudgetConstraint | None = budget
+
         if soft_target is not None:
             BudgetConstraint(maximum=soft_target)
+
         self.__soft_target: Decimal | None = soft_target
 
     @property
@@ -121,6 +140,7 @@ class SearchConstraints:
     def max_price(self) -> int | None:
         if self.budget is not None:
             return self.budget.legacy_maximum
+
         return self.__max_price
 
     @property
@@ -135,8 +155,10 @@ class SearchConstraints:
         remain based on the catalog's actual metadata.
         """
         result = set(tags)
+
         if category_name.strip().casefold() == 'minuman':
             result.add('drink')
+
         return frozenset(result)
 
     @property
@@ -146,12 +168,37 @@ class SearchConstraints:
     def __eq__(self, other: object) -> bool | NotImplementedType:
         if not isinstance(other, SearchConstraints) or type(self) is not type(other):
             return NotImplemented
-        return (self.required_tags, self.excluded_tags, self.category, self.max_price, self.moods, self.budget, self.soft_target) == (
-            other.required_tags, other.excluded_tags, other.category, other.max_price, other.moods, other.budget, other.soft_target,
+
+        return (
+            self.required_tags,
+            self.excluded_tags,
+            self.category,
+            self.max_price,
+            self.moods,
+            self.budget,
+            self.soft_target,
+        ) == (
+            other.required_tags,
+            other.excluded_tags,
+            other.category,
+            other.max_price,
+            other.moods,
+            other.budget,
+            other.soft_target,
         )
 
     def __hash__(self) -> int:
-        return hash((self.required_tags, self.excluded_tags, self.category, self.max_price, self.moods, self.budget, self.soft_target))
+        return hash(
+            (
+                self.required_tags,
+                self.excluded_tags,
+                self.category,
+                self.max_price,
+                self.moods,
+                self.budget,
+                self.soft_target,
+            )
+        )
 
     def __repr__(self) -> str:
         return (
@@ -168,10 +215,13 @@ class SearchConstraints:
             "max_price": self.max_price,
             "moods": sorted(self.moods),
         }
+
         if self.budget is not None:
             payload["budget"] = self.budget.to_dict()
+
         if self.soft_target is not None:
             payload['soft_target'] = str(self.soft_target)
+
         return payload
 
     @classmethod
@@ -212,7 +262,8 @@ class RecommendationService:
         exclude_ids: Collection[int] | None = None,
         required_tags: Collection[str] | None = None,
         constraints: SearchConstraints | None = None,
-        *, include_unscored: bool = False,
+        *,
+        include_unscored: bool = False,
     ) -> list[RecommendationMatch]:
         items = (
             MenuItem.objects.filter(
@@ -224,6 +275,7 @@ class RecommendationService:
             .prefetch_related("tags")
         )
         excluded_ids = set(exclude_ids or [])
+
         if constraints is not None:
             required_tags = set(constraints.required_tags)
             max_price = constraints.max_price
@@ -238,39 +290,59 @@ class RecommendationService:
             max_price = preferences.max_price
             category = preferences.category
             excluded_tags = preferences.excluded_tags
+
         ranked: list[RecommendationMatch] = []
         prices = {}
 
         for item in items:
             if item.id in excluded_ids:
                 continue
+
             payable = MenuSelection.minimum_payable(item)
+
             if payable is None:
                 continue
+
             prices[item.pk] = payable
             item_tags = {tag.name for tag in item.tags.all()}
             filter_tags = SearchConstraints.tags_with_category(item_tags, item.category.name)
+
             if not required_tags.issubset(filter_tags):
                 continue
+
             if filter_tags & excluded_tags:
                 continue
-            if constraints is not None and constraints.budget is not None and not constraints.budget.allows(payable):
+
+            if (
+                constraints is not None
+                and constraints.budget is not None
+                and not constraints.budget.allows(payable)
+            ):
                 continue
+
             if max_price is not None and payable > max_price:
                 continue
+
             if category and item.category.name.casefold() != category.casefold():
                 continue
 
-            score = 1 if (
-                excluded_tags or preferences.soft_excluded_tags or preferences.prefer_affordable
-            ) else 0
+            score = (
+                1
+                if (
+                    excluded_tags or preferences.soft_excluded_tags or preferences.prefer_affordable
+                )
+                else 0
+            )
             reasons: list[str] = []
+
             # Missing a catalog tag does not verify the absence of an ingredient.
             # Hard exclusion filters remain active without making a "free from" claim.
             for tag in sorted(item_tags & preferences.tags):
                 score += self.DIRECT_TAG_WEIGHT
+
                 if constraints is None or tag in constraints.required_tags:
                     reasons.append(tag_label(tag))
+
             for tag in sorted((item_tags & preferences.mood_tags) - preferences.tags):
                 score += self.MOOD_TAG_WEIGHT
                 reasons.append(tag_label(tag))
@@ -282,18 +354,21 @@ class RecommendationService:
                 score += self.CATEGORY_WEIGHT
                 reasons.append("🍽️ Sesuai pilihan makanan")
 
-            if max_price is not None or (constraints is not None and constraints.budget is not None):
+            if max_price is not None or (
+                constraints is not None and constraints.budget is not None
+            ):
                 score += self.BUDGET_WEIGHT
                 reasons.append("💰 Sesuai batas harga")
             elif preferences.prefer_affordable and payable <= self.AFFORDABLE_PRICE_CEILING:
                 score += self.BUDGET_WEIGHT
                 reasons.append("💰 Ramah di kantong")
 
-            if score > 0 or include_unscored or (constraints is not None and constraints.soft_target is not None):
-                labels = tuple(
-                    tag_label(tag)
-                    for tag in sorted(item_tags)
-                )
+            if (
+                score > 0
+                or include_unscored
+                or (constraints is not None and constraints.soft_target is not None)
+            ):
+                labels = tuple(tag_label(tag) for tag in sorted(item_tags))
                 ranked.append(
                     RecommendationMatch(
                         item=item,
@@ -305,10 +380,17 @@ class RecommendationService:
 
         ranked.sort(
             key=lambda match: (
-                abs(prices[match.item.pk] - constraints.soft_target) if constraints is not None and constraints.soft_target is not None else Decimal(0),
-                -match.score, prices[match.item.pk], match.item.name.casefold(),
+                (
+                    abs(prices[match.item.pk] - constraints.soft_target)
+                    if constraints is not None and constraints.soft_target is not None
+                    else Decimal(0)
+                ),
+                -match.score,
+                prices[match.item.pk],
+                match.item.name.casefold(),
             )
         )
+
         return ranked[: max(0, limit)]
 
     def recommend(
@@ -318,9 +400,9 @@ class RecommendationService:
         exclude_ids: Collection[int] | None = None,
     ) -> list[MenuItem]:
         """Return MenuItems for callers that do not need explanation metadata."""
+
         return [
-            match.item
-            for match in self.rank(preferences, limit=limit, exclude_ids=exclude_ids)
+            match.item for match in self.rank(preferences, limit=limit, exclude_ids=exclude_ids)
         ]
 
     def find_catalog_matches(
@@ -329,52 +411,54 @@ class RecommendationService:
         excluded_tags: Collection[str] | None = None,
         category: str | None = None,
         max_price: int | None = None,
-        *, budget: BudgetConstraint | None = None, soft_target: Decimal | None = None,
+        *,
+        budget: BudgetConstraint | None = None,
+        soft_target: Decimal | None = None,
     ) -> list[RecommendationMatch]:
         required_tags = set(tags)
         excluded_tags = set(excluded_tags or [])
+
         if not required_tags:
             return []
 
         tag_filter = Q(tags__name__in=required_tags)
+
         if 'drink' in required_tags:
             tag_filter |= Q(category__name__iexact='Minuman')
+
         item_query = MenuItem.objects.filter(
-                tag_filter,
-                is_active=True,
-                is_available=True,
-                category__is_active=True,
-            )
+            tag_filter,
+            is_active=True,
+            is_available=True,
+            category__is_active=True,
+        )
+
         if category:
             item_query = item_query.filter(category__name__iexact=category)
-        items = (
-            item_query
-            .select_related("category")
-            .prefetch_related("tags")
-            .distinct()
-        )
+
+        items = item_query.select_related("category").prefetch_related("tags").distinct()
         matches: list[RecommendationMatch] = []
         prices = {}
+
         for item in items:
             payable = MenuSelection.minimum_payable(item)
-            if payable is None or (max_price is not None and payable > max_price) or (budget is not None and not budget.allows(payable)):
+
+            if (
+                payable is None
+                or (max_price is not None and payable > max_price)
+                or (budget is not None and not budget.allows(payable))
+            ):
                 continue
+
             prices[item.pk] = payable
             item_tags = {tag.name for tag in item.tags.all()}
             filter_tags = SearchConstraints.tags_with_category(item_tags, item.category.name)
-            if (
-                not required_tags.issubset(filter_tags)
-                or filter_tags & excluded_tags
-            ):
+
+            if not required_tags.issubset(filter_tags) or filter_tags & excluded_tags:
                 continue
-            reasons = tuple(
-                tag_label(tag)
-                for tag in sorted(required_tags)
-            )
-            labels = tuple(
-                tag_label(tag)
-                for tag in sorted(item_tags)
-            )
+
+            reasons = tuple(tag_label(tag) for tag in sorted(required_tags))
+            labels = tuple(tag_label(tag) for tag in sorted(item_tags))
             matches.append(
                 RecommendationMatch(
                     item=item,
@@ -383,10 +467,14 @@ class RecommendationService:
                     labels=labels,
                 )
             )
+
         return sorted(
             matches,
-            key=lambda match: (abs(prices[match.item.pk] - soft_target) if soft_target is not None else Decimal(0),
-                               prices[match.item.pk], match.item.name.casefold()),
+            key=lambda match: (
+                abs(prices[match.item.pk] - soft_target) if soft_target is not None else Decimal(0),
+                prices[match.item.pk],
+                match.item.name.casefold(),
+            ),
         )
 
     def get_available_match(self, item_id: int) -> RecommendationMatch | None:
@@ -401,12 +489,12 @@ class RecommendationService:
             .prefetch_related("tags")
             .first()
         )
+
         if item is None:
             return None
-        labels = tuple(
-            tag_label(tag.name)
-            for tag in item.tags.all()
-        )
+
+        labels = tuple(tag_label(tag.name) for tag in item.tags.all())
+
         return RecommendationMatch(
             item=item,
             score=0,
