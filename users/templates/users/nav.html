@@ -69,7 +69,10 @@
       <div class="cms-profile-role">Administrator</div>
     </div>
   </div>
-  <a class="px-2 py-1 d-inline-block" href="{% url 'staff:logout' %}"
-    ><i class="bi bi-box-arrow-left me-1"></i>Keluar</a
-  >
+  <form method="post" action="{% url 'staff:logout' %}">
+    {% csrf_token %}
+    <button type="submit" class="px-2 py-1 d-inline-block border-0 bg-transparent">
+      <i class="bi bi-box-arrow-left me-1"></i>Keluar
+    </button>
+  </form>
 </div>

@@ -17,6 +17,11 @@ from menu.selection import MenuSelection
 class CartService:
     SESSION_KEY: ClassVar[str] = "cart"
 
+    @staticmethod
+    def _validate_quantity(quantity: object) -> None:
+        if type(quantity) is not int or not 1 <= quantity <= 99:
+            raise ValidationError({"quantity": "Jumlah porsi harus 1 sampai 99."})
+
     def __init__(self, session: SessionBase) -> None:
         self.session: SessionBase = session
         self._lines: list[CartLine] = deepcopy(session.get(self.SESSION_KEY, []))
@@ -48,8 +53,7 @@ class CartService:
         if not isinstance(menu_item_id, int):
             raise ValidationError({"menu_item_id": "Must be an integer."})
 
-        if not isinstance(quantity, int) or isinstance(quantity, bool) or quantity < 1:
-            raise ValidationError({"quantity": "Must be a positive integer."})
+        self._validate_quantity(quantity)
 
         variants = self._ids(variant_ids or [], "variant_ids")
         addons = self._ids(addon_ids or [], "addon_ids")
@@ -63,7 +67,9 @@ class CartService:
                 and line["addon_ids"] == addons
                 and line.get("note", "") == note
             ):
-                line["quantity"] += quantity
+                combined_quantity = line["quantity"] + quantity
+                self._validate_quantity(combined_quantity)
+                line["quantity"] = combined_quantity
                 self._save()
 
                 return deepcopy(line)
@@ -108,8 +114,7 @@ class CartService:
         quantity = payload.get("quantity")
         note = payload.get("note", "")
 
-        if not isinstance(quantity, int) or isinstance(quantity, bool) or not 1 <= quantity <= 99:
-            raise ValidationError("Jumlah porsi harus 1 sampai 99.")
+        self._validate_quantity(quantity)
 
         if not isinstance(note, str) or len(note) > 500:
             raise ValidationError("Catatan maksimal 500 karakter.")
@@ -132,12 +137,13 @@ class CartService:
         self._save()
 
     def update_quantity(self, line_id: str, quantity: int) -> CartLine | None:
-        if not isinstance(quantity, int):
+        if type(quantity) is not int:
             raise ValidationError({"quantity": "Must be an integer."})
 
         if quantity <= 0:
             return self.remove_item(line_id)
 
+        self._validate_quantity(quantity)
         for line in self._lines:
             if line["id"] == line_id:
                 line["quantity"] = quantity
@@ -220,8 +226,12 @@ class CartService:
 
         return rendered
 
-    def get_total(self) -> Decimal:
+    @staticmethod
+    def total_for(items: list[RenderedCartLine]) -> Decimal:
         return sum(
-            (Decimal(line["line_total"]) for line in self.get_items() if line.get("valid")),
+            (Decimal(line["line_total"]) for line in items if line.get("valid")),
             Decimal("0.00"),
         )
+
+    def get_total(self) -> Decimal:
+        return self.total_for(self.get_items())

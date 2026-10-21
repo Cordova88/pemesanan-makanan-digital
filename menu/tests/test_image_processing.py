@@ -1,7 +1,7 @@
 import io
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from PIL import Image
 from django.contrib import admin
@@ -28,6 +28,24 @@ def upload(kind="PNG", size=(40, 20), alpha=True):
 
 
 class PhotoProcessingTests(SimpleTestCase):
+    def test_only_supported_parsers_can_run_at_both_image_open_stages(self):
+        file = upload()
+        with patch('menu.image_processing.Image.open', wraps=Image.open) as image_open:
+            prepare_photo(file)
+        self.assertEqual(image_open.call_count, 2)
+        for call in image_open.call_args_list:
+            self.assertEqual(set(call.kwargs['formats']), {'JPEG', 'PNG', 'WEBP'})
+
+    def test_unsupported_parser_factory_is_never_invoked(self):
+        # A valid synthetic BMP would previously reach the BMP parser before rejection.
+        file = upload('BMP', alpha=False)
+        Image.init()
+        factory = Mock()
+        with patch.dict(Image.OPEN, {'BMP': (factory, None)}):
+            with self.assertRaises(ValidationError):
+                prepare_photo(file)
+        factory.assert_not_called()
+
     def test_content_detection_formats_and_transparency(self):
         for kind in ("JPEG", "PNG", "WEBP"):
             with self.subTest(kind=kind):

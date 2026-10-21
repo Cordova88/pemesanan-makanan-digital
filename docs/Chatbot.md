@@ -448,6 +448,28 @@ juga bukan berarti gratis. Timeout dapat membuat pemakaian belum diketahui.
 Catat ID request dan ringkasan aman; cocokkan dengan dashboard penyedia bila
 sedang melakukan percobaan live.
 
+Log JSON tampil di terminal server Django melalui logger
+`recommendation.services.gemini` pada level INFO. Jalur percakapan AI-first
+(`converse`) mencatat satu `provider_attempt` setelah setiap panggilan SDK
+selesai, termasuk respons permintaan tool dan respons akhir. Satu pesan pelanggan
+dapat menghasilkan beberapa baris; kelompokkan dengan `request_id` yang sama.
+Setiap baris berisi token untuk panggilan tersebut, bukan akumulasi sesi:
+`input_tokens`, `output_tokens`, `thinking_tokens`, `cached_tokens`, dan
+`total_tokens`. Gunakan `total_tokens` dari provider; jangan menjumlahkan semua
+kolom karena kategori token dapat saling mencakup.
+
+Contoh ringkasan field dari satu baris (angka ilustrasi):
+
+```json
+{"event":"provider_attempt","model":"dummy-model","outcome":"success","latency_ms":850.2,"input_tokens":100,"output_tokens":30,"thinking_tokens":10,"cached_tokens":20,"total_tokens":140,"provider_called":true}
+```
+
+Timeout/error juga menghasilkan `provider_attempt` dengan pemakaian token
+yang belum diketahui serta `provider_failure` berisi kategori aman. Penolakan
+kuota mempunyai `provider_called=false`. Isi pesan, jawaban, argument/hasil tool,
+dan API key tidak dimasukkan ke log ini. Konfigurasi bawaan hanya mencetak ke
+console, belum menyimpan ke file atau menampilkan total token di halaman web.
+
 Saat menelusuri kendala, gunakan urutan pesan yang menyebabkan masalah dan
 cocokkan hasilnya dengan katalog. Catat langkah serta hasil yang terlihat agar
 anggota lain bisa mengulangnya. Panduan pemeriksaan melalui browser ada di
