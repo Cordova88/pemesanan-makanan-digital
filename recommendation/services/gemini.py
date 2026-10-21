@@ -22,7 +22,7 @@ class GeminiClient(TextGenerator):
             self.client = genai.Client(
                 api_key=api_key,
                 http_options=types.HttpOptions(
-                    timeout=15000, retry_options=types.HttpRetryOptions(attempts=1)
+                    timeout=30000, retry_options=types.HttpRetryOptions(attempts=1)
                 ),
             )
 
@@ -163,3 +163,84 @@ class GeminiClient(TextGenerator):
             provider_failure_event(category, status)
 
             return None
+
+    def converse(
+        self,
+        message: str,
+        system_instruction: str,
+        tool_declarations: list,
+        tool_handler,
+        before_request,
+        max_iterations: int = 4,
+    ) -> tuple[str | None, list]:
+        if self.client is None or not getattr(settings, 'GEMINI_ENABLED', False):
+            return None, []
+
+        model = settings.GEMINI_MODEL
+        contents = [
+            types.Content(
+                role="user",
+                parts=[types.Part(text=message)],
+            )
+        ]
+        tool = types.Tool(function_declarations=tool_declarations)
+        config = types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            tools=[tool],
+            temperature=0.7,
+            max_output_tokens=600,
+        )
+        tool_results = []
+        for _ in range(max(1, max_iterations)):
+            if before_request and not before_request():
+                return None, tool_results
+            try:
+                response = self.client.models.generate_content(
+                    model=model,
+                    contents=contents,
+                    config=config,
+                )
+            except Exception as exc:
+                category, status = self._failure_metadata(exc)
+                provider_failure_event(category, status)
+                return None, tool_results
+
+            candidate = (response.candidates or [None])[0]
+            content = candidate.content if candidate else None
+            if content is None:
+                return None, tool_results
+            contents.append(content)
+            function_calls = [
+                part.function_call
+                for part in (content.parts or [])
+                if part.function_call is not None
+            ]
+            if not function_calls:
+                text = response.text or None
+                return text, tool_results
+
+            response_parts = []
+            for function_call in function_calls:
+                name = function_call.name or ""
+                arguments = dict(function_call.args or {})
+                result = tool_handler(name, arguments)
+                tool_results.append(
+                    {
+                        "name": name,
+                        "arguments": arguments,
+                        "result": result,
+                    }
+                )
+                response_parts.append(
+                    types.Part(
+                        function_response=types.FunctionResponse(
+                            name=name,
+                            id=function_call.id,
+                            response=result,
+                        )
+                    )
+                )
+            contents.append(
+                types.Content(role="user", parts=response_parts)
+            )
+        return None, tool_results

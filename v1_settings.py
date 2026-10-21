@@ -3,6 +3,11 @@
 from pathlib import Path
 from secrets import token_urlsafe
 import os
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent / '.env')
+except ImportError:
+    pass
 
 BASE_DIR = Path(__file__).resolve().parent
 # Persist a local-only key so login sessions survive development restarts.
@@ -65,16 +70,21 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "/staff/login/"
-GEMINI_API_KEY = ""
-GEMINI_ENABLED = False
-CHATBOT_SEMANTIC_RERANKING_ENABLED = True
-CHATBOT_AI_WORDING_ENABLED = False
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_ENABLED = os.environ.get("GEMINI_ENABLED", "false").lower() == "true"
+CHATBOT_SEMANTIC_RERANKING_ENABLED = (
+    os.environ.get("CHATBOT_SEMANTIC_RERANKING_ENABLED", "true").lower() == "true"
+)
+CHATBOT_AI_WORDING_ENABLED = (
+    os.environ.get("CHATBOT_AI_WORDING_ENABLED", "false").lower() == "true"
+)
 CHATBOT_CONTEXT_SWITCHING_ENABLED = (
     os.environ.get('CHATBOT_CONTEXT_SWITCHING_ENABLED', 'true').lower() == 'true'
 )
 
-GEMINI_MAX_CALLS_PER_SESSION = 8
-GEMINI_MODEL = 'gemini-2.0-flash'
+GEMINI_MAX_CALLS_PER_SESSION = int(os.environ.get("GEMINI_MAX_CALLS_PER_SESSION", "50"))
+GEMINI_MAX_TOOL_ITERATIONS = int(os.environ.get("GEMINI_MAX_TOOL_ITERATIONS", "4"))
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
 
 MENU_ORIGINALS_ROOT = BASE_DIR / 'private' / 'menu-originals'

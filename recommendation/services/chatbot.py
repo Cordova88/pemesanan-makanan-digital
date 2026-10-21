@@ -175,6 +175,14 @@ class ChatbotService:
         self.gemini_client: TextGenerator = (
             GeminiClient() if gemini_client is None else gemini_client
         )
+        from .ai.assistant import GeminiAssistant
+
+        self.assistant = GeminiAssistant(
+            self.gemini_client,
+            self.recommender,
+            self.tag_extractor,
+            session=self.session,
+        )
         from .ai.turn_generator import TurnGenerator
 
         self._turn_generator = TurnGenerator(self.gemini_client)
@@ -3829,7 +3837,138 @@ class ChatbotService:
 
         return False
 
+    def _consume_gemini_budget(self) -> bool:
+        maximum = max(0, int(settings.GEMINI_MAX_CALLS_PER_SESSION))
+        calls = int(self.session.get("gemini_calls", 0))
+        if calls >= maximum:
+            return False
+        self.session["gemini_calls"] = calls + 1
+        if hasattr(self.session, "modified"):
+            self.session.modified = True
+        return True
+
+    def _gemini_context(self) -> dict[str, object]:
+        state = self.session.get(self.SESSION_KEY, {})
+        return {
+            "preferences": {
+                "tags": sorted(state.get("tags", [])),
+                "mood_tags": sorted(state.get("mood_tags", [])),
+                "excluded_tags": sorted(state.get("excluded_tags", [])),
+                "soft_excluded_tags": sorted(state.get("soft_excluded_tags", [])),
+                "moods": sorted(state.get("moods", [])),
+                "prefer_affordable": state.get("prefer_affordable", False),
+            },
+            "active_search": self._search_constraints().to_dict(),
+            "shown_ids": list(self.session.get(self.SHOWN_KEY, [])),
+            "last_recommendation_ids": list(
+                state.get("last_recommendations", [])
+            ),
+            "last_question": state.get(
+                "last_question",
+                self.session.get("last_question"),
+            ),
+            "recent_turn": {
+                "customer": self.session.get("recommendation_last_message", ""),
+                "assistant": self.session.get("recommendation_last_response", ""),
+            },
+        }
+
+    def _gemini_first_reply(self, message: str) -> ChatbotResponse | None:
+        context = self._gemini_context()
+        response, _tool_results = self.assistant.respond(
+            message or "Mulai percakapan dan bantu pelanggan memilih menu.",
+            context,
+            self._consume_gemini_budget,
+        )
+        if response is None:
+            return None
+
+        matches = context.get("last_tool_matches", [])
+        constraints_data = context.get("last_tool_constraints")
+        if constraints_data:
+            constraints = SearchConstraints.from_dict(constraints_data)
+            preferences = self._preferences()
+            preferences.tags.update(constraints.required_tags)
+            preferences.tags.difference_update(constraints.excluded_tags)
+            preferences.excluded_tags.update(constraints.excluded_tags)
+            preferences.max_price = constraints.max_price
+            preferences.category = constraints.category
+            self.session[self.SEARCH_KEY] = constraints.to_dict()
+            self.session["recommendation_required_tags"] = sorted(
+                constraints.required_tags
+            )
+            ids = [match.item.id for match in matches]
+            self.session[self.SHOWN_KEY] = ids
+            self.session["last_recommendations"] = ids
+            self.session["shown_recommendation_ids"] = ids
+            self.session[self.LAST_RESULT_EMPTY_KEY] = False
+            self.session["recommendation_last_message"] = message[:500]
+            self.session["recommendation_last_response"] = response[:1200]
+            if hasattr(self.session, "modified"):
+                self.session.modified = True
+            self._save(preferences, "RECOMMENDING")
+            return {
+                "message": response,
+                "state": "RECOMMENDING",
+                "preferences": self._response_preferences(
+                    preferences,
+                    "RECOMMENDING",
+                ),
+                "active_search": constraints.to_dict(),
+                "recommendations": matches,
+                "explanations": {
+                    match.item.id: self.explanation_service.fallback(match)
+                    for match in matches
+                },
+                "quick_replies": [
+                    self._quick_reply(
+                        "🔄 Cari Menu Lain",
+                        "Cari menu lain",
+                        action="more",
+                    ),
+                    self._quick_reply(
+                        "🔄 Mulai Lagi",
+                        "mulai lagi",
+                        action="reset",
+                    ),
+                ],
+            }
+
+        state = self.session.get(self.SESSION_KEY, {}).get(
+            "state",
+            "COLLECTING_PREFERENCES",
+        )
+        self.session["recommendation_last_message"] = message[:500]
+        self.session["recommendation_last_response"] = response[:1200]
+        if hasattr(self.session, "modified"):
+            self.session.modified = True
+        return {
+            "message": response,
+            "state": state,
+            "preferences": self._response_preferences(
+                self._preferences(),
+                state,
+            ),
+            "recommendations": [],
+            "quick_replies": [],
+        }
+
     def reply(self, message: str, more: bool = False, action: str | None = None) -> ChatbotResponse:
+        normalized = normalize_text(message)
+        action_name = action or ''
+        if action_name == 'reset' or normalized in self.RESET_PHRASES:
+            self.reset()
+            if self.assistant.available:
+                ai_res = self._gemini_first_reply('')
+                if ai_res is not None:
+                    return ai_res
+            return self._question()
+
+        if self.assistant.available and not more and action_name != 'more':
+            ai_res = self._gemini_first_reply(message)
+            if ai_res is not None:
+                return ai_res
+
         self._turn_generator.reset()
         self._turn_generator.protect(message)
         self._turn_source_session = self.session

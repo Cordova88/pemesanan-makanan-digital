@@ -16,6 +16,12 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv(BASE_DIR / '.env')
+except ImportError:
+    pass
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
@@ -138,7 +144,8 @@ MAILERS = {
 }
 
 GEMINI_MAX_CALLS_PER_SESSION = int(os.environ.get("GEMINI_MAX_CALLS_PER_SESSION", "50"))
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
+GEMINI_MAX_TOOL_ITERATIONS = int(os.environ.get("GEMINI_MAX_TOOL_ITERATIONS", "4"))
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
 
 LOGGING = {
     "version": 1,
