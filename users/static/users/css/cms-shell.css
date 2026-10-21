@@ -1,0 +1,74 @@
+/* CMS workspace: shared visual language with the customer UI, desktop layout. */
+.cms-app{
+  --brand:#b8322e;--brand-dark:#962722;--brand-soft:#fbe8e3;
+  --cms-ink:#13234a;--cms-muted:#667080;--cms-line:#e6e4dc;
+  --bs-body-color:var(--cms-ink);--bs-body-bg:#faf8f2;
+  --bs-border-color:var(--cms-line);--bs-border-radius:12px;
+  --bs-link-color:var(--brand);--bs-link-hover-color:var(--brand-dark);
+  --bs-link-color-rgb:184,50,46;--bs-link-hover-color-rgb:150,39,34;
+  --bs-primary:#b8322e;--bs-primary-rgb:184,50,46;
+  margin:0;background:var(--bs-body-bg);color:var(--cms-ink);
+  font-family:Arial,Helvetica,sans-serif;
+}
+.cms-app *{box-sizing:border-box}
+.cms-app :focus-visible{outline:3px solid #293e8e;outline-offset:3px}
+.cms-app .text-secondary{color:var(--cms-muted)!important}
+.cms-app h1,.cms-app h2,.cms-app h3{font-weight:700;letter-spacing:-.025em}
+.cms-app .skip-link{position:fixed;top:8px;left:8px;transform:translateY(-150%);z-index:1100;background:#fff;padding:12px;border-radius:12px;color:var(--cms-ink)}
+.cms-app .skip-link:focus{transform:none}
+.cms-app .sidebar{width:260px;background:#fff;min-height:100dvh;border-right:1px solid var(--cms-line)}
+.cms-app aside.sidebar{inset:0 auto 0 0;height:100dvh;overflow-y:auto}
+.cms-app .brand{display:flex;align-items:center;gap:10px;color:var(--brand);text-decoration:none;line-height:1.2;padding:12px 10px}
+.cms-app .brand-mark{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:var(--brand);color:#fff;font-size:23px}
+.cms-app .brand small{display:block;margin-top:5px;font-size:11px;font-weight:400;color:var(--cms-muted)}
+.cms-app .sidebar a:not(.brand){color:var(--cms-muted);text-decoration:none;border-radius:12px;min-height:44px;display:flex;align-items:center;gap:2px;border:1px solid transparent}
+.cms-app .sidebar a:not(.brand):hover{background:#f6f4ee;color:var(--cms-ink)}
+.cms-app .sidebar a.active{color:var(--brand);background:var(--brand-soft);border-color:#f0d0c9;font-weight:700}
+.cms-app .nav-label{font-size:10px;font-weight:700;letter-spacing:.12em;color:var(--cms-muted)}
+.cms-app .cms-profile{color:var(--cms-ink);border-top:1px solid var(--cms-line)}
+.cms-app .cms-profile-role{color:var(--cms-muted);font-size:11px;margin-top:3px}
+.cms-app .cms-avatar{background:var(--brand-soft);color:var(--brand);width:34px;height:34px;flex-shrink:0}
+.cms-app .cms-main{min-width:0;width:100%;min-height:100dvh}
+.cms-app .content{max-width:1280px;min-width:0}
+.cms-app .content-narrow{max-width:780px;margin-left:0}
+.cms-app .cms-topbar{min-height:72px;padding:16px 24px;gap:16px;border-bottom:1px solid var(--cms-line);background:#fff}
+.cms-app .cms-topbar-label{font-size:12px;color:var(--cms-muted);margin-bottom:3px}
+.cms-app .cms-topbar strong{font-size:15px}
+.cms-app .cms-mobile-nav{background:#fff;border-bottom:1px solid var(--cms-line)}
+.cms-app .cms-mobile-nav .navbar-brand{color:var(--brand);font-size:19px}
+.cms-app .offcanvas{background:#fff;max-width:calc(100vw - 24px)}
+.cms-app .offcanvas-header{border-bottom:1px solid var(--cms-line);color:var(--cms-ink)}
+.cms-app .offcanvas-body.sidebar{width:100%;min-height:0;display:flex;flex-direction:column;border:0}
+.cms-app .btn{border-radius:12px;font-weight:600;min-height:42px;padding:9px 16px}
+.cms-app .btn-sm{font-size:12px;min-height:36px;padding:7px 12px}
+.cms-app .btn-success,.cms-app .btn-primary{
+  --bs-btn-bg:var(--brand);--bs-btn-border-color:var(--brand);--bs-btn-color:#fff;
+  --bs-btn-hover-bg:var(--brand-dark);--bs-btn-hover-border-color:var(--brand-dark);
+  --bs-btn-active-bg:var(--brand-dark);--bs-btn-active-border-color:var(--brand-dark);
+  --bs-btn-disabled-bg:var(--brand);--bs-btn-disabled-border-color:var(--brand);
+}
+.cms-app .btn-outline-success{--bs-btn-color:var(--brand);--bs-btn-border-color:var(--brand);--bs-btn-hover-bg:var(--brand);--bs-btn-hover-border-color:var(--brand);--bs-btn-active-bg:var(--brand);--bs-btn-active-border-color:var(--brand)}
+.cms-app .btn-outline-secondary{--bs-btn-color:var(--cms-ink);--bs-btn-border-color:#d5d8df;--bs-btn-hover-bg:#edf0f8;--bs-btn-hover-color:var(--cms-ink);--bs-btn-hover-border-color:#bcc3d6}
+.cms-app .form-control,.cms-app .form-select{background-color:#fff;border-color:#dcdedc;color:var(--cms-ink);min-height:42px;border-radius:10px}
+.cms-app .form-control:focus,.cms-app .form-select:focus{border-color:#293e8e;box-shadow:0 0 0 3px #293e8e18}
+.cms-app .form-check-input:checked{background-color:var(--brand);border-color:var(--brand)}
+.cms-app .form-label{font-size:13px;font-weight:600}
+.cms-app .form-text{font-size:12px;color:var(--cms-muted)}
+.cms-app .stat,.cms-app .form-card{border:1px solid var(--cms-line);border-radius:16px;background:#fff;box-shadow:0 3px 8px #13234a08}
+.cms-app .card-header{padding:16px 20px;border-bottom-color:var(--cms-line);border-radius:16px 16px 0 0;background:#fff!important}
+.cms-app .card-footer{border-top-color:var(--cms-line);border-radius:0 0 16px 16px}
+.cms-app .stat>.fs-3{color:var(--cms-ink);margin-top:8px}
+.cms-app .table{--bs-table-color:var(--cms-ink);--bs-table-border-color:var(--cms-line);--bs-table-bg:transparent}
+.cms-app .table-responsive{max-width:100%;border-radius:16px;overscroll-behavior-x:contain}
+.cms-app .table>:not(caption)>*>*{padding:14px 18px;white-space:nowrap}
+.cms-app .table thead th{background:#f6f4ee;color:var(--cms-muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+.cms-app .table tbody tr:hover{background:#faf8f2}
+.cms-app .badge-tag{background:var(--brand-soft);color:var(--brand-dark);font-weight:500;border-radius:999px;padding:.3em .7em}
+.cms-app .badge-tag-more,.cms-app .tag-more-btn{background:#eef0f6;color:var(--cms-muted);border:0;border-radius:999px}
+.cms-app .tag-more-btn{cursor:pointer;font-weight:600}
+.cms-app .tag-more-btn:hover{background:#e0e5f1;color:var(--cms-ink)}
+.cms-app .alert{border-radius:12px;overflow-wrap:anywhere}
+.cms-app .content h1,.cms-app .content p,.cms-app .cms-profile{overflow-wrap:anywhere}
+@media(min-width:992px){.cms-app .cms-main{margin-left:260px;width:calc(100% - 260px)}}
+@media(max-width:575px){.cms-app .content{padding:20px 16px!important}.cms-app .content .row>*{min-width:0}.cms-app .content h1{font-size:24px}.cms-app .btn{white-space:normal}.cms-app .navbar-brand{margin-right:8px}}
+@media(prefers-reduced-motion:reduce){.cms-app *{scroll-behavior:auto!important;transition:none!important}}

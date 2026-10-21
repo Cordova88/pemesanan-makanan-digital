@@ -19,11 +19,11 @@
   overflow-wrap: anywhere;
 }
 .choice-picker__option:has(input:checked) {
-  background: #ecfdf5;
-  border-color: #047857;
+  background: var(--brand-soft, #fbe8e3);
+  border-color: var(--brand, #b8322e);
 }
 .choice-picker__option:focus-within {
-  outline: 2px solid #047857;
+  outline: 2px solid var(--brand, #b8322e);
   outline-offset: 2px;
 }
 .choice-picker__option .form-check-input { flex-shrink: 0; }
@@ -39,3 +39,11 @@
 .menu-editor__preview[hidden] { display: none; }
 .menu-editor .card-body { min-width: 0; }
 .menu-editor input[type="file"] { max-width: 100%; }
+
+/* Menu list toolbar may shrink; the table alone owns horizontal scrolling. */
+.menu-toolbar{max-width:100%;min-width:0}
+.menu-search{min-width:0;max-width:100%;flex:1}
+.menu-search .form-control{min-width:0;width:240px;flex:1}
+.menu-search .btn{flex-shrink:0}
+.menu-list-photo{background:#faf8f2}
+@media(max-width:575px){.menu-toolbar{width:100%}.menu-search{flex-basis:100%}.menu-search .form-control{width:0}}

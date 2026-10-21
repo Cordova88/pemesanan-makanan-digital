@@ -1,141 +1,190 @@
-# Pemesanan Makanan Digital
+# RasaKita — Pemesanan Makanan Digital
 
-Aplikasi pemesanan makanan berbasis Django untuk katalog restoran, keranjang sesi, checkout, pemesanan meja melalui QR, pengelolaan kasir, dan rekomendasi menu melalui chatbot berbahasa Indonesia.
+Aplikasi restoran berbasis Django: pelanggan memilih menu dan membuat pesanan,
+staf mengelola katalog, dan kasir mencatat pembayaran. Chatbot membantu mencari
+menu; pemesanan tetap dilanjutkan melalui pilihan menu dan keranjang.
 
-Panduan onboarding frontend/backend yang lebih rinci tersedia di [docs/PANDUAN_PENGEMBANGAN.md](docs/PANDUAN_PENGEMBANGAN.md).
+Proyek bersama mahasiswa **Universitas Mulawarman, Samarinda, Kalimantan Timur**.
+Waktu operasional mengikuti **WITA (UTC+8)**.
 
-## Prasyarat
+Panduan ini mengikuti **branch `ahmad`**. Pembaruan source tidak otomatis mengubah
+database, akun, foto upload, atau konfigurasi di laptop anggota lain.
 
-- Python 3.12 atau lebih baru.
-- `pip` untuk memasang dependensi dari `requirements.txt`.
-- Git untuk mengambil kode sumber.
-- Browser modern. Koneksi internet diperlukan agar Bootstrap dan pustaka pemindai QR yang dimuat dari CDN dapat digunakan.
-- SQLite sudah menjadi basis data bawaan untuk pengembangan lokal. Tidak perlu memasang Laragon, MySQL, atau server basis data terpisah.
+## Sebelum mulai
 
-## Menjalankan secara lokal
+- Siapkan Git, Python, dan browser. Proyek diverifikasi menggunakan **Python 3.14**.
+- SQLite sudah tersedia bersama Python; tidak perlu memasang MySQL atau Laragon.
+- Internet diperlukan saat clone, instalasi dependency, serta memuat Bootstrap
+  dan pemindai QR dari CDN. Chatbot lokal tidak membutuhkan API key Gemini.
+- Contoh memakai PowerShell Windows. Jalankan semua perintah dari folder
+  `pemesanan-makanan-digital` yang berisi `manage.py`; lokasi penyimpanannya bebas
+  pada laptop masing-masing anggota.
 
-Contoh berikut menggunakan PowerShell di Windows. Jalankan dari folder proyek:
+## Instalasi pertama — lima langkah
+
+Gunakan bagian ini untuk **clone baru yang belum memiliki database sendiri**.
+Jika sudah mempunyai proyek/data, ikuti [cara memperbarui proyek](#memperbarui-proyek-yang-sudah-ada).
+
+### 1. Ambil branch ahmad
 
 ```powershell
-py -3.12 -m venv .venv
+git clone --branch ahmad https://github.com/Cordova88/pemesanan-makanan-digital.git
+cd pemesanan-makanan-digital
+git branch --show-current
+```
+
+Hasil terakhir harus `ahmad`. Jika folder bernama sama sudah ada, jangan ditimpa;
+gunakan folder baru atau ikuti langkah pembaruan.
+
+### 2. Siapkan Python dan dependency
+
+```powershell
+python --version
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py seed_demo
-python manage.py runserver
+python -m pip install -r requirements.txt
 ```
 
-Buka `http://127.0.0.1:8000/` untuk katalog dan `http://127.0.0.1:8000/chatbot/` untuk chatbot. Perintah pengelolaan staf tersedia di `/staff/`, sedangkan Django Admin tersedia di `/admin/`.
+Lingkungan virtual menyimpan dependency proyek secara terpisah. Jika aktivasi
+PowerShell diblokir, gunakan `.\.venv\Scripts\python.exe` sebagai pengganti
+`python` pada perintah berikutnya. Tidak perlu mengubah kebijakan keamanan Windows.
 
-Untuk Linux atau macOS, buat dan aktifkan lingkungan virtual dengan:
+### 3. Buat database dan akun admin
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
+```powershell
+python -B manage.py migrate
+python -B manage.py loaddata v1_catalog
+python -B manage.py createsuperuser
 ```
 
-Kemudian jalankan langkah pemasangan dependensi dan perintah `manage.py` yang sama.
+- `migrate`: membuat tabel aplikasi.
+- `loaddata v1_catalog`: mengisi empat menu awal, kategori, tag, varian, dan
+  tambahan. Tidak membuat akun atau meja.
+- `createsuperuser`: isi username/password pilihan sendiri secara interaktif.
+  Password tidak ditampilkan saat diketik; itu normal.
 
-Database SQLite `db.sqlite3` dibuat di folder proyek setelah migrasi. `seed_demo` mengisi data contoh menu, kategori, tag, varian, add-on, meja, dan akun staf development. Akun awal demo adalah `admin` / `admin12345` dan `cashier` / `cashier12345`; gunakan hanya untuk development dan ubah sebelum pemakaian yang lebih luas.
+**Jangan menjalankan `seed_demo` untuk instalasi branch ini.** Jangan mengulang
+`loaddata` pada database yang katalognya sudah diedit karena ID yang sama dapat tertimpa.
 
-Pengaturan dibaca dari variabel lingkungan proses (`SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`, dan `SQLITE_DATABASE_NAME`). Berkas `.env.example` hanya contoh nilai—proyek tidak memuat berkas `.env` secara otomatis. Nilai bawaan `SECRET_KEY` hanya untuk development. Untuk deployment, atur rahasia sendiri, set `DEBUG=false`, sesuaikan `ALLOWED_HOSTS`, lalu jalankan `python manage.py collectstatic` dan sajikan berkas statis melalui web server atau CDN.
+### 4. Siapkan foto katalog awal
 
-Jalankan `python manage.py expire_orders` secara berkala, misalnya setiap menit menggunakan Task Scheduler atau cron, untuk memperbarui status pesanan kedaluwarsa.
+Folder `media/` tidak ikut GitHub. Foto awal tersedia di
+`menu/assets/recovered-menu/`; salin ke lokasi yang dirujuk fixture:
 
-## Ikhtisar sistem
+```powershell
+New-Item -ItemType Directory -Path media/menu/detail -Force | Out-Null
 
-Aplikasi adalah satu proyek Django dengan SQLite sebagai penyimpanan development:
+"ayam-geprek", "nasi-goreng", "kentang-goreng", "es-jeruk" | ForEach-Object {
+    Copy-Item "menu/assets/recovered-menu/$_.webp" "media/menu/"
+}
 
-- `menu`: kategori, item menu, tag, grup/opsi varian, add-on, katalog, dan perintah `seed_demo`.
-- `cart`: keranjang sesi yang menyimpan ID pilihan; harga selalu dihitung dari data server.
-- `orders`: checkout, snapshot item dan harga, status pesanan, QR meja, pembayaran, pembatalan, refund, dan pencatatan audit.
-- `users`: login staf dan halaman pengelolaan untuk kasir/admin.
-- `recommendation`: halaman chatbot, ekstraksi preferensi, suasana hati, pemeringkatan menu, dan integrasi ke keranjang yang sudah ada.
-- `config`: konfigurasi Django, URL utama, middleware, sesi, dan database.
-
-### Alur pemesanan
-
-```text
-Katalog atau chatbot
-        ↓
-MenuItem + varian + add-on
-        ↓
-CartService → keranjang berbasis sesi
-        ↓
-checkout → OrderService → Order dan snapshot harga
-        ↓
-konfirmasi pesanan / alur kasir
+Copy-Item "menu/assets/recovered-menu/ayam-detail.webp" "media/menu/detail/"
 ```
 
-Chatbot tidak memiliki keranjang, pesanan, atau sesi percakapan persisten tersendiri. Preferensi sementara dan riwayat menu yang sudah ditampilkan disimpan di sesi Django, sedangkan pilihan menu tetap masuk melalui `CartService` yang dipakai storefront.
+Langkah ini untuk instalasi baru. Foto upload/menu tambahan milik anggota lain
+tidak otomatis tersedia; pindahkan backup database dan media bersama.
 
-### Arsitektur rekomendasi chatbot
+### 5. Periksa dan jalankan web
 
-Chatbot sepenuhnya rule-based: tidak memakai LLM, layanan AI eksternal, machine learning, embeddings, atau pencarian vektor.
-
-```text
-Pesan pelanggan
-  ├─ TagExtractor → preferensi menu langsung dan pantangan
-  ├─ MoodExtractor → suasana atau situasi
-  └─ MoodResolver → karakteristik menu yang sesuai suasana
-                    ↓
-              Preferences
-                    ↓
-         RecommendationService
-                    ↓
-           ChatbotService
-                    ↓
-      kartu rekomendasi → CartService
+```powershell
+python -B manage.py check
+python -B manage.py runserver 127.0.0.1:8890 --noreload
 ```
 
-- `language.py` berisi normalisasi bahasa informal, parser nominal Rupiah, dan kamus terpusat label tag berbahasa Indonesia.
-- `TagExtractor` mengenali selera, bahan, jenis makanan, kategori, batas harga, serta larangan atau ketidaksukaan.
-- `MoodExtractor` mengenali situasi seperti lelah, suasana hati kurang baik, sangat lapar, gerah/haus, terburu-buru, dan kebingungan.
-- `MoodResolver` memetakan suasana tersebut ke karakteristik menu, misalnya suasana lelah ke makanan mengenyangkan dan makanan yang terasa nyaman.
-- `Preferences` menyimpan tag positif, tag hasil suasana, tag yang dikecualikan, harga maksimum, kategori, dan suasana sebagai data terstruktur di sesi.
-- `RecommendationService` menyaring menu nonaktif/tidak tersedia, menerapkan batas harga dan pantangan, kemudian mengurutkan hasil secara deterministik.
-- `ChatbotService` mengelola pertanyaan lanjutan, respons kontekstual, pilihan cepat, “Cari Menu Lain”, dan “Mulai Lagi”.
+Berhasil jika pemeriksaan tidak menemukan masalah dan terminal menampilkan
+alamat server `http://127.0.0.1:8890/`.
+Biarkan terminal tetap berjalan. Untuk berhenti, tekan `Ctrl+C`.
 
-Pemeringkatan dapat dijelaskan melalui bobot: kecocokan tag langsung `+4`, karakteristik hasil suasana `+2`, kategori `+3`, dan kecocokan anggaran `+3`. Preferensi harga terjangkau tanpa nominal memakai batas relatif yang eksplisit sebesar Rp15.000. Pantangan tegas mengecualikan item; ketidaksukaan yang lebih lunak mengurangi skor. Skor hanya digunakan untuk pengurutan—pelanggan melihat alasan kecocokan dalam label Indonesia, bukan angka skor atau ID tag internal.
+Alternatif setelah lingkungan Python aktif: `.\start.ps1`.
+Untuk port lain: `.\start.ps1 -Port 8892`. Karena memakai `--noreload`, restart
+server setelah mengubah kode Python.
 
-### Endpoint utama
+## Alamat yang dibuka
 
-- `GET /api/menu/`: katalog menu.
-- `GET /api/cart/`: isi keranjang sesi.
-- `POST /api/cart/add/`: menambahkan item; `PATCH` atau `DELETE /api/cart/<line_id>/`: mengubah/menghapus baris keranjang; `DELETE /api/cart/clear/`: mengosongkan keranjang.
-- `POST /api/orders/checkout/`: membuat pesanan dari keranjang.
-- `GET /orders/<public_id>/`: halaman konfirmasi pesanan.
-- `POST /api/recommendation/chat/`: mengirim pesan dan menerima balasan/rekomendasi.
-- `POST /api/recommendation/add/`: menambahkan rekomendasi beserta varian/add-on ke keranjang yang sama.
-- Endpoint staf berada di bawah `/staff/`; Django Admin berada di `/admin/`.
+| Pengguna | Alamat | Login? |
+|---|---|---|
+| Pelanggan | http://127.0.0.1:8890/ | Tidak |
+| Chatbot | http://127.0.0.1:8890/chatbot/ | Tidak |
+| Login staf/kasir | http://127.0.0.1:8890/staff/login/ | Ya |
+| CMS staf | http://127.0.0.1:8890/staff/ | Akun staf |
+| Kasir | http://127.0.0.1:8890/kasir/ | Akun staf atau grup `Cashier` |
+| Django Admin | http://127.0.0.1:8890/admin/ | Akun admin yang sesuai |
 
-## Frontend storefront
+Gunakan akun yang dibuat pada langkah 3 untuk penyiapan pertama. Cara membuat
+akun staf/kasir dan menguji satu pesanan ada di [panduan penggunaan](docs/PANDUAN_PENGGUNAAN.md).
 
-Template `menu/templates/menu/storefront.html` memuat markup halaman. Aset statisnya berada di `menu/static/menu/`:
+## Menjalankan lagi di hari berikutnya
 
-- `css/storefront.css`: gaya storefront.
-- `js/storefront.mjs`: inisialisasi dan penghubung fitur.
-- `js/state.mjs`: state halaman dan konteks meja.
-- `js/api.mjs`: request JSON, CSRF, format harga, dan notifikasi.
-- `js/menu.mjs`: katalog, pencarian, kategori, dan pemilihan item.
-- `js/cart.mjs`: keranjang sesi.
-- `js/table-scanner.mjs`: pemindaian QR meja.
-- `js/checkout.mjs`: validasi dan pengiriman checkout.
-
-Template chatbot berada di `recommendation/templates/recommendation/chatbot.html`. UI merender teks dengan DOM API yang aman dan meneruskan konfigurasi item ke endpoint rekomendasi, tanpa membuat alur keranjang terpisah.
-
-## Tes dan pemeriksaan
-
-```bash
-python manage.py check
-python manage.py test
+```powershell
+cd pemesanan-makanan-digital
+.\.venv\Scripts\Activate.ps1
+.\start.ps1
 ```
 
-Django membuat database SQLite sementara untuk test. Pengujian mencakup aturan bahasa dan harga chatbot, rekomendasi dan pantangan, sesi percakapan, data demo, serta integrasi rekomendasi → varian/add-on → keranjang → checkout.
+Tidak perlu mengulang clone, membuat database, memuat fixture, atau membuat akun.
+Setiap laptop memakai database sendiri. Pesanan di laptop A tidak otomatis
+muncul di laptop B walaupun memakai repository yang sama.
 
-## Catatan deployment
+## Memperbarui proyek yang sudah ada
 
-Jangan gunakan `SECRET_KEY` bawaan atau akun demo pada deployment. Atur `SECRET_KEY`, `DEBUG=false`, dan `ALLOWED_HOSTS` melalui environment deployment. SQLite sesuai untuk development atau demonstrasi dengan beban rendah; gunakan PostgreSQL untuk deployment dengan beberapa kasir yang dapat membayar pesanan bersamaan karena SQLite tidak menyediakan row lock `SELECT ... FOR UPDATE` seperti PostgreSQL.
+1. Hentikan server. Cadangkan `db.sqlite3` dan `media/` ke folder lain.
+2. Jalankan `git status`. Simpan atau selesaikan perubahan lokal sebelum
+   berpindah branch atau menarik perubahan; jangan memakai reset/clean untuk memaksanya.
+3. Jika folder kerja sudah bersih, jalankan:
 
-PHPMyAdmin tidak membuka SQLite. Untuk memeriksa `db.sqlite3`, gunakan Django Admin atau aplikasi seperti DB Browser for SQLite.
+   ```powershell
+   git switch ahmad
+   git pull --ff-only origin ahmad
+   .\.venv\Scripts\Activate.ps1
+   python -m pip install -r requirements.txt
+   python -B manage.py showmigrations
+   python -B manage.py migrate
+   python -B manage.py check
+   .\start.ps1
+   ```
+
+4. Jika pull gagal karena riwayat bercabang atau konflik, selesaikan bersama
+   pemilik perubahan. Jangan menggunakan force-push.
+
+Pada pembaruan, **jangan menjalankan `loaddata`, `seed_demo`, atau menyalin foto
+awal di atas foto yang sudah diedit**. Migrasi mengubah struktur tabel; fixture
+mengisi data katalog. Keduanya berbeda.
+
+## Konfigurasi yang perlu diketahui
+
+| File/folder | Kegunaan |
+|---|---|
+| `v1_settings.py` | Konfigurasi bawaan untuk menjalankan `manage.py` secara lokal. |
+| `config/settings.py` | Profil terpisah, misalnya untuk persiapan deployment; bukan default `manage.py` lokal. |
+| `db.sqlite3` | Katalog, akun, pesanan, dan sesi lokal. Tidak masuk Git. |
+| `media/`, `private/menu-originals/` | Foto upload dan arsip foto asli. Tidak masuk Git. |
+| `.local-secret-key` | Rahasia development lokal yang dibuat otomatis. Jangan dibagikan. |
+| `.env`, `local_gemini_settings.py` | Konfigurasi Gemini opsional per laptop. Tidak diperlukan untuk mode lokal dan tidak masuk Git. |
+
+Mode lokal memakai `GEMINI_ENABLED=False`. Pemasangan SDK `google-genai` tidak
+otomatis mengirim pesan ke Gemini. Mode hybrid dijelaskan di
+[panduan pengembangan](docs/PANDUAN_PENGEMBANGAN.md#8-chatbot-lokal-dan-hybrid).
+
+## Jika mengalami kendala
+
+| Gejala | Langkah awal |
+|---|---|
+| `No module named django` | Aktifkan `.venv` dan pasang requirements melalui Python yang sama. |
+| Migrasi belum diterapkan atau tabel alias tidak ditemukan | Cadangkan data, lalu jalankan `showmigrations` dan `migrate`. |
+| Menu kosong pada instalasi baru | Periksa apakah fixture berhasil dimuat pada database baru yang sama. |
+| Menu tampil tetapi fotonya hilang | Periksa langkah 4 dan file di `media/menu/`. |
+| Tidak bisa login | Gunakan akun sendiri; tidak ada akun/password demo otomatis. |
+| Port sudah dipakai | Gunakan port lain dan sesuaikan alamat browser. |
+| Kamera QR tidak tersedia | Baca [catatan QR](docs/PANDUAN_PENGGUNAAN.md#4-makan-di-tempat-dan-qr-meja). |
+
+## Dokumentasi lanjutan
+
+- [Modul belajar OOP](docs/oop/README.md): konsep dasar, contoh proyek, dan latihan tim.
+- [Penjelasan sistem chatbot](docs/Chatbot.md): perjalanan pesan, konteks, budget, dan peran AI.
+- [Pengembangan](docs/PANDUAN_PENGEMBANGAN.md): struktur kode, model, endpoint,
+  OOP, chatbot, dan cara mengubah fitur.
+- [Penggunaan](docs/PANDUAN_PENGGUNAAN.md): pelanggan, staf, kasir, akun, dan simulasi.
+- [CMS/Admin](docs/PANDUAN_CMS_ADMIN.md): rincian layar dan form pengelolaan.
+- [Pemeriksaan lokal](docs/PANDUAN_TESTING_LOKAL.md) dan
+  [verifikasi hosting](docs/PANDUAN_VERIFIKASI_HOSTING.md).
+- [Indeks seluruh panduan](docs/README.md).

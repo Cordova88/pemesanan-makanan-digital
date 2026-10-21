@@ -17,9 +17,22 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Table',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                (
+                    'id',
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name='ID'
+                    ),
+                ),
                 ('number', models.CharField(max_length=30, unique=True)),
-                ('token', models.CharField(default=orders.models.new_table_token, editable=False, max_length=64, unique=True)),
+                (
+                    'token',
+                    models.CharField(
+                        default=orders.models.new_table_token,
+                        editable=False,
+                        max_length=64,
+                        unique=True,
+                    ),
+                ),
                 ('is_active', models.BooleanField(db_index=True, default=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
@@ -31,16 +44,31 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='table',
-            index=models.Index(fields=['is_active', 'number'], name='orders_tabl_is_acti_01fb76_idx'),
+            index=models.Index(
+                fields=['is_active', 'number'], name='orders_tabl_is_acti_01fb76_idx'
+            ),
         ),
         migrations.AddField(
             model_name='order',
             name='table',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='orders', to='orders.table'),
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.PROTECT,
+                related_name='orders',
+                to='orders.table',
+            ),
         ),
         migrations.AddConstraint(
             model_name='order',
-            constraint=models.CheckConstraint(condition=models.Q(models.Q(('order_type', 'DINE_IN'), ('table__isnull', False)), models.Q(('order_type', 'TAKEAWAY'), ('table__isnull', True)), _connector='OR'), name='order_table_matches_type'),
+            constraint=models.CheckConstraint(
+                condition=models.Q(
+                    models.Q(('order_type', 'DINE_IN'), ('table__isnull', False)),
+                    models.Q(('order_type', 'TAKEAWAY'), ('table__isnull', True)),
+                    _connector='OR',
+                ),
+                name='order_table_matches_type',
+            ),
         ),
         migrations.RemoveField(
             model_name='order',

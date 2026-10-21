@@ -2,33 +2,19 @@
 {% block content %}
 <div class="mb-3">
   <h1 class="h3 mb-0">Tambahan</h1>
-  <small class="text-secondary">{{ addons|length }} add-on</small>
+  <small class="text-secondary">{{ addons|length }} tambahan</small>
+  <p class="text-secondary mt-2 mb-0">Tambahan hanya tersedia pada menu yang dipilih ketika status Aktif dan Tersedia untuk dipesan menyala.</p>
 </div>
 
 <div class="row g-4">
   <div class="col-lg-4">
     <div class="card stat">
-      <div class="card-header bg-white"><strong>Tambah add-on</strong></div>
+      <div class="card-header bg-white"><strong>Tambah tambahan</strong></div>
       <div class="card-body">
         <form method="post" class="vstack gap-3">
           {% csrf_token %}
-          {% if form.non_field_errors %}<div class="alert alert-danger mb-0">{{ form.non_field_errors }}</div>{% endif %}
-          {% for field in form %}
-          <div>
-            {% if field.field.widget.input_type == 'checkbox' %}
-            <div class="form-check form-switch">
-              {{ field }}
-              <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-            </div>
-            {% else %}
-            <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
-            {{ field }}
-            {% endif %}
-            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-            <div class="text-danger small">{{ field.errors }}</div>
-          </div>
-          {% endfor %}
-          <button class="btn btn-success"><i class="bi bi-plus-lg me-1"></i>Tambah add-on</button>
+          {% include 'users/includes/cms_form_fields.html' %}
+          <button class="btn btn-success"><i class="bi bi-plus-lg me-1"></i>Simpan tambahan</button>
         </form>
       </div>
     </div>
@@ -44,7 +30,7 @@
               <th class="text-end">Harga</th>
               <th>Menu terkait</th>
               <th>Status</th>
-              <th></th>
+              <th>Tindakan</th>
             </tr>
           </thead>
           <tbody>
@@ -54,7 +40,7 @@
               <td class="text-end">Rp {{ addon.price|floatformat:"0g" }}</td>
               <td>
                 {% with items=addon.menu_items.all %}
-                {% for item in items|slice:":2" %}<span class="badge badge-tag-more me-1">{{ item.name }}</span>{% empty %}<span class="text-secondary">Semua / belum dipilih</span>{% endfor %}
+                {% for item in items|slice:":2" %}<span class="badge badge-tag-more me-1">{{ item.name }}</span>{% empty %}<span class="text-secondary">Belum terhubung ke menu</span>{% endfor %}
                 {% if items|length > 2 %}<span class="badge badge-tag-more" title="{% for item in items %}{{ item.name }}{% if not forloop.last %}, {% endif %}{% endfor %}">+{{ items|length|add:"-2" }}</span>{% endif %}
                 {% endwith %}
               </td>
@@ -69,7 +55,7 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="5" class="text-center text-secondary py-4">Belum ada add-on. Tambahkan yang pertama di sebelah kiri.</td>
+              <td colspan="5" class="text-center text-secondary py-4">Belum ada tambahan. Gunakan form tambah.</td>
             </tr>
             {% endfor %}
           </tbody>

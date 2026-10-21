@@ -54,10 +54,10 @@
   >
 </nav>
 
-<div class="border-top border-secondary pt-3 mt-3 text-white small">
+<div class="cms-profile pt-3 mt-3 small">
   <div class="d-flex align-items-center gap-2 mb-2">
     <div
-      class="rounded-circle bg-success d-flex align-items-center justify-content-center fw-semibold"
+      class="cms-avatar rounded-circle d-flex align-items-center justify-content-center fw-semibold"
       style="width: 34px; height: 34px"
     >
       {{ request.user.username|slice:":1"|upper }}
@@ -66,7 +66,7 @@
       <div class="fw-semibold lh-sm">
         {{ request.user.get_full_name|default:request.user.username }}
       </div>
-      <div class="text-white-50">Administrator</div>
+      <div class="cms-profile-role">Administrator</div>
     </div>
   </div>
   <a class="px-2 py-1 d-inline-block" href="{% url 'staff:logout' %}"

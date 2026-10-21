@@ -1,0 +1,347 @@
+[
+  {
+    "model": "menu.category",
+    "pk": 1,
+    "fields": {
+      "name": "Makanan",
+      "is_active": true,
+      "created_at": "2026-10-12T14:14:23.679Z",
+      "updated_at": "2026-10-12T14:14:23.679Z"
+    }
+  },
+  {
+    "model": "menu.category",
+    "pk": 2,
+    "fields": {
+      "name": "Minuman",
+      "is_active": true,
+      "created_at": "2026-10-12T14:14:23.685Z",
+      "updated_at": "2026-10-12T14:14:23.685Z"
+    }
+  },
+  {
+    "model": "menu.category",
+    "pk": 3,
+    "fields": {
+      "name": "Camilan",
+      "is_active": true,
+      "created_at": "2026-10-12T14:14:23.691Z",
+      "updated_at": "2026-10-12T14:14:23.691Z"
+    }
+  },
+  {
+    "model": "menu.menutag",
+    "pk": 1,
+    "fields": {
+      "name": "chicken",
+      "display_name": ""
+    }
+  },
+  {
+    "model": "menu.menutag",
+    "pk": 2,
+    "fields": {
+      "name": "rice",
+      "display_name": ""
+    }
+  },
+  {
+    "model": "menu.menutag",
+    "pk": 3,
+    "fields": {
+      "name": "spicy",
+      "display_name": ""
+    }
+  },
+  {
+    "model": "menu.menutag",
+    "pk": 4,
+    "fields": {
+      "name": "savory",
+      "display_name": ""
+    }
+  },
+  {
+    "model": "menu.menutag",
+    "pk": 5,
+    "fields": {
+      "name": "filling",
+      "display_name": ""
+    }
+  },
+  {
+    "model": "menu.menutag",
+    "pk": 6,
+    "fields": {
+      "name": "fried_rice",
+      "display_name": ""
+    }
+  },
+  {
+    "model": "menu.menutag",
+    "pk": 7,
+    "fields": {
+      "name": "snack",
+      "display_name": ""
+    }
+  },
+  {
+    "model": "menu.menutag",
+    "pk": 8,
+    "fields": {
+      "name": "light",
+      "display_name": ""
+    }
+  },
+  {
+    "model": "menu.menutag",
+    "pk": 9,
+    "fields": {
+      "name": "crispy",
+      "display_name": ""
+    }
+  },
+  {
+    "model": "menu.menutag",
+    "pk": 10,
+    "fields": {
+      "name": "drink",
+      "display_name": ""
+    }
+  },
+  {
+    "model": "menu.menutag",
+    "pk": 11,
+    "fields": {
+      "name": "sweet",
+      "display_name": ""
+    }
+  },
+  {
+    "model": "menu.menutag",
+    "pk": 12,
+    "fields": {
+      "name": "refreshing",
+      "display_name": ""
+    }
+  },
+  {
+    "model": "menu.menutag",
+    "pk": 13,
+    "fields": {
+      "name": "cold",
+      "display_name": ""
+    }
+  },
+  {
+    "model": "menu.menuitem",
+    "pk": 1,
+    "fields": {
+      "category": 1,
+      "name": "Ayam Geprek",
+      "description": "Ayam digeprek mas Amba",
+      "price": "18000.00",
+      "image": "menu/ayam-geprek.webp",
+      "detail_image": "menu/detail/ayam-detail.webp",
+      "is_active": true,
+      "is_available": true,
+      "stock_estimate": null,
+      "created_at": "2026-10-12T14:14:23.700Z",
+      "updated_at": "2026-10-14T05:36:28.167Z",
+      "tags": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    }
+  },
+  {
+    "model": "menu.menuitem",
+    "pk": 2,
+    "fields": {
+      "category": 1,
+      "name": "Nasi Goreng",
+      "description": "Nasi Goreng dengan minyak sawit",
+      "price": "20000.00",
+      "image": "menu/nasi-goreng.webp",
+      "detail_image": "",
+      "is_active": true,
+      "is_available": true,
+      "stock_estimate": null,
+      "created_at": "2026-10-12T14:14:23.743Z",
+      "updated_at": "2026-10-16T20:26:52.996Z",
+      "tags": [
+        2,
+        4,
+        5,
+        6
+      ]
+    }
+  },
+  {
+    "model": "menu.menuitem",
+    "pk": 3,
+    "fields": {
+      "category": 3,
+      "name": "Kentang Goreng",
+      "description": "Potongan kentang yang di goreng dengan sedikit garam",
+      "price": "10000.00",
+      "image": "menu/kentang-goreng.webp",
+      "detail_image": "",
+      "is_active": true,
+      "is_available": true,
+      "stock_estimate": null,
+      "created_at": "2026-10-12T14:14:23.772Z",
+      "updated_at": "2026-10-13T23:05:14.734Z",
+      "tags": [
+        4,
+        7,
+        8,
+        9
+      ]
+    }
+  },
+  {
+    "model": "menu.menuitem",
+    "pk": 4,
+    "fields": {
+      "category": 2,
+      "name": "Es Jeruk",
+      "description": "Es Jeruk yang segar dan manis",
+      "price": "10000.00",
+      "image": "menu/es-jeruk.webp",
+      "detail_image": "",
+      "is_active": true,
+      "is_available": true,
+      "stock_estimate": null,
+      "created_at": "2026-10-12T14:14:23.776Z",
+      "updated_at": "2026-10-13T23:05:14.753Z",
+      "tags": [
+        10,
+        11,
+        12,
+        13
+      ]
+    }
+  },
+  {
+    "model": "menu.variantgroup",
+    "pk": 1,
+    "fields": {
+      "menu_item": 1,
+      "name": "Level pedas",
+      "is_required": true,
+      "is_active": true,
+      "display_order": 0
+    }
+  },
+  {
+    "model": "menu.variantgroup",
+    "pk": 2,
+    "fields": {
+      "menu_item": 2,
+      "name": "Level pedas",
+      "is_required": true,
+      "is_active": true,
+      "display_order": 0
+    }
+  },
+  {
+    "model": "menu.variantoption",
+    "pk": 1,
+    "fields": {
+      "group": 1,
+      "name": "Tidak pedas",
+      "price_adjustment": "0.00",
+      "is_active": true,
+      "display_order": 0
+    }
+  },
+  {
+    "model": "menu.variantoption",
+    "pk": 2,
+    "fields": {
+      "group": 1,
+      "name": "Sedang",
+      "price_adjustment": "0.00",
+      "is_active": true,
+      "display_order": 0
+    }
+  },
+  {
+    "model": "menu.variantoption",
+    "pk": 3,
+    "fields": {
+      "group": 1,
+      "name": "Pedas",
+      "price_adjustment": "0.00",
+      "is_active": true,
+      "display_order": 0
+    }
+  },
+  {
+    "model": "menu.variantoption",
+    "pk": 4,
+    "fields": {
+      "group": 2,
+      "name": "Tidak pedas",
+      "price_adjustment": "0.00",
+      "is_active": true,
+      "display_order": 0
+    }
+  },
+  {
+    "model": "menu.variantoption",
+    "pk": 5,
+    "fields": {
+      "group": 2,
+      "name": "Sedang",
+      "price_adjustment": "0.00",
+      "is_active": true,
+      "display_order": 0
+    }
+  },
+  {
+    "model": "menu.variantoption",
+    "pk": 6,
+    "fields": {
+      "group": 2,
+      "name": "Pedas",
+      "price_adjustment": "0.00",
+      "is_active": true,
+      "display_order": 0
+    }
+  },
+  {
+    "model": "menu.addon",
+    "pk": 2,
+    "fields": {
+      "name": "Keju",
+      "price": "3000.00",
+      "is_active": true,
+      "is_available": true,
+      "created_at": "2026-10-13T12:31:47.337Z",
+      "menu_items": [
+        1,
+        2
+      ]
+    }
+  },
+  {
+    "model": "menu.addon",
+    "pk": 1,
+    "fields": {
+      "name": "Telur",
+      "price": "5000.00",
+      "is_active": true,
+      "is_available": true,
+      "created_at": "2026-10-12T14:14:23.733Z",
+      "menu_items": [
+        1,
+        2
+      ]
+    }
+  }
+]

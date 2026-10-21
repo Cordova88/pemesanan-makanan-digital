@@ -1,19 +1,61 @@
+from django.http import HttpRequest, HttpResponse
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET
 from .models import MenuItem
+
+
 @require_GET
-def customer_menu(request):
-    items = MenuItem.objects.filter(is_active=True, is_available=True, category__is_active=True).select_related("category").prefetch_related("variant_groups__options", "allowed_addons", "tags")
-    return JsonResponse({"items": [{
-        "id": item.id, "name": item.name, "description": item.description, "price": format(item.price, ".2f"), "category": item.category.name,
-        "image_url": item.image.url if item.image else "",
-        "tags": [tag.display_name or tag.name.replace("_", " ").title() for tag in item.tags.all()[:3]],
-        "variants": [{"id": group.id, "name": group.name, "required": group.is_required, "options": [{"id": option.id, "name": option.name, "price_adjustment": format(option.price_adjustment, ".2f")} for option in group.options.filter(is_active=True)]} for group in item.variant_groups.filter(is_active=True)],
-        "addons": [{"id": addon.id, "name": addon.name, "price": format(addon.price, ".2f")} for addon in item.allowed_addons.filter(is_active=True, is_available=True)],
-    } for item in items]})
+def customer_menu(request: HttpRequest) -> HttpResponse:
+    items = (
+        MenuItem.objects.filter(is_active=True, is_available=True, category__is_active=True)
+        .select_related("category")
+        .prefetch_related("variant_groups__options", "allowed_addons", "tags")
+    )
+
+    return JsonResponse(
+        {
+            "items": [
+                {
+                    "id": item.id,
+                    "name": item.name,
+                    "description": item.description,
+                    "price": format(item.price, ".2f"),
+                    "category": item.category.name,
+                    "image_url": item.image.url if item.image else "",
+                    "detail_image_url": item.detail_image.url if item.detail_image else "",
+                    "tags": [
+                        tag.display_name or tag.name.replace("_", " ").title()
+                        for tag in item.tags.all()[:3]
+                    ],
+                    "variants": [
+                        {
+                            "id": group.id,
+                            "name": group.name,
+                            "required": group.is_required,
+                            "options": [
+                                {
+                                    "id": option.id,
+                                    "name": option.name,
+                                    "price_adjustment": format(option.price_adjustment, ".2f"),
+                                }
+                                for option in group.options.filter(is_active=True)
+                            ],
+                        }
+                        for group in item.variant_groups.filter(is_active=True)
+                    ],
+                    "addons": [
+                        {"id": addon.id, "name": addon.name, "price": format(addon.price, ".2f")}
+                        for addon in item.allowed_addons.filter(is_active=True, is_available=True)
+                    ],
+                }
+                for item in items
+            ]
+        }
+    )
 
 
-def storefront(request):
+def storefront(request: HttpRequest) -> HttpResponse:
     """Customer-facing shell; live menu and cart data are loaded from server APIs."""
+
     return render(request, "menu/storefront.html")

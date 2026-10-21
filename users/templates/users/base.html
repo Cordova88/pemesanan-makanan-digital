@@ -13,209 +13,33 @@
       href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="{% static 'users/css/menu_forms.css' %}">
-    <style>
-      :root {
-        --brand: #047857;
-        --brand-dark: #065f46;
-        --brand-soft: #ecfdf5;
-        --bs-body-color: #1c1917;
-        --bs-border-color: #e7e5e4;
-        --bs-primary: #047857;
-        --bs-primary-rgb: 4, 120, 87;
-        --bs-border-radius: 10px;
-        --bs-link-color: #047857;
-        --bs-link-hover-color: #065f46;
-        --bs-body-bg: #f1f3ef;
-      }
-
-      body {
-        background: var(--bs-body-bg);
-        color: var(--bs-body-color);
-      }
-
-      /* Sidebar */
-      .sidebar {
-        width: 250px;
-        background: #10251e;
-        min-height: 100vh;
-      }
-      .sidebar a {
-        color: #b9ccc4;
-        text-decoration: none;
-        border-radius: 8px;
-        border-left: 3px solid transparent;
-      }
-      .sidebar a:hover {
-        color: #fff;
-        background: rgba(255, 255, 255, 0.06);
-      }
-      .sidebar a.active {
-        color: #fff;
-        background: rgba(255, 255, 255, 0.1);
-        border-left-color: #34d399;
-      }
-      .brand {
-        color: #fff !important;
-      }
-      .nav-label {
-        font-size: 0.7rem;
-        color: #83a294;
-        letter-spacing: 0.08em;
-      }
-
-      /* Layout */
-      .content {
-        max-width: 1400px;
-      }
-      @media (min-width: 992px) {
-        main {
-          margin-left: 250px;
-        }
-      }
-
-      /* Buttons and form controls */
-      .btn-success,
-      .btn-primary {
-        --bs-btn-bg: #047857;
-        --bs-btn-border-color: #047857;
-        --bs-btn-hover-bg: #065f46;
-        --bs-btn-hover-border-color: #065f46;
-        --bs-btn-active-bg: #064e3b;
-        --bs-btn-active-border-color: #064e3b;
-      }
-      .btn-outline-success {
-        --bs-btn-color: #047857;
-        --bs-btn-border-color: #047857;
-        --bs-btn-hover-bg: #047857;
-        --bs-btn-hover-border-color: #047857;
-      }
-      .form-check-input:checked {
-        background-color: #047857;
-        border-color: #047857;
-      }
-      .form-control:focus,
-      .form-select:focus {
-        border-color: #047857;
-        box-shadow: 0 0 0 0.2rem rgba(4, 120, 87, 0.15);
-      }
-
-      .tag-more-btn {
-        background: #f5f5f4;
-        color: #78716c;
-        border: 0;
-        cursor: pointer;
-        user-select: none;
-        font-weight: 600;
-        transition:
-          background 0.15s,
-          color 0.15s;
-      }
-      .tag-more-btn:hover,
-      .tag-more-btn:focus-visible {
-        background: #e7e5e4;
-        color: #1c1917;
-      }
-      .tag-more-btn:focus-visible {
-        outline: 2px solid #047857;
-        outline-offset: 2px;
-      }
-
-      /* Cards and tables */
-      .stat {
-        border: 1px solid var(--bs-border-color);
-        border-radius: 14px;
-      }
-      .stat,
-      .form-card {
-        background: #fff;
-        border: 1px solid #dde2da;
-        border-radius: 14px;
-        box-shadow:
-          0 1px 2px rgba(16, 37, 30, 0.06),
-          0 6px 16px rgba(16, 37, 30, 0.04);
-      }
-      .table > * > * {
-        white-space: nowrap;
-      }
-      .table > :not(caption) > * > * {
-        padding: 0.8rem 1rem;
-      }
-      .table thead th {
-        font-size: 0.72rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: #78716c;
-        font-weight: 600;
-        background: transparent;
-      }
-      .table tbody tr:hover {
-        background: #f5f5f4;
-      }
-
-      /* Table header gets its own tinted band */
-      .table thead th {
-        background: #f6f8f5;
-        border-bottom: 1px solid #dde2da;
-      }
-      .card-header.bg-white {
-        background: #f9faf8 !important;
-        border-bottom: 1px solid #dde2da;
-      }
-
-      /* Narrower content so wide screens don't look sparse */
-      .content {
-        max-width: 1180px;
-      }
-      .content-narrow {
-        max-width: 780px;
-        margin-left: 0;
-      }
-
-      /* Tags: light pill instead of solid green */
-      .badge-tag {
-        background: var(--brand-soft);
-        color: var(--brand-dark);
-        font-weight: 500;
-        border-radius: 999px;
-        padding: 0.3em 0.7em;
-      }
-      .badge-tag-more {
-        background: #f5f5f4;
-        color: #78716c;
-      }
-
-      @media (max-width: 991px) {
-        .sidebar {
-          min-height: auto;
-          width: 100%;
-        }
-      }
-    </style>
+    <link rel="stylesheet" href="{% static 'users/css/menu_forms.css' %}?v=phase11">
+    {{ form.media.css }}
+    <link rel="stylesheet" href="{% static 'users/css/cms-shell.css' %}?v=phase10">
   </head>
-  <body>
+  <body class="cms-app">
+    <a class="skip-link" href="#cms-main">Lewati ke konten utama</a>
     <div class="d-lg-flex">
-      <aside class="sidebar p-3 d-none d-lg-flex flex-column position-fixed">
-        <a class="brand fs-4 fw-bold mb-4" href="{% url 'staff:dashboard' %}"
-          >RasaKita <small class="fs-6 fw-normal">CMS</small></a
-        >{% include 'users/nav.html' %}
+      <aside class="sidebar p-3 d-none d-lg-flex flex-column position-fixed" aria-label="Navigasi CMS">
+        <a class="brand fs-4 fw-bold mb-3" href="{% url 'staff:dashboard' %}"><span class="brand-mark" aria-hidden="true">R</span><span>RasaKita<small>Manajemen restoran</small></span></a>{% include 'users/nav.html' %}
       </aside>
-      <main class="flex-grow-1 ms-lg-auto" style="min-width: 0">
-        <nav class="navbar bg-white border-bottom px-3 d-lg-none">
+      <main id="cms-main" class="cms-main flex-grow-1" tabindex="-1">
+        <header class="cms-topbar d-none d-lg-flex justify-content-between align-items-center"><div><div class="cms-topbar-label">RasaKita CMS</div><strong>Panel operasional</strong></div><a class="btn btn-outline-secondary btn-sm" href="{% url 'storefront' %}">Lihat menu pelanggan <i class="bi bi-arrow-up-right ms-1" aria-hidden="true"></i></a></header>
+        <nav class="navbar cms-mobile-nav px-3 d-lg-none">
           <a class="navbar-brand fw-bold" href="{% url 'staff:dashboard' %}"
             >RasaKita CMS</a
           ><button
             class="btn btn-outline-success"
             data-bs-toggle="offcanvas"
-            data-bs-target="#nav"
+            data-bs-target="#nav" aria-controls="nav" aria-label="Buka navigasi CMS" type="button"
           >
             Menu
           </button>
         </nav>
-        <div class="offcanvas offcanvas-start" id="nav">
+        <div class="offcanvas offcanvas-start" id="nav" tabindex="-1" aria-labelledby="cms-nav-title">
           <div class="offcanvas-header">
-            <h5>RasaKita CMS</h5>
-            <button class="btn-close" data-bs-dismiss="offcanvas"></button>
+            <h5 id="cms-nav-title">RasaKita CMS</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Tutup navigasi"></button>
           </div>
           <div class="offcanvas-body sidebar">
             {% include 'users/nav.html' %}
@@ -229,6 +53,8 @@
             {{ message }}<button
               class="btn-close"
               data-bs-dismiss="alert"
+              type="button"
+              aria-label="Tutup pemberitahuan"
             ></button>
           </div>
           {% endfor %}{% endif %}{% block content %}{% endblock %}
@@ -236,7 +62,8 @@
       </main>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{% static 'users/js/menu_forms.js' %}" defer></script>
+    <script src="{% static 'users/js/menu_forms.js' %}?v=phase5" defer></script>
+    {{ form.media.js }}
     {% block scripts %}{% endblock %}
   </body>
 </html>

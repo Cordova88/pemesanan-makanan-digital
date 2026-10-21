@@ -1,0 +1,85 @@
+{
+  "photos": [
+    {
+      "name": "Ayam Geprek",
+      "source_svg": "ayam-geprek.svg",
+      "source_png": "ayam-geprek-source.png",
+      "source_sha256": "e8707ca4bc6cea99e21a91b2f25256e317ab8a7f2d63d069d2f03d04a2a44341",
+      "source_bytes": 1905277,
+      "svg_bytes": 5082902,
+      "source_dimensions": [
+        1254,
+        1254
+      ],
+      "webp": "ayam-geprek.webp",
+      "webp_bytes": 225940,
+      "dimensions": [
+        960,
+        960
+      ],
+      "quality": 85,
+      "alpha_preserved": true,
+      "detail_webp": "ayam-detail.webp"
+    },
+    {
+      "name": "Nasi Goreng",
+      "source_svg": "nasi-goreng.svg",
+      "source_png": "nasi-goreng-source.png",
+      "source_sha256": "4ff18a27025e4369dafd7a7bba89eaf04c65ccdc545df95914f9c46aeb5da45f",
+      "source_bytes": 1763011,
+      "svg_bytes": 4703678,
+      "source_dimensions": [
+        1254,
+        1254
+      ],
+      "webp": "nasi-goreng.webp",
+      "webp_bytes": 161326,
+      "dimensions": [
+        960,
+        960
+      ],
+      "quality": 85,
+      "alpha_preserved": true
+    },
+    {
+      "name": "Kentang Goreng",
+      "source_svg": "kentang-goreng.svg",
+      "source_png": "kentang-goreng-source.png",
+      "source_sha256": "edbd7b43ef3dc31661954c4f5457cd7387c8ae3ad62432cfe28d067a09551e57",
+      "source_bytes": 2089444,
+      "svg_bytes": 5574104,
+      "source_dimensions": [
+        1254,
+        1254
+      ],
+      "webp": "kentang-goreng.webp",
+      "webp_bytes": 204466,
+      "dimensions": [
+        960,
+        960
+      ],
+      "quality": 85,
+      "alpha_preserved": true
+    },
+    {
+      "name": "Es Jeruk",
+      "source_svg": "es-jeruk.svg",
+      "source_png": "es-jeruk-source.png",
+      "source_sha256": "39b31a17b2ba3564bd86627a2c86767d1a80ceb5254cd1b69ac341ba67f61b5b",
+      "source_bytes": 1801408,
+      "svg_bytes": 4805933,
+      "source_dimensions": [
+        1254,
+        1254
+      ],
+      "webp": "es-jeruk.webp",
+      "webp_bytes": 221986,
+      "dimensions": [
+        960,
+        960
+      ],
+      "quality": 85,
+      "alpha_preserved": true
+    }
+  ]
+}

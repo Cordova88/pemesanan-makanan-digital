@@ -1,17 +1,28 @@
-# [OOP: Abstraction] resolve() menerjemahkan mood menjadi tag karakteristik; pemanggil tidak
-# perlu tahu isi tabel pemetaannya.
-# [OOP: Encapsulation] Tabel RESOLUTIONS dibungkus sebagai atribut class.
+from typing import ClassVar
+from collections.abc import Iterable
+
+
 class MoodResolver:
     """Translate detected situations into lower-weight menu characteristics."""
 
-    RESOLUTIONS = {
+    RESOLUTIONS: ClassVar[dict[str, set[str]]] = {
         "tired": {"filling", "heavy_meal", "comfort_food"},
-        "low_mood": {"comfort_food", "sweet", "crispy", "rich"},
         "very_hungry": {"filling", "heavy_meal", "rice", "noodle"},
         "hot_thirsty": {"cold", "refreshing", "drink"},
         "quick": {"quick_meal"},
     }
 
-    # [OOP: Abstraction] Menggabungkan tag dari semua mood yang terdeteksi menjadi satu himpunan.
-    def resolve(self, moods):
-        return set().union(*(self.RESOLUTIONS.get(mood, set()) for mood in moods))
+    def resolve(self, moods: Iterable[str], *, explicit_tags: Iterable[str] = ()) -> set[str]:
+        resolved = set().union(*(self.RESOLUTIONS.get(mood, set()) for mood in moods))
+        explicit = set(explicit_tags)
+
+        if explicit & {"warm", "hot", "warming"}:
+            resolved.difference_update({"cold", "refreshing"})
+
+        if (
+            explicit & {"rice", "noodle", "heavy_meal", "chicken", "beef", "fish"}
+            and "drink" not in explicit
+        ):
+            resolved.difference_update({"drink", "cold", "refreshing"})
+
+        return resolved

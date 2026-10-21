@@ -1,0 +1,197 @@
+/* Keep the 412px Figma frame on desktop; fit smaller screens without scaling the page. */
+:root {
+  --customer-width: 412px;
+  --customer-gutter: clamp(16px, calc(8.7vw - 11.8px), 24px);
+  --app-height: 100dvh;
+}
+
+.customer-shell, .chat-shell {
+  width: 100%;
+  max-width: var(--customer-width);
+  margin-inline: auto;
+}
+
+.catalog-header, .catalog-main, .home-view {
+  padding-inline: var(--customer-gutter);
+}
+
+.catalog-header > .d-flex > .d-flex { right: var(--customer-gutter); }
+.catalog-header h1 { padding-right: 48px; }
+.catalog-header > .muted { max-width: calc(100% - 44px); }
+.search-field { min-width: 0; }
+.search-field input { min-width: 0; }
+
+.category-list {
+  display: flex;
+  flex-wrap: wrap;
+  height: auto;
+  gap: 8px;
+}
+
+.category-chip {
+  flex: 1 1 calc((100% - 24px) / 4);
+  min-width: 0;
+  min-height: 40px;
+  height: auto;
+  padding: 10px 4px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.catalog-main > .catalog-menu-heading {
+  height: auto;
+  min-height: 44px;
+  gap: 12px;
+}
+
+.catalog-main .menu-section-title {
+  position: relative;
+  inset: auto;
+  flex: 0 1 190px;
+  min-width: 0;
+  width: 190px;
+  height: auto;
+  margin-left: -6px;
+}
+
+.menu-section-title img { width: 100%; height: auto; }
+.menu-count { position: static; flex: 0 0 70px; }
+
+#menuGrid .food-card__footer { gap: 4px; min-height: 44px; }
+.food-card__add { flex-basis: 44px; min-width: 44px; }
+.food-card__content { padding-inline: clamp(8px, 2.9vw, 12px); }
+.food-card__price { font-size: clamp(12px, 3.4vw, 14px); }
+
+.service-context { height: auto; min-height: 64px; }
+.service-context > span:nth-child(2) { min-width: 0; flex: 1; }
+.service-context > .ms-auto { flex-shrink: 0; }
+.service-context strong, .service-context small { overflow-wrap: anywhere; }
+
+.floating-cart-wrapper, .status-bottom {
+  max-width: var(--customer-width);
+  padding-inline: var(--customer-gutter);
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+.cart-caption { height: auto; min-height: 16px; flex-wrap: wrap; }
+.catalog-main { padding-bottom: calc(var(--cart-bar-height, 0px) + 112px); }
+.catalog-ai {
+  right: max(var(--customer-gutter), calc((100vw - var(--customer-width)) / 2 + var(--customer-gutter)));
+  bottom: calc(var(--cart-bar-height, 0px) + 24px + env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+.catalog-ai img { pointer-events: auto; }
+#menuView:has(#floatingCart:not(.d-none)) .catalog-ai {
+  bottom: calc(var(--cart-bar-height, 108px) + 16px);
+}
+.catalog-ai-bubble { flex-shrink: 1; max-width: calc(100vw - 112px); }
+
+/* Make the photo, options and note one scrollable region, including on short screens. */
+#itemModal .modal-dialog, #checkoutModal .modal-dialog {
+  max-width: var(--customer-width);
+  height: var(--app-height);
+  min-height: 0;
+}
+#itemModal .modal-content, #checkoutModal .modal-content {
+  height: var(--app-height);
+  min-height: 0;
+}
+.item-scroll-region { flex: 1; min-height: 0; overflow-y: auto; }
+#itemModal .modal-header { padding-inline: var(--customer-gutter) !important; }
+#modalBody { flex: none; overflow: visible; padding-inline: var(--customer-gutter) !important; }
+#itemModal .modal-footer, #checkoutModal .modal-footer, .cart-footer {
+  padding-inline: var(--customer-gutter) !important;
+  padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
+}
+.item-description { flex-wrap: wrap; }
+.item-description p { flex: 1 1 160px; min-width: 0; max-width: none; }
+.item-quantity-row { flex-wrap: wrap; }
+.variant-chips { flex-wrap: wrap; }
+.variant-chips .option-row { flex: 1 1 72px; min-height: 44px; height: auto; }
+.choice-section > .option-row { height: auto; min-height: 48px; }
+.choice-section > .option-row label { min-width: 0; gap: 8px; flex-wrap: wrap; }
+.btn-primary-app { height: auto; min-height: 52px; white-space: normal; }
+
+.cart-bottom-sheet { max-width: var(--customer-width); height: var(--app-height) !important; }
+#cartDrawer .offcanvas-header, #checkoutModal .modal-header {
+  height: auto;
+  min-height: 80px;
+  padding-inline: var(--customer-gutter) !important;
+}
+#cartDrawer .offcanvas-body, #checkoutModal .modal-body {
+  min-height: 0;
+  padding-inline: var(--customer-gutter) !important;
+  overscroll-behavior: contain;
+}
+.cart-item-card { min-height: 0; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.cart-item-card > div:first-child { min-height: 0; }
+.cart-item-card > div:first-child > div { width: 100%; min-width: 0; align-items: flex-start !important; }
+.cart-item-card .cart-item-image.food-card__art {
+  position: relative;
+  inset: auto;
+  flex: 0 0 clamp(88px, 30vw, 128px);
+  width: clamp(88px, 30vw, 128px);
+  height: auto;
+  aspect-ratio: 1.25;
+}
+.cart-item-details { flex: 1; min-width: 0; margin-left: 0; padding-right: 18px; }
+.cart-line-price { overflow-wrap: anywhere; }
+.cart-item-card > .border-top {
+  position: static;
+  height: auto;
+  min-height: 44px;
+  margin: 0 !important;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.edit-selection { min-height: 44px; }
+.summary-card p { flex-wrap: wrap; }
+.summary-card strong { overflow-wrap: anywhere; }
+
+.review-item { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1fr); min-height: 0; gap: 14px; }
+.review-item > .review-image.food-card__art { position: relative; inset: auto; width: 100%; height: auto; aspect-ratio: 1.25; }
+.review-item-heading { min-height: 0; padding: 0; align-self: center; min-width: 0; }
+.review-detail { grid-column: 1 / -1; min-width: 0; padding: 16px; }
+.detail-row { align-items: flex-start; }
+.detail-row > span, .detail-row strong { min-width: 0; overflow-wrap: anywhere; }
+.payment-method > div { min-width: 0; }
+.payment-notice > div { min-width: 0; }
+
+#serviceModal .modal-dialog { width: min(calc(100% - 32px), 380px); margin-inline: auto; min-height: min(100%, var(--app-height)); }
+#serviceModal .modal-content { max-height: calc(var(--app-height) - 32px); }
+#serviceModal .modal-body { overflow-y: auto; }
+.service-choice { gap: 12px; min-height: 48px; }
+
+.chat-shell { height: var(--app-height); min-height: 0; }
+.chat-header { height: auto; min-height: 94px; margin-inline: var(--customer-gutter); }
+.chat-header > div { min-width: 0; }
+.chat-reset { flex-shrink: 0; min-width: 44px; min-height: 44px; }
+.chat-messages { padding-inline: var(--customer-gutter); overscroll-behavior: contain; }
+.chat-input { height: auto; min-height: 88px; flex-basis: auto; padding: 18px var(--customer-gutter) max(18px, env(safe-area-inset-bottom)); }
+.chat-input input { font-size: 16px; }
+.chat-recommendation { display: flow-root; }
+.chat-recommendation > .food-card__art { width: min(110px, 40%); margin-left: 8px; }
+
+.receipt-summary { flex-wrap: wrap; }
+.receipt-summary-info { flex-basis: 100px; }
+.receipt-summary > #total { max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
+.receipt-more, #expiryBox { overflow-wrap: anywhere; }
+.receipt-copy-controls, #expiryBox { flex-wrap: wrap; }
+
+@media (max-width: 359px) {
+  .catalog-header h1 { font-size: 23px; }
+  .food-card__name { font-size: 14px; }
+  .catalog-ai img { width: 52px; height: 56px; flex-basis: 52px; }
+}
+
+@media (max-height: 500px) {
+  #modalImage { height: min(28dvh, 140px); margin-bottom: 12px !important; }
+  #itemModal .modal-header { padding-top: 16px !important; }
+  .screen-heading { margin-bottom: 16px; }
+  .item-modal-heading h2 { font-size: 22px !important; line-height: 27px; }
+  .chat-header { min-height: 68px; padding-block: 12px; }
+  .chat-input { min-height: 72px; padding-top: 10px; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+}
+
+/* Preserve scroll locking while a child popup opens over the cart. */
+body.customer-overlay-open { overflow: hidden; }

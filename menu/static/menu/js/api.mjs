@@ -3,7 +3,7 @@ export function money(value) {
     style: "currency",
     currency: "IDR",
     maximumFractionDigits: 0,
-  }).format(value);
+  }).format(value).replace(/\s/g, "");
 }
 
 function csrfToken() {

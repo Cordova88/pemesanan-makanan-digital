@@ -3,6 +3,7 @@
 <div class="mb-3">
   <h1 class="h3 mb-0">Varian</h1>
   <small class="text-secondary">{{ groups|length }} grup varian</small>
+  <p class="text-secondary mt-2 mb-0">Buat grup untuk satu menu, lalu tambahkan opsi beserta tambahan harganya. Pelanggan memilih satu opsi per grup. Klik nama opsi untuk mengedit harga, urutan, atau statusnya.</p>
 </div>
 
 <div class="row g-4">
@@ -13,20 +14,7 @@
         <form method="post" class="vstack gap-3">
           {% csrf_token %}
           <input type="hidden" name="kind" value="group">
-          {% for field in group_form %}
-          <div>
-            {% if field.field.widget.input_type == 'checkbox' %}
-            <div class="form-check form-switch">
-              {{ field }}
-              <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-            </div>
-            {% else %}
-            <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
-            {{ field }}
-            {% endif %}
-            <div class="text-danger small">{{ field.errors }}</div>
-          </div>
-          {% endfor %}
+          {% include 'users/includes/cms_form_fields.html' with form=group_form %}
           <button class="btn btn-success"><i class="bi bi-plus-lg me-1"></i>Simpan grup</button>
         </form>
       </div>
@@ -37,26 +25,11 @@
     <div class="card stat">
       <div class="card-header bg-white"><strong>Tambah opsi varian</strong></div>
       <div class="card-body">
-        <form method="post" class="row g-3">
+        <form method="post" class="vstack gap-3">
           {% csrf_token %}
           <input type="hidden" name="kind" value="option">
-          {% for field in option_form %}
-          <div class="col-md-6">
-            {% if field.field.widget.input_type == 'checkbox' %}
-            <div class="form-check form-switch mt-4">
-              {{ field }}
-              <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-            </div>
-            {% else %}
-            <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
-            {{ field }}
-            {% endif %}
-            <div class="text-danger small">{{ field.errors }}</div>
-          </div>
-          {% endfor %}
-          <div class="col-12">
-            <button class="btn btn-success"><i class="bi bi-plus-lg me-1"></i>Simpan opsi</button>
-          </div>
+          {% include 'users/includes/cms_form_fields.html' with form=option_form %}
+          <button class="btn btn-success"><i class="bi bi-plus-lg me-1"></i>Simpan opsi</button>
         </form>
       </div>
     </div>
@@ -71,8 +44,10 @@
           <th>Menu</th>
           <th>Grup</th>
           <th>Wajib</th>
+          <th>Status grup</th>
+          <th>Urutan</th>
           <th>Opsi</th>
-          <th></th>
+          <th>Tindakan</th>
         </tr>
       </thead>
       <tbody>
@@ -80,15 +55,21 @@
         <tr>
           <td class="fw-semibold">{{ group.menu_item.name }}</td>
           <td>{{ group.name }}</td>
-          <td>{% if group.is_required %}<span class="badge text-bg-success rounded-pill">Wajib</span>{% else %}<span class="badge text-bg-secondary rounded-pill">Opsional</span>{% endif %}</td>
-          <td>{% for option in group.options.all %}<span class="badge badge-tag-more me-1">{{ option.name }} +Rp {{ option.price_adjustment|floatformat:"0g" }}</span>{% empty %}<span class="text-secondary">—</span>{% endfor %}</td>
+          <td>{% if group.is_required %}<span class="badge badge-tag">Wajib</span>{% else %}<span class="badge badge-tag-more">Opsional</span>{% endif %}</td>
+          <td>{% if group.is_active %}Aktif{% else %}Nonaktif{% endif %}</td>
+          <td>{{ group.display_order }}</td>
+          <td>
+            {% for option in group.options.all %}
+            <div class="mb-2"><a class="badge badge-tag-more text-decoration-none" href="{% url 'staff:variant-option-edit' option.pk %}" aria-label="Edit opsi {{ option.name }} untuk {{ group.menu_item.name }} / {{ group.name }}">{{ option.name }} +Rp {{ option.price_adjustment|floatformat:"0g" }} · Urutan {{ option.display_order }}{% if not option.is_active %} · Nonaktif{% endif %}</a></div>
+            {% empty %}<span class="text-secondary">Belum ada opsi</span>{% endfor %}
+          </td>
           <td class="text-end">
             <a class="btn btn-sm btn-outline-secondary" href="{% url 'staff:variant-group-edit' group.pk %}"><i class="bi bi-pencil me-1"></i>Edit</a>
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="5" class="text-center text-secondary py-4">Belum ada varian.</td>
+          <td colspan="7" class="text-center text-secondary py-4">Belum ada varian.</td>
         </tr>
         {% endfor %}
       </tbody>
