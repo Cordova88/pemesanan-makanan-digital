@@ -736,6 +736,18 @@ class ChatbotService:
         if constraints_data:
             constraints = SearchConstraints.from_dict(constraints_data)
             preferences = self._preferences()
+            if (
+                matches
+                and any(
+                    phrase in normalize_text(response)
+                    for phrase in ("nggak ada", "kosong")
+                )
+            ):
+                response = self._response_message(
+                    preferences,
+                    message,
+                    constraints=constraints,
+                )
             preferences.tags.update(constraints.required_tags)
             preferences.tags.difference_update(constraints.excluded_tags)
             preferences.excluded_tags.update(constraints.excluded_tags)
