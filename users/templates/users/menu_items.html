@@ -5,39 +5,30 @@
     <h1 class="h3 mb-0">Item Menu</h1>
     <small class="text-secondary">{{ items|length }} menu</small>
   </div>
-  <div class="d-flex flex-wrap gap-2">
-    <form class="d-flex gap-2" method="get">
-      <input class="form-control" style="min-width:240px" name="q" value="{{ query }}" placeholder="Cari nama atau kategori">
-      <button class="btn btn-outline-secondary"><i class="bi bi-search"></i></button>
+  <div class="menu-toolbar d-flex flex-wrap gap-2">
+    <form class="menu-search d-flex gap-2" method="get" role="search">
+      <input class="form-control" type="search" aria-label="Cari menu" name="q" value="{{ query }}" placeholder="Cari nama atau kategori">
+      <button type="submit" class="btn btn-outline-secondary" aria-label="Cari menu"><i class="bi bi-search" aria-hidden="true"></i></button>
+      {% if query %}<a class="btn btn-outline-secondary" href="{% url 'staff:menu-items' %}">Reset</a>{% endif %}
     </form>
-    <button class="btn btn-success" data-bs-toggle="collapse" data-bs-target="#add"><i class="bi bi-plus-lg me-1"></i>Tambah menu</button>
+    <button class="btn btn-success" data-bs-toggle="collapse" data-bs-target="#add" type="button" aria-controls="add" aria-expanded="{% if form.errors %}true{% else %}false{% endif %}"><i class="bi bi-plus-lg me-1"></i>Tambah menu</button>
   </div>
 </div>
 
 <div class="collapse{% if form.errors %} show{% endif %} mb-4" id="add">
-  <div class="card stat card-body">
-    <form method="post" enctype="multipart/form-data" class="row g-3">
+  <section class="menu-editor" aria-labelledby="add-menu-title">
+    <h2 id="add-menu-title" class="h4 mb-3">Tambah menu</h2>
+    <form method="post" enctype="multipart/form-data" data-menu-editor>
       {% csrf_token %}
-      {% if form.non_field_errors %}
-      <div class="col-12 text-danger">{{ form.non_field_errors }}</div>
-      {% endif %}
-      {% for field in form %}
-      <div class="{% if field.name == 'tags' or field.name == 'description' %}col-12{% else %}col-md-6{% endif %}">
-        {% if field.name == 'tags' %}
-        {% include 'users/includes/choice_picker.html' with field=field %}
-        {% elif field.widget_type == 'checkbox' %}
-        <div class="form-check">{{ field }}<label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label></div>
-        {% else %}
-        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-        {{ field }}
-        {% endif %}
-        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-        <div class="text-danger small">{{ field.errors }}</div>
+      {% if form.errors %}<div class="alert alert-danger" role="alert">Menu belum disimpan. Periksa kolom yang ditandai di bawah. Jika memilih foto baru, pilih kembali file sebelum menyimpan.</div>{% endif %}
+      {% if form.non_field_errors %}<div class="text-danger">{{ form.non_field_errors }}</div>{% endif %}
+      {% include 'users/includes/menu_editor_fields.html' %}
+      <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
+        <a class="btn btn-outline-secondary" href="{% url 'staff:menu-items' %}">Batal</a>
+        <button class="btn btn-success" type="submit">Simpan menu</button>
       </div>
-      {% endfor %}
-      <div><button class="btn btn-success">Simpan</button></div>
     </form>
-  </div>
+  </section>
 </div>
 
 <div class="card stat">
@@ -59,7 +50,7 @@
         <tr{% if not item.is_active %} class="text-secondary"{% endif %}>
           <td>
             {% if item.image %}
-            <img src="{{ item.image.url }}" width="40" height="40" class="rounded object-fit-cover" alt="">
+            <img src="{{ item.image.url }}" width="40" height="40" class="rounded object-fit-contain menu-list-photo" alt="">
             {% else %}
             <div class="rounded bg-light border d-flex align-items-center justify-content-center fw-semibold text-secondary" style="width:40px;height:40px">{{ item.name|slice:":1"|upper }}</div>
             {% endif %}
@@ -84,7 +75,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="7" class="text-center text-secondary py-4">Tidak ada menu.</td>
+          <td colspan="7" class="text-center text-secondary py-4">{% if query %}Tidak ada menu yang cocok dengan pencarian. Coba kata lain atau Reset.{% else %}Belum ada menu. Gunakan Tambah menu untuk mulai.{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>

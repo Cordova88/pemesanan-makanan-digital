@@ -1,0 +1,51 @@
+    <div class="row g-4">
+      <div class="col-lg-8">
+        <section class="card form-card mb-4">
+          <div class="card-body p-3 p-md-4">
+            <h2 class="h5 mb-3">Informasi menu</h2>
+            <div class="row g-3">
+              {% include 'users/includes/form_field.html' with field=form.name %}
+              {% include 'users/includes/form_field.html' with field=form.category %}
+              {% include 'users/includes/form_field.html' with field=form.description full_width=True %}
+              {% include 'users/includes/form_field.html' with field=form.price %}
+              {% include 'users/includes/form_field.html' with field=form.stock_estimate %}
+            </div>
+          </div>
+        </section>
+        <section class="card form-card">
+          <div class="card-body p-3 p-md-4">
+            {% include 'users/includes/choice_picker.html' with field=form.tags %}
+            <div class="form-text">{{ form.tags.help_text }} <a href="{% url 'staff:tags' %}" target="_blank" rel="noopener">Kelola tag</a></div>
+            <div class="text-danger small">{{ form.tags.errors }}</div>
+          </div>
+        </section>
+      </div>
+      <div class="col-lg-4">
+        <section class="card form-card mb-4">
+          <div class="card-body p-3 p-md-4">
+            <h2 class="h5 mb-3">Gambar menu</h2>
+            <label class="visually-hidden" for="{{ form.image.id_for_label }}">{{ form.image.label }}</label>
+            {{ form.image }}
+            <div class="form-text">{{ form.image.help_text }}</div>
+            <div class="text-danger small">{{ form.image.errors }}</div>
+            <details class="mt-4" {% if form.detail_image.errors %}open{% endif %}>
+            <summary>Foto lama (arsip opsional)</summary>
+            <label class="form-label" for="{{ form.detail_image.id_for_label }}">{{ form.detail_image.label }}</label>
+            {{ form.detail_image }}
+            <div class="form-text">{{ form.detail_image.help_text }}</div>
+            <div class="text-danger small">{{ form.detail_image.errors }}</div>
+            </details>
+          </div>
+        </section>
+        <section class="card form-card">
+          <div class="card-body p-3 p-md-4">
+            <h2 class="h5 mb-3">Status menu</h2>
+            <div class="row g-3">
+              {% include 'users/includes/form_field.html' with field=form.is_active full_width=True %}
+              {% include 'users/includes/form_field.html' with field=form.is_available full_width=True %}
+            </div>
+            <p class="text-secondary small mt-3 mb-0">Menu tampil untuk pelanggan ketika menu aktif, tersedia, dan kategorinya aktif.</p>
+          </div>
+        </section>
+      </div>
+    </div>

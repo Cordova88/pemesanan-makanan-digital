@@ -1,13 +1,14 @@
 <div class="modal fade" id="checkoutModal" tabindex="-1" aria-labelledby="checkoutTitle">
   <div class="modal-dialog modal-dialog-centered">
     <form id="checkoutForm" class="modal-content border-0 shadow">
-      <div class="modal-header p-4"><h2 id="checkoutTitle" class="modal-title fw-bold fs-5">Detail Pemesanan</h2><button class="btn-close" data-bs-dismiss="modal" aria-label="Tutup checkout"></button></div>
+      <div class="modal-header p-4"><h2 id="checkoutTitle" class="modal-title fw-bold fs-5">Detail pemesanan</h2><button type="button" class="back-button" data-bs-dismiss="modal" aria-label="Kembali">‹</button></div>
       <div class="modal-body px-4">
-        <label class="form-label fw-semibold">Nama Pemesan</label>
-        <input class="form-control mb-3" name="customer_name" required placeholder="Masukkan nama Anda">
-        <label class="form-label fw-semibold">Nomor WhatsApp <span class="text-muted fw-normal">(Opsional)</span></label>
-        <input class="form-control mb-3" name="phone" placeholder="08xxxxxxxxxx">
-        <label class="form-label fw-semibold">Tipe Pesanan</label>
+        <div id="checkoutDetails" class="checkout-step">
+        <label for="customerName" class="form-label fw-semibold">Nama Pemesan</label>
+        <input class="form-control mb-3" name="customer_name" id="customerName" required placeholder="Masukkan nama Anda">
+        <label for="customerPhone" class="form-label fw-semibold">Nomor WhatsApp <span class="text-muted fw-normal">(Opsional)</span></label>
+        <input class="form-control mb-3" name="phone" id="customerPhone" inputmode="tel" placeholder="08xxxxxxxxxx">
+        <label for="orderType" class="form-label fw-semibold">Tipe Pesanan</label>
         <select class="form-select mb-3" name="order_type" id="orderType"><option value="TAKEAWAY">Bawa Pulang</option><option value="DINE_IN">Makan di Tempat</option></select>
         <div id="tableScanContainer" class="d-none mb-3">
           <div id="tableDetectedBanner" class="alert alert-success d-none"><span>Meja terdeteksi: </span><strong id="detectedTableName">Meja --</strong><button type="button" id="btnRescan" class="btn btn-sm btn-outline-success ms-2">Ganti</button></div>
@@ -16,11 +17,22 @@
             <div id="cameraViewport" class="w-100 h-100 d-none position-relative"><div id="tableQrReader"></div><div class="position-absolute bottom-0 start-0 end-0 p-2 bg-dark text-white d-flex justify-content-between"><span id="scanStatus" class="small">Arahkan ke QR Meja...</span><button type="button" id="btnStopScan" class="btn btn-sm btn-outline-light">Batal</button></div></div>
           </div>
         </div>
-        <label class="form-label fw-semibold">Catatan Pesanan <span class="text-muted fw-normal">(Opsional)</span></label>
-        <textarea class="form-control mb-3" name="note" rows="2" placeholder="Contoh: Tanpa pedas, sendok plastik..."></textarea>
-        <div id="checkoutError" class="alert alert-danger d-none"></div>
+        <label for="orderNote" class="form-label fw-semibold">Catatan Pesanan <span class="text-muted fw-normal">(Opsional)</span></label>
+        <textarea class="form-control mb-3" name="note" id="orderNote" maxlength="500" rows="2" placeholder="Contoh: Tanpa pedas, sendok plastik..."></textarea>
+        </div>
+        <div id="checkoutReview" class="checkout-step" hidden>
+          <p class="muted small">Pastikan menu dan meja sudah sesuai.</p>
+          <div id="reviewService" class="service-context paper-card"><span class="service-icon" aria-hidden="true"></span><span><strong id="reviewServiceLabel"></strong><small id="reviewServiceDetail"></small></span><span class="ms-auto" aria-hidden="true"></span></div>
+          <h3 class="section-title review-section-title mb-3">Pesananmu</h3><div id="reviewItems"></div>
+          <h3 class="section-title review-section-title my-3">Cara pembayaran</h3>
+          <div class="paper-card payment-card"><div class="payment-method"><span class="payment-bag" aria-hidden="true"></span><div><h3>Bayar di kasir</h3><p>Tunjukkan kode pesanan ke kasir.</p></div><span class="service-chevron" aria-hidden="true"></span></div><p class="payment-explanation">Pesanan dibuat setelah kamu menekan tombol.</p></div>
+          <div class="paper-card summary-card"><p><span>Subtotal</span><strong id="reviewSubtotal"></strong></p><p><span>Total pembayaran</span><strong id="reviewTotal"></strong></p></div>
+          <div class="payment-notice"><span class="clock-symbol" aria-hidden="true"></span><div><strong>Belum dibayar</strong><p>Lanjutkan pembayaran langsung ke kasir.</p></div></div>
+          <button id="cancelCheckout" type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batalkan konfirmasi</button>
+        </div>
+        <div id="checkoutError" class="alert alert-danger d-none mt-3" role="alert"></div>
       </div>
-      <div class="modal-footer p-4"><button id="btnSubmitCheckout" class="btn btn-primary-app w-100 py-3 fw-bold" type="submit">Konfirmasi & Buat Pesanan</button></div>
+      <div class="modal-footer p-4"><p class="muted small w-100 text-center mb-1" id="checkoutHint">Periksa detail sebelum melanjutkan.</p><button id="btnSubmitCheckout" class="btn btn-primary-app w-100" type="submit">Lanjut konfirmasi</button></div>
     </form>
   </div>
 </div>

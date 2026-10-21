@@ -22,3 +22,13 @@ media/
 # OS
 .DS_Store
 Thumbs.db
+private/menu-originals/
+
+# Local V1 state
+.local-secret-key
+*.sqlite3-wal
+*.sqlite3-shm
+staticfiles/
+
+# Machine-specific Gemini profile
+local_gemini_settings.py

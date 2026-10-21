@@ -4,10 +4,19 @@
     <h1 class="h3 mb-0">{{ title }}</h1>
   </div>
 
+  {% if show_tag_usage %}
+  <div class="card stat mb-3">
+    <div class="card-body">
+      <h2 class="h5">Pemakaian pada {{ tag_usage_count }} menu</h2>
+      <p class="text-secondary mb-0">Pilihan di bawah hanya memuat menu yang sudah memakai tag ini. Hilangkan centang untuk melepas tag, lalu simpan perubahan. Untuk memasang tag pada menu lain, gunakan <a href="{% url 'staff:menu-items' %}">Item Menu</a>.</p>
+    </div>
+  </div>
+  {% endif %}
   <div class="card form-card">
     <form method="post" enctype="multipart/form-data">
       {% csrf_token %}
       <div class="card-body">
+        {% if form.errors and show_tag_usage %}<div class="alert alert-danger" role="alert">Perubahan tag belum disimpan. Periksa kolom yang ditandai.</div>{% endif %}
         <div class="row g-3">
           {% if form.non_field_errors %}
           <div class="col-12">

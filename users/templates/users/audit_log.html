@@ -2,35 +2,67 @@
 {% block content %}
 <div class="mb-3">
   <h1 class="h3 mb-0">Log Audit</h1>
-  <small class="text-secondary">Riwayat tindakan pada pesanan</small>
+  <small class="text-secondary">{{ total }} catatan{% if filtered %} (difilter){% endif %}</small>
+  <p class="text-secondary mt-2 mb-0">Riwayat tindakan pada pesanan. Klik ID pesanan untuk menemukannya pada daftar Pesanan.</p>
 </div>
+
+<form method="get" class="card stat card-body mb-3" role="search" aria-label="Filter log audit">
+  <div class="row g-2">
+    <div class="col-12">
+      <label class="form-label" for="audit-search">Cari log audit</label>
+      <input class="form-control" id="audit-search" type="search" name="q" value="{{ q }}" placeholder="ID pesanan, nama pelanggan, atau pengguna">
+    </div>
+    <div class="col-6 col-lg-4">
+      <label class="form-label" for="audit-action">Aksi</label>
+      <select class="form-select" id="audit-action" name="action">
+        <option value="">Semua aksi</option>
+        {% for value, label in action_choices %}<option value="{{ value }}"{% if value == action %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-lg-4">
+      <label class="form-label" for="audit-period">Periode</label>
+      <select class="form-select" id="audit-period" name="period">
+        <option value="">Semua waktu</option>
+        <option value="today"{% if period == 'today' %} selected{% endif %}>Hari ini</option>
+        <option value="7"{% if period == '7' %} selected{% endif %}>7 hari terakhir</option>
+      </select>
+    </div>
+    <div class="col-12 col-lg-4 d-flex flex-wrap gap-2 align-self-end">
+      <button class="btn btn-success flex-grow-1" type="submit">Terapkan filter</button>
+      {% if filtered %}<a class="btn btn-outline-secondary" href="{% url 'staff:audit-log' %}">Reset</a>{% endif %}
+    </div>
+  </div>
+</form>
 
 <div class="card stat">
   <div class="table-responsive">
     <table class="table align-middle mb-0">
       <thead>
         <tr>
-          <th>Waktu</th>
-          <th>Order</th>
+          <th>Waktu (WITA)</th>
+          <th>Pesanan</th>
           <th>Aksi</th>
           <th>Pengguna</th>
+          <th>Peran saat tindakan</th>
         </tr>
       </thead>
       <tbody>
         {% for log in logs %}
         <tr>
           <td class="text-secondary">{{ log.created_at|date:'d M Y H:i' }}</td>
-          <td class="fw-semibold"><code class="text-body">{{ log.order.public_id }}</code></td>
+          <td class="fw-semibold"><a href="{% url 'staff:orders' %}?q={{ log.order.public_id|urlencode }}" aria-label="Lihat pesanan {{ log.order.public_id }}">{{ log.order.public_id }}</a></td>
           <td><span class="badge badge-tag-more">{{ log.get_action_display }}</span></td>
-          <td>{% if log.actor %}{{ log.actor }}{% else %}<span class="text-secondary"><i class="bi bi-gear me-1"></i>System</span>{% endif %}</td>
+          <td>{% if log.actor %}{{ log.actor }}{% else %}<span class="text-secondary">Sistem</span>{% endif %}</td>
+          <td>{{ log.actor_role }}</td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="4" class="text-center text-secondary py-4">Belum ada aktivitas.</td>
+          <td colspan="5" class="text-center text-secondary py-4">{% if filtered %}Tidak ada catatan yang cocok dengan filter.{% else %}Belum ada aktivitas.{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% include 'users/includes/cms_pagination.html' %}
 </div>
 {% endblock %}
