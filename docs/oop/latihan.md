@@ -1,81 +1,76 @@
-# 8. Latihan dan bahan diskusi tim
+# Latihan membaca OOP dari proyek
 
-Tujuan: menjelaskan konsep memakai alur proyek, bukan mengulang definisi buku.
-Kerjakan latihan kode di file terpisah. Tidak perlu mengubah aplikasi atau
-memakai database restoran untuk latihan awal.
+[Kembali ke indeks](README.md).
 
-## Latihan A — dua batas harga
+Latihan ini memakai class yang sudah ada. Mulai dengan membaca file. Untuk
+operasi database gunakan instalasi latihan terpisah; jangan mengubah data tim
+atau memanggil Gemini hanya untuk mencoba inheritance.
 
-Gunakan contoh pada [class dan object](class-dan-object.md).
+## 1. Class dan object
 
-1. Buat budget maksimal Rp10.000 dan Rp20.000.
-2. Periksa harga Rp8.000, Rp15.000, dan Rp25.000.
-3. Tulis tebakan sebelum menjalankan program.
-4. Jelaskan mengapa satu class dapat menghasilkan keputusan berbeda.
+Buka MenuItem dan AddOn pada menu/models.py. Sebutkan dua atribut, satu method,
+dan contoh dua object yang berbeda. Jelaskan perbedaan membuat object model
+dengan menyimpannya ke database.
 
-Hasil acuan untuk pengecekan sesudah mencoba:
+## 2. Atribut dan method
 
-| Harga | Maksimal Rp10.000 | Maksimal Rp20.000 |
-|---|---|---|
-| Rp8.000 | Boleh | Boleh |
-| Rp15.000 | Tidak | Boleh |
-| Rp25.000 | Tidak | Tidak |
+Buka CartService. Kelompokkan SESSION_KEY, session, _lines, clear, dan _ids.
+Mengapa clear membutuhkan self, sedangkan _ids merupakan static method?
 
-## Latihan B — batas tidak masuk akal
+## 3. Enkapsulasi
 
-Coba buat `BudgetConstraint` dengan minimum Rp20.000 dan maksimum Rp10.000.
-Tangani `ValueError`, lalu jelaskan mengapa penolakan saat pembuatan object
-lebih membantu daripada membiarkan nilai tidak sah dipakai bagian lain.
+Buka BudgetConstraint. Telusuri penolakan minimum lebih besar dari maksimum.
+Kemudian buka MenuSelection.options. Mengapa tuple tidak membuat seluruh model
+Django di dalamnya menjadi immutable?
 
-## Latihan C — pembuat teks palsu
+## 4. Relasi UML
 
-1. Jalankan contoh [polymorphism](polymorphism.md).
-2. Buat turunan lain yang mengembalikan teks berbeda.
-3. Berikan object itu ke `minta_teks` tanpa mengubah fungsi tersebut.
-4. Jelaskan mana inheritance, mana override, dan mana pemakaian polymorphism.
+Gambar Category–MenuItem dan Order–OrderItem berdasarkan field model.
+Tambahkan multiplisitas serta catatan PROTECT. Jelaskan mengapa itu tidak sama
+dengan janji penghapusan otomatis seluruh bagian.
 
-Jangan mengganti contoh dengan panggilan Gemini nyata. Tujuannya memahami
-hubungan class tanpa menambah penggunaan API.
+## 5. Inheritance
 
-## Latihan D — telusuri pilihan menu
+Baca MenuPhotoForm.__init__ dan MenuPhotoWidget.get_context. Tandai pekerjaan
+induk melalui super dan pekerjaan tambahan anak. Buat prediksi apa yang bermasalah
+jika inisialisasi induk tidak dijalankan.
 
-Baca kode saja:
+## 6. Polimorfisme dan abstraksi
 
-1. Buka [`CartService.add_item`](../../cart/services.py).
-2. Cari pemakaian [`MenuSelection`](../../menu/selection.py).
-3. Temukan pemeriksaan opsi wajib dan tambahan.
-4. Temukan perhitungan harga satuan dan total.
-5. Jelaskan mengapa browser tidak boleh menetapkan harga akhir sendiri.
+Bandingkan generate pada TextGenerator, GeminiClient, dan TurnGenerator.
+Lalu bandingkan __str__ pada MenuItem dan VariantGroup. Jelaskan pemanggilan sama,
+implementasi berbeda. Mengapa kontrak generate belum cukup untuk converse?
 
-Bedakan apa yang Anda lihat di kode dengan perilaku yang benar-benar sudah
-Anda jalankan. Untuk mencoba transaksi, gunakan instalasi latihan sesuai
-[panduan penggunaan](../PANDUAN_PENGGUNAAN.md), bukan data kerja anggota lain.
+## 7. SOLID
 
-## Latihan E — ceritakan perjalanan satu chat
+Pilih satu prinsip dari solid.md. Tunjukkan bukti penerapan, batasnya, dan contoh
+perubahan yang mungkin memengaruhi desain itu. Hindari kesimpulan bahwa banyak
+class otomatis berarti seluruh SOLID sudah dipenuhi.
 
-Baca [Chatbot.md](../Chatbot.md), lalu jelaskan pesan `minuman maksimal 10 ribu`:
+## Contoh latihan tanpa database atau API
 
-1. Apa yang dimaksud pelanggan?
-2. Informasi apa yang perlu diingat?
-3. Menu seperti apa yang harus dikeluarkan dari kandidat?
-4. Kapan AI mungkin diperlukan?
-5. Mengapa kartu rekomendasi belum berarti pesanan sudah dibuat?
+Jalankan dari folder proyek melalui Python proyek. Potongan ini memakai class
+nyata, bukan mendefinisikan class latihan baru.
 
-## Cara presentasi singkat
+```python
+from decimal import Decimal
+from recommendation.services.budget import BudgetConstraint
 
-Gunakan urutan: **masalah → contoh kode → alur → alasan desain → batasnya**.
-Contoh masalah: “Kami perlu menguji chatbot tanpa menghubungi provider.”
-Tunjukkan `TextGenerator`, generator palsu pada tes, lalu pemanggilnya. Jelaskan
-bahwa tes itu membuktikan kontrak/fallback, bukan kualitas bahasa Gemini live.
+murah = BudgetConstraint(maximum=Decimal("10000"))
+lebih_longgar = BudgetConstraint(maximum=Decimal("20000"))
 
-## Checklist belajar
+print(murah.allows(Decimal("15000")))          # False
+print(lebih_longgar.allows(Decimal("15000")))  # True
+print(murah == BudgetConstraint(maximum=Decimal("10000")))  # True
+```
 
-- [ ] Bisa membedakan class dan object dengan contoh sendiri.
-- [ ] Bisa menjelaskan property dan jalur validasi.
-- [ ] Bisa menunjukkan induk/turunan yang benar-benar ada pada kode.
-- [ ] Bisa membedakan inheritance dengan memakai object bantuan.
-- [ ] Bisa menjelaskan manfaat generator palsu tanpa membuka API key.
-- [ ] Bisa menunjukkan bagian yang masih besar atau mempunyai keterbatasan.
+Angka pada contoh adalah data latihan. Baca alur method sebelum menjalankannya,
+lalu jelaskan hasil dengan istilah object, keadaan, method, dan kesamaan nilai.
 
-Pertanyaan penutup: mengapa “kode mempunyai banyak class” belum membuktikan
-desainnya mudah dirawat? Apa yang perlu diuji ketika alat pembuat teks diganti?
+## Pola presentasi satu kasus
+
+1. Jelaskan masalah pelanggan atau anggota tim.
+2. Tunjukkan file dan class/method yang terkait.
+3. Telusuri input, data internal, pemrosesan, dan hasil.
+4. Hubungkan dengan satu konsep OOP utama.
+5. Sebutkan batas penerapannya supaya penjelasan tidak berlebihan.

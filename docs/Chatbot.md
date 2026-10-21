@@ -59,15 +59,17 @@ dikeluarkan dari hasil. Itu tidak membutuhkan percakapan bebas dengan AI.
 untuk “nemenin nugas”. Hasil bantuannya tetap perlu dibatasi dan diperiksa.
 AI tidak mengambil alih database, aturan harga, atau izin transaksi.
 
-Istilah *deterministic-first* pada proyek berarti: gunakan aturan lokal lebih
-dahulu ketika kebutuhan sudah dapat dipastikan, lalu gunakan bantuan AI pada
-jalur yang diizinkan. Jangan membayangkan setiap balasan selalu ditulis Gemini.
+Konsep utama sekarang **AI-first**, mengikuti implementasi tim di `main`.
+Ketika Gemini aktif dan tersedia, pesan biasa diproses oleh `GeminiAssistant`
+lebih dahulu. AI dapat bertanya atau meminta pencarian melalui fungsi Django.
+Jika Gemini nonaktif atau gagal, aturan lokal menjadi jalur cadangan.
+Hasil mode lokal tidak mewakili semua kemampuan percakapan AI-first.
 
 | Pertanyaan | Jawaban |
 |---|---|
 | Apakah SDK terpasang berarti Gemini aktif? | Tidak. Flag, model, key, dan jalur yang dipilih juga menentukan. |
 | Apakah chatbot bisa berjalan tanpa key? | Bisa, memakai profil lokal default. |
-| Apakah ranking AI berarti kalimatnya juga dari AI? | Tidak. Ranking dan penyusunan kalimat adalah tugas berbeda. |
+| Siapa menyusun kalimat saat AI-first aktif? | Gemini; fakta menu diambil melalui fungsi katalog Django. |
 | Apakah JSON dari AI otomatis dipakai? | Tidak. Bentuk dan isinya diperiksa dahulu. |
 
 ## 3. Perjalanan satu pesan
@@ -77,8 +79,9 @@ Ikuti pesan **`minuman maksimal 10 ribu`**:
 1. Browser mengirim pesan ke `POST /api/recommendation/chat/` dengan informasi
    sesi/revisi yang dibutuhkan alur percakapan serta CSRF.
 2. View memeriksa request dan memuat keadaan percakapan yang benar.
-3. `ChatbotService` mengatur penafsiran: ini pencarian minuman dengan batas harga.
-4. Bagian budget, identitas menu, dan konteks membantu membentuk kebutuhan yang jelas.
+3. `ChatbotService` mencoba `GeminiAssistant` jika tersedia. Gemini membaca pesan dan konteks.
+4. Jika membutuhkan fakta menu, Gemini meminta `search_menu` atau `get_menu_details`.
+   Django menjalankan fungsi tersebut. Jika AI tidak tersedia, penafsir lokal menangani pesan.
 5. Pencarian memeriksa katalog serta syarat yang berlaku. Menu tidak tersedia
    atau yang melanggar batas tidak menjadi kandidat yang sah.
 6. Hasil dirangkai menjadi rencana respons, kalimat, tombol, dan kartu menu.
@@ -113,6 +116,7 @@ Jangan membaca seluruh file besar sekaligus. Mulailah dari pekerjaan tiap bagian
 | Halaman chatbot | Tempat pelanggan berbicara dan melihat pilihan | [template chatbot](../recommendation/templates/recommendation/chatbot.html) |
 | View | Penerima pesan yang memeriksa bentuk permintaan | [views.py](../recommendation/views.py) |
 | `ChatbotService` | Pengatur alur percakapan | [chatbot.py](../recommendation/services/chatbot.py) |
+| `GeminiAssistant` | Percakapan AI-first dan permintaan fungsi katalog | [assistant.py](../recommendation/services/ai/assistant.py) |
 | `ConversationInterpreter` | Membaca jenis maksud dan perubahan pilihan | [conversation_interpreter.py](../recommendation/services/conversation_interpreter.py) |
 | `EntityResolver` | Mencocokkan sebutan dengan identitas menu | [entity_resolver.py](../recommendation/services/entity_resolver.py) |
 | `TagExtractor`, bagian mood | Membaca ciri atau suasana yang disebut | [tag_extractor.py](../recommendation/services/tag_extractor.py), [mood_extractor.py](../recommendation/services/mood_extractor.py), [mood_resolver.py](../recommendation/services/mood_resolver.py) |
@@ -166,6 +170,23 @@ Rp20.000 per menu berbeda dengan Rp20.000 untuk seluruh rencana pesanan.
 | `sekitar 20 ribu` | Target perkiraan; jangan otomatis menganggapnya batas keras maksimal Rp20.000. |
 | `budget 20 ribu` | Jika scope belum jelas, bisa perlu bertanya total atau per menu. |
 | `20 ribu untuk dua porsi` | Jumlah dan scope total perlu diperiksa bersama. |
+
+Contoh percakapan bertahap:
+
+1. Pelanggan: “budget ku 30rb”. Bot menanyakan total pesanan atau batas per menu.
+2. Pelanggan: “total ya”. Bot mencatat Rp30.000 sebagai budget seluruh pesanan.
+3. Pelanggan: “makanan dan minuman”. Kedua kategori diingat. Bot menanyakan jumlah orang.
+4. Pelanggan: “untuk 1 orang”. Bot dapat mencari satu makanan dan satu minuman bersama.
+   Untuk beberapa orang, bot menanyakan porsi masing-masing atau berbagi jika belum jelas.
+
+Setelah bot bertanya jumlah orang, pelanggan juga boleh menjawab singkat seperti
+“1”, “satu”, atau “sendiri”. Angka singkat dibaca sebagai jumlah orang hanya
+dalam konteks pertanyaan tersebut, bukan otomatis dianggap harga atau jumlah menu.
+
+Jawaban dapat menggabungkan informasi, misalnya “total untuk makanan dan minuman
+1 orang”. Pengguna tidak harus menjawab dengan satu kata persis. Koreksi nominal
+mengikuti cakupan budget yang sudah dikonfirmasi. Jika belum jelas, bot bertanya lagi.
+Permintaan dengan jumlah porsi yang sudah lengkap tidak perlu ditanyai ulang.
 
 `BudgetConstraint` mewakili batas harga yang sudah jelas. `BudgetRequest` dan
 bagian penafsiran rencana membantu memahami maksud kalimatnya. Method
@@ -232,7 +253,26 @@ periksa keadaan terbaru sebelum mengulang tindakan.
 bukan bagian yang ikut dikosongkan oleh tombol itu, dan hitungan penggunaan
 provider tidak boleh dihapus hanya untuk melewati batas.
 
+### Menambah menu saat pilihan sebelumnya belum pasti
+
+Contoh: pelanggan menyebut budget total Rp30.000, lalu meminta menu ayam maksimal
+Rp20.000. Bot menawarkan beberapa menu. Jika pelanggan langsung berkata
+“sekalian nasi goreng”, bot belum boleh menganggap salah satu menu ayam sudah
+dipilih.
+
+Bot menanyakan menu sebelumnya yang ingin digabung, sambil mengingat tambahan
+Nasi Goreng. Pelanggan dapat menjawab nama menu atau urutannya. Setelah itu,
+harga terbaru dan total gabungan diperiksa. Jika melebihi budget, tambahan
+ditolak dan pilihan sebelumnya yang sah tetap dicatat. Semuanya masih berupa
+rencana percakapan, bukan pesanan dalam keranjang.
+
+Catatan tambahan yang menunggu jawaban berlaku paling lama lima menit dan hanya
+untuk pencarian dalam sesi tersebut. Pembatalan, reset, atau permintaan baru
+dapat menghapusnya. Bot juga memeriksa kembali harga, ketersediaan, varian wajib,
+dan pantangan sebelum menggabungkan menu.
+
 ## 8. Bagaimana menu dipilih dan diurutkan?
+
 
 Dua pekerjaan ini berbeda:
 
@@ -256,6 +296,20 @@ sistem sudah dapat menyelesaikan semua kemungkinan pembagian budget dan porsi.
 Permintaan yang tidak jelas tetap dapat ditanyakan kembali.
 
 ## 9. Apa tepatnya peran Gemini?
+
+Jalur utama berada di [`GeminiAssistant`](../recommendation/services/ai/assistant.py).
+Ia mengirim pesan dan konteks singkat kepada Gemini. AI dapat memanggil:
+
+- `search_menu`: mencari menu melalui filter dan katalog aplikasi.
+- `get_menu_details`: membaca rincian berdasarkan ID menu.
+
+Satu pesan dapat membutuhkan beberapa permintaan ke provider: meminta pencarian,
+menerima hasil fungsi, lalu menyusun jawaban. `GEMINI_MAX_TOOL_ITERATIONS`
+membatasi putaran tersebut. Setiap permintaan tetap dicatat dan dibatasi kuotanya.
+AI tidak diberi fungsi untuk mengubah keranjang, checkout, atau pembayaran.
+
+Flag ranking/wording/proposal di bawah adalah komponen hybrid yang tetap tersedia
+pada jalur cadangan; flag tersebut tidak mematikan `GeminiAssistant` yang aktif.
 
 Ada beberapa kemampuan terpisah. Flag konfigurasi menentukan mana yang aktif:
 
@@ -292,7 +346,9 @@ Keluaran JSON yang bisa dibaca belum otomatis lolos seluruh pemeriksaan.
 
 ### Mode default dan mode opsional
 
-- `v1_settings.py` menonaktifkan Gemini pada penggunaan lokal default.
+- `v1_settings.py` membaca `GEMINI_ENABLED` dari environment atau `.env`; default `false`.
+- Jika aktif dan tersedia, AI-first didahulukan untuk pesan biasa. Tombol cari lain
+  mempertahankan jalur yang sudah tersedia pada implementasi `main`.
 - `CHATBOT_AI_RESPONSE_MODE` membedakan tugas respons seperti ranking/wording.
 - `CHATBOT_AI_WORDING_ENABLED` bukan otomatis aktif ketika ranking diaktifkan.
 - `CHATBOT_RANKING_STRUCTURED_OUTPUT_ENABLED` mengatur format JSON terstruktur
@@ -305,6 +361,10 @@ rahasia. Mode lokal tidak memerlukannya. Pengaktifan layanan berbayar perlu
 disepakati dengan pemilik akun; jangan menyalin key anggota lain.
 
 ## 10. Dari hasil pencarian menjadi kalimat
+
+Pada jalur AI-first, teks jawaban berasal dari `GeminiAssistant`, sedangkan kartu
+menu berasal dari hasil fungsi katalog Django. Penjelasan `ResponsePlan` dan
+template di bawah berlaku untuk jalur lokal dan komponen hybrid cadangan.
 
 Hasil pencarian belum merupakan balasan siap baca. Bot perlu tahu tujuannya:
 memberi rekomendasi, menjawab harga, meminta penjelasan, menjelaskan hasil kosong,

@@ -16,34 +16,31 @@ dari folder `docs/`, kecuali README proyek yang berada satu tingkat di atas.
 
 ## Modul pembelajaran OOP
 
-Urutan daftar berikut juga merupakan urutan belajar yang disarankan.
+Mulai dari [oop/README.md](oop/README.md). Indeks itu menjelaskan folder/file,
+urutan belajar sesuai tujuh modul kuliah, dan lokasi **35 kasus nyata**, masing-masing
+lima kasus per materi. Setiap kasus mempunyai situasi, tautan class/method,
+urutan membaca, hasil, hubungan konsep, serta batas penerapannya.
 
-1. [oop/README.md](oop/README.md): pengantar modul OOP, cara belajar, urutan
-   materi, dan peta contoh class yang benar-benar ada pada proyek.
-2. [oop/class-dan-object.md](oop/class-dan-object.md): menjelaskan class,
-   object, atribut, method, `__init__`, dan `self` melalui contoh batas harga
-   dua pelanggan yang berbeda.
-3. [oop/encapsulation.md](oop/encapsulation.md): menjelaskan enkapsulasi,
-   property, serta alasan data dibaca atau diubah melalui jalur tertentu.
-   Contohnya memakai batas harga dan pilihan menu yang harus divalidasi.
-4. [oop/abstraction.md](oop/abstraction.md): menjelaskan abstraksi sebagai
-   kesepakatan pekerjaan tanpa perlu mengetahui seluruh detail pelaksanaannya.
-   Mengenalkan `ABC` dan abstract method melalui pembuat teks.
-5. [oop/inheritance.md](oop/inheritance.md): menjelaskan hubungan class induk
-   dan turunan, override, serta contoh pewarisan `TextGenerator`, `GeminiClient`,
-   dan `TurnGenerator`.
-6. [oop/polymorphism.md](oop/polymorphism.md): menjelaskan pemanggilan method
-   yang sama pada object berbeda. Contoh generator latihan menunjukkan bagaimana
-   hasil berhasil atau tidak tersedia ditangani tanpa memanggil Gemini.
-7. [oop/composition.md](oop/composition.md): menjelaskan perbedaan “memakai
-   object bantuan” dengan “mewarisi class”. Mengenalkan pemberian alat bantuan
-   dari luar melalui contoh pelayan dan generator teks.
-8. [oop/solid.md](oop/solid.md): menjelaskan lima prinsip SOLID dengan
-   pertanyaan sederhana, contoh penerapan pada proyek, dan keterbatasan yang
-   masih perlu diperhatikan.
-9. [oop/latihan.md](oop/latihan.md): latihan budget, generator palsu,
-   penelusuran pilihan menu, perjalanan pesan chatbot, dan bahan diskusi atau
-   presentasi anggota tim.
+1. [oop/class-dan-object.md](oop/class-dan-object.md): Modul 1, class, object,
+   __init__, dan self melalui menu, budget, keranjang, tambahan, dan akses staf.
+2. [oop/atribut-dan-method.md](oop/atribut-dan-method.md): Modul 2, atribut
+   instance/kelas, instance method, classmethod, staticmethod, dan property.
+3. [oop/encapsulation.md](oop/encapsulation.md): Modul 3, data internal,
+   property, validasi, tuple, dan salinan data, beserta batas perlindungannya.
+4. [oop/uml-class-relationships.md](oop/uml-class-relationships.md): Modul 4,
+   asosiasi, agregasi, komposisi, dependency, multiplisitas, dan diagram relasi nyata.
+5. [oop/inheritance.md](oop/inheritance.md): Modul 5, induk/turunan, override,
+   super, MRO, dan pemisahan kode buatan tim dari kemampuan Django.
+6. [oop/polymorphism.md](oop/polymorphism.md): Modul 6, polimorfisme dan
+   abstraksi, ABC, generate, __str__, __eq__, dan widget.
+7. [oop/solid.md](oop/solid.md): Modul 7, lima prinsip SOLID; satu kasus per
+   prinsip dengan bukti dan keterbatasan desain yang terlihat.
+8. [oop/abstraction.md](oop/abstraction.md): catatan pendamping untuk membedakan
+   kontrak pembuat teks dari percakapan AI-first dengan tool.
+9. [oop/composition.md](oop/composition.md): catatan pendamping untuk membedakan
+   perangkaian object bantuan dari komposisi UML yang ketat.
+10. [oop/latihan.md](oop/latihan.md): latihan penelusuran tiap modul, contoh
+    budget tanpa database/API, dan alur presentasi satu kasus.
 
 ## Sistem chatbot
 

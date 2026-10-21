@@ -58,13 +58,14 @@ itu. Nama file ini tidak bergantung pada nama folder repository. Jangan
 menghapusnya atau mengganti default ke `config.settings` tanpa meninjau perbedaannya.
 
 - `v1_settings.py`: SQLite `db.sqlite3`, media lokal, waktu WITA (UTC+8) untuk Samarinda,
-  host loopback, dan Gemini nonaktif.
+  host loopback, dan Gemini nonaktif secara default. Nilainya dapat diubah lewat environment.
 - `config/settings.py`: profil terpisah yang membaca environment sesuai kode
   di file itu. Jangan menganggap nama variabelnya sama dengan profil lain.
 - `local_gemini_settings.py`: profil lokal opsional yang dibuat per laptop;
   tidak disediakan melalui Git. Dapat membaca `.env` jika pemiliknya menambahkan
   `load_dotenv`. Konfigurasi dan key disiapkan sendiri oleh pemilik laptop.
-- File `.env` saja tidak otomatis mengaktifkan Gemini pada `v1_settings`.
+- `v1_settings` dan `config.settings` memuat `.env` jika `python-dotenv` terpasang.
+  `GEMINI_ENABLED=true`, key, dan model yang sesuai diperlukan untuk menggunakan Gemini.
 - Nama teknis zona waktu pada Django adalah `Asia/Makassar`. Pengenal ini
   mewakili WITA yang juga digunakan di Samarinda; bukan lokasi tim pengembang.
 - Rahasia development `.local-secret-key` dibuat otomatis secara lokal.
@@ -225,25 +226,25 @@ Cart pelanggan tetap sama ketika berpindah dari chatbot ke katalog.
 
 ## 8. Chatbot lokal dan hybrid
 
-Chatbot bersifat **deterministic-first**: bahasa/aturan jelas diproses lokal,
-katalog menyaring hasil, dan Gemini membantu tugas tertentu jika konfigurasi
-mengizinkan. Tidak semua pesan membutuhkan panggilan AI.
+Chatbot bersifat **AI-first**, mengikuti sistem pada `main`. Jika Gemini aktif
+dan tersedia, `GeminiAssistant` menangani pesan biasa lebih dahulu. AI mengambil
+fakta menu melalui fungsi Django. Jalur lokal tetap tersedia sebagai fallback.
 
 ```mermaid
 flowchart TD
-    A[Pesan pelanggan] --> B[Kenali maksud dan konteks]
-    B --> C{Bantuan AI diperlukan dan diizinkan?}
-    C -->|Tidak| D[Gunakan hasil lokal]
-    C -->|Ya| E[Satu tugas AI dengan batas penggunaan]
-    E --> F{Keluaran valid?}
-    F -->|Tidak| D
-    F -->|Ya| G[Pakai bantuan tervalidasi]
-    D --> H[Aturan katalog dan respons server]
+    A[Pesan pelanggan] --> B{Gemini aktif dan tersedia?}
+    B -->|Tidak| C[Jalur lokal]
+    B -->|Ya| D[Gemini memahami percakapan]
+    D --> E{Perlu fakta menu?}
+    E -->|Ya| F[Fungsi katalog Django]
+    F --> D
+    E -->|Tidak| G[Jawaban AI]
+    D -->|Gagal atau kuota habis| C
+    C --> H[Balasan dan kartu menu]
     G --> H
-    H --> I[Balasan dan kartu menu]
 ```
 
-[Buka diagram SVG](diagrams/chatbot-hybrid.svg).
+[Diagram SVG komponen hybrid cadangan](diagrams/chatbot-hybrid.svg).
 
 Diagram menunjukkan batas kepercayaan. Pada tugas ranking, kandidat sudah
 disaring sebelum dikirim ke AI; aturan server tetap berlaku setelahnya. Gemini
@@ -279,7 +280,9 @@ konfirmasi bahan dan risiko kontak silang kepada staf tetap diperlukan.
 ### Mode AI
 
 - **Lokal:** `GEMINI_ENABLED=False`; respons dan keputusan lokal tanpa API.
-- **Ranking:** Gemini dapat membantu urutan kandidat yang lolos filter.
+- **AI-first:** jalur utama saat Gemini tersedia. Memakai `GeminiAssistant`
+  dan fungsi katalog, dengan batas putaran `GEMINI_MAX_TOOL_ITERATIONS`.
+- **Ranking pada fallback:** Gemini dapat membantu urutan kandidat yang lolos filter.
   `ranking_validation=accepted` menunjukkan keluaran dipakai; sukses HTTP provider belum cukup.
 - **Wording:** fitur kalimat AI opsional, default nonaktif pada profil lokal. Kalimat
   tetap dapat berupa template lokal walaupun ranking Gemini aktif.

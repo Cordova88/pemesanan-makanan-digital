@@ -78,6 +78,7 @@ CHATBOT_SEMANTIC_RERANKING_ENABLED = (
 CHATBOT_AI_WORDING_ENABLED = (
     os.environ.get("CHATBOT_AI_WORDING_ENABLED", "false").lower() == "true"
 )
+CHATBOT_AI_RESPONSE_MODE = os.environ.get("CHATBOT_AI_RESPONSE_MODE", "ranking").lower()
 CHATBOT_CONTEXT_SWITCHING_ENABLED = (
     os.environ.get('CHATBOT_CONTEXT_SWITCHING_ENABLED', 'true').lower() == 'true'
 )
@@ -85,6 +86,19 @@ CHATBOT_CONTEXT_SWITCHING_ENABLED = (
 GEMINI_MAX_CALLS_PER_SESSION = int(os.environ.get("GEMINI_MAX_CALLS_PER_SESSION", "50"))
 GEMINI_MAX_TOOL_ITERATIONS = int(os.environ.get("GEMINI_MAX_TOOL_ITERATIONS", "4"))
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {
+        "recommendation.services.gemini": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
 
 
 MENU_ORIGINALS_ROOT = BASE_DIR / 'private' / 'menu-originals'

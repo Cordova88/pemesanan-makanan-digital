@@ -1,74 +1,36 @@
-# 3. Abstraksi
+# Catatan pendamping: abstraksi
 
-Tujuan: memakai suatu pekerjaan tanpa perlu memahami semua detail pelaksanaannya.
+[Kembali ke indeks](README.md) · Materi utama: [Modul 6](polymorphism.md).
 
-## Mulai dari kegiatan sehari-hari
-
-Ketika meminta “buatkan minuman”, pelanggan menyebut hasil yang diinginkan.
-Cara menyiapkan bahan dan memakai alat merupakan detail pelaksanaannya.
-Dalam kode, abstraksi membantu menyepakati **pekerjaan yang tersedia**, lalu
-memisahkannya dari detail cara mengerjakan.
-
-## Contoh proyek: pembuat teks
-
-[`TextGenerator`](../../recommendation/services/text_generator.py) menyatakan:
-
-> Object pembuat teks menyediakan `generate(prompt)`, dengan hasil teks atau `None`.
-
-- `prompt`: petunjuk/data yang diberikan kepada pembuat teks.
-- `str`: hasil berupa teks.
-- `None`: hasil tidak tersedia; pemanggil perlu menangani keadaan itu.
-
-Class tersebut memakai `ABC` dan `@abstractmethod` dari Python. Bentuk ringkas
-aturan yang sama dapat dibaca seperti ini; ini **contoh penjelasan**, bukan file baru aplikasi:
+Abstraksi membantu pemanggil mengetahui pekerjaan yang dapat diminta tanpa harus
+membaca seluruh cara kerjanya. Contoh formalnya adalah
+[TextGenerator](../../recommendation/services/text_generator.py).
 
 ```python
-from abc import ABC, abstractmethod
-
-
-class PembuatTeks(ABC):
+class TextGenerator(ABC):
     @abstractmethod
     def generate(self, prompt: str) -> str | None:
-        raise NotImplementedError
 ```
 
-`ABC` menandai class abstrak. `@abstractmethod` menandai pekerjaan yang harus
-disediakan turunannya. `raise NotImplementedError` pada contoh bukan panggilan
-Gemini; itu penanda bahwa detailnya belum diberikan.
+Cuplikan deklarasi proyek ini tidak menampilkan import dan isi method.
+Janji dasarnya menerima prompt dan mengembalikan teks atau None. Implementasi
+konkret tersedia pada GeminiClient dan TurnGenerator. ABC melarang instansiasi
+turunan yang belum memenuhi abstract method, tetapi tidak memeriksa kebenaran
+semua kalimat hasil provider.
 
-Class abstrak belum lengkap untuk dipakai membuat hasil:
+## Jangan menyamakan dua kontrak
 
-```python
-try:
-    pembuat = PembuatTeks()
-except TypeError:
-    print('Belum ada pelaksanaan generate yang lengkap.')
-```
+| Kebutuhan | Lokasi nyata | Batas |
+|---|---|---|
+| Membuat teks umum | TextGenerator.generate | str atau None. |
+| Meminta format ranking | TextGenerator.generate_ranking | Implementasi bawaan meneruskan ke generate. |
+| Percakapan dengan tool | GeminiClient.converse | Kemampuan tambahan di luar kontrak TextGenerator. |
+| Menjalankan percakapan AI-first | GeminiAssistant.respond | Memakai converse dan tool katalog. |
 
-## Mengapa berguna di RasaKita?
+Abstraksi juga dapat berupa antarmuka layanan, tanpa harus selalu menggunakan
+ABC. CartService menyediakan add_item tanpa meminta view mengatur langsung
+seluruh list internalnya. Itu berbeda dari menjadikan CartService abstract class.
 
-Bagian penjelasan rekomendasi membutuhkan teks. Ia tidak perlu menangani sendiri
-koneksi, timeout, dan konfigurasi SDK Google. Detail provider ditempatkan pada
-[`GeminiClient`](../../recommendation/services/gemini.py). Pemanggil tetap wajib
-memeriksa format dan isi hasil; teks dari provider tidak otomatis benar.
-
-Abstraksi juga ada tanpa `ABC`: saat memakai `CartService.add_item`, view tidak
-perlu menghitung ulang seluruh pilihan dengan kode sendiri. Namun, tidak semua
-class yang menyembunyikan detail adalah abstract class Python.
-
-## Bedakan dengan enkapsulasi
-
-| Pertanyaan | Konsep yang paling dekat |
-|---|---|
-| Pekerjaan apa yang disediakan? | Abstraksi |
-| Bagaimana data dijaga/dibaca melalui jalur tertentu? | Enkapsulasi |
-
-Keduanya dapat hadir pada desain yang sama.
-
-## Cek pemahaman
-
-1. Mengapa `PembuatTeks()` ditolak pada contoh?
-2. Mengapa pemanggil tetap perlu menangani `None`?
-3. Apakah setiap class pada proyek harus memakai `ABC`? Jelaskan alasannya.
-
-Lanjut: [inheritance](inheritance.md).
+Lima kasus yang dihitung untuk materi polimorfisme dan abstraksi tersedia di
+[Modul 6](polymorphism.md). Tidak perlu membuat class fiktif agar jumlah contoh
+terpenuhi.
