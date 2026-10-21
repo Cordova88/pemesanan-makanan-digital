@@ -1,69 +1,122 @@
-# 1. Class dan object
+# Modul 1. Pengantar OOP, class, dan object
 
-Tujuan: memahami empat istilah dasar sebelum membahas inheritance.
+[Kembali ke indeks OOP](README.md) · Acuan: **Modul 1 Pengantar OOP, Class, dan Object.pdf**, halaman PDF 2–13.
 
-## Mulai dari contoh restoran
+## Gambaran awal
 
-Dua pelanggan sama-sama memiliki batas harga, tetapi nominalnya berbeda.
-Program tidak perlu membuat aturan baru untuk setiap pelanggan. Program cukup
-memiliki satu bentuk data “batas harga”, kemudian membuat object sesuai kebutuhan.
+Bayangkan daftar menu restoran. Nama, harga, dan ketersediaan suatu menu saling berkaitan. Class mengelompokkan data itu dengan perilaku yang relevan. Object adalah satu wujudnya, misalnya satu menu Ayam Geprek. Dua object dari class yang sama dapat memiliki data berbeda.
 
-| Istilah | Arti sederhana | Contoh proyek |
-|---|---|---|
-| Class | Bentuk/cetakan yang menjelaskan data dan pekerjaan | `BudgetConstraint` |
-| Object | Satu hasil pembuatan dari class | Batas maksimal Rp10.000 |
-| Atribut | Informasi milik object | `maximum` |
-| Method | Pekerjaan yang dapat diminta dari object | `allows(harga)` |
+## Istilah yang perlu dipahami
 
-## Coba membuat dua object
+| Istilah | Arti dalam pembelajaran ini |
+|---|---|
+| Class | Rancangan data dan perilaku, ditulis dengan class. |
+| Object atau instance | Satu hasil pembuatan class. Variabel menyimpan referensi ke object itu. |
+| Atribut | Data milik object, seperti nama atau harga. |
+| Method | Pekerjaan yang disediakan class. |
+| __init__ dan self | __init__ mengisi keadaan awal. self merujuk object yang sedang digunakan. |
 
-Contoh memakai class proyek yang tidak membutuhkan database:
+## Lima kasus dari file proyek
 
-```python
-from decimal import Decimal
+### Kasus 1. Dua menu, satu rancangan
 
-from recommendation.services.budget import BudgetConstraint
+**File:** [`menu/models.py`](../../menu/models.py#L48)
 
-budget_ani = BudgetConstraint(maximum=Decimal('10000'))
-budget_budi = BudgetConstraint(maximum=Decimal('20000'))
+**Class/method:** `MenuItem`.
 
-print(budget_ani.allows(Decimal('15000')))
-print(budget_budi.allows(Decimal('15000')))
-```
+**Situasi:** Restoran mempunyai Ayam Geprek dan Es Jeruk. Nama dan harganya berbeda, tetapi struktur datanya sama.
 
-Hasilnya `False`, lalu `True`. Class-nya sama, tetapi isi kedua object berbeda.
-`Decimal` dipakai untuk nilai uang; jangan mengartikannya sebagai class menu.
+**Urutan membaca kode:**
 
-Saat baris `BudgetConstraint(...)` dijalankan, Python memanggil `__init__`
-untuk menyiapkan isi object. `self` dalam method menunjuk object yang sedang
-dipakai. Ketika `budget_ani.allows(...)` dipanggil, `self` menunjuk budget Ani,
-bukan budget Budi.
+1. Cari class MenuItem(models.Model).
+2. Perhatikan name, price, category, dan is_available.
+3. Bedakan class MenuItem dengan object hasil MenuItem(...) atau hasil pembacaan database.
+4. Baca __str__: representasi teks object memakai nama menu.
 
-## Lihat kode proyek
+**Hasil dan batasnya:** Perubahan pada satu object menu tidak otomatis mengubah object menu lain. Pembuatan MenuItem(...) saja belum menyimpan baris ke database.
 
-Buka [`budget.py`](../../recommendation/services/budget.py), lalu cari:
+**Hubungan dengan materi:** Class adalah pola bersama. Object menyimpan nilai masing-masing. Field Django di badan class dikelola oleh framework, bukan sekadar variabel kelas Python biasa.
 
-1. `class BudgetConstraint`: nama bentuk datanya.
-2. `__init__`: pemeriksaan dan penyiapan batas.
-3. `maximum`: cara membaca batas atas.
-4. `allows`: memeriksa apakah satu harga diperbolehkan.
+### Kasus 2. Dua pelanggan mempunyai budget berbeda
 
-Method tidak selalu menulis database. `BudgetConstraint` cukup menyimpan nilai
-dan melakukan pemeriksaan. Sebaliknya, class model Django seperti
-[`MenuItem`](../../menu/models.py) berhubungan dengan penyimpanan katalog.
-Membuat object model Python belum selalu berarti data sudah disimpan.
+**File:** [`recommendation/services/budget.py`](../../recommendation/services/budget.py#L14)
 
-## Salah paham yang sering terjadi
+**Class/method:** `BudgetConstraint`.
 
-- `BudgetConstraint` adalah class; `budget_ani` adalah nama variabel yang menunjuk object.
-- Satu class dapat dipakai untuk banyak object dengan nilai berbeda.
-- Method bukan harus tombol layar; method adalah bagian kode yang dipanggil program.
-- Class biasa tidak otomatis menjadi tabel database. Model Django mempunyai aturan tambahan.
+**Situasi:** Pelanggan A membatasi harga Rp10.000, sedangkan pelanggan B Rp20.000.
 
-## Cek pemahaman
+**Urutan membaca kode:**
 
-1. Mengapa hasil dua pemeriksaan harga Rp15.000 di atas berbeda?
-2. Jika dibuat object ketiga, apakah batas Ani otomatis berubah?
-3. Apa perbedaan menyimpan harga menu dan memeriksa apakah harga memenuhi budget?
+1. Baca __init__ dan parameter maximum.
+2. Telusuri penyimpanan nilai ke __maximum.
+3. Lihat property maximum, lalu method allows.
+4. Bandingkan pemeriksaan harga Rp15.000 pada dua object budget.
 
-Lanjut: [enkapsulasi](encapsulation.md).
+**Hasil dan batasnya:** Dengan batas inklusif, object A menolak Rp15.000 dan object B menerima. Angka ini ilustrasi pembelajaran, bukan pembacaan harga katalog.
+
+**Hubungan dengan materi:** Satu class menghasilkan object dengan keadaan berbeda. self.maximum pada allows merujuk batas milik object pemanggil.
+
+### Kasus 3. Keranjang mengikuti sesi pelanggan
+
+**File:** [`cart/services.py`](../../cart/services.py#L17)
+
+**Class/method:** `CartService`.
+
+**Situasi:** Dua pelanggan membuka web. Isi keranjang mereka harus mengikuti sesi masing-masing.
+
+**Urutan membaca kode:**
+
+1. Baca __init__(session).
+2. Temukan self.session dan salinan data pada self._lines.
+3. Ikuti add_item sampai _save.
+4. Perhatikan bahwa _save menulis ke sesi yang dipegang object itu.
+
+**Hasil dan batasnya:** Dua CartService dengan sesi berbeda bekerja pada data berbeda. Dua object yang sengaja diberi sesi sama tetap dapat mengacu ke penyimpanan yang sama.
+
+**Hubungan dengan materi:** Object layanan juga termasuk OOP, walaupun bukan benda fisik. Identitas sesi yang diberikan memengaruhi keadaan object.
+
+### Kasus 4. Satu tambahan menu menyimpan statusnya
+
+**File:** [`menu/models.py`](../../menu/models.py#L168)
+
+**Class/method:** `AddOn`.
+
+**Situasi:** Tambahan susu tersedia hari ini, tetapi tambahan lain sedang kosong.
+
+**Urutan membaca kode:**
+
+1. Cari class AddOn.
+2. Baca atribut is_available.
+3. Baca dapatkan_status().
+4. Hubungkan self.is_available dengan teks hasil method.
+
+**Hasil dan batasnya:** dapatkan_status() menghasilkan Tersedia atau Sedang Kosong sesuai object. Method tersebut membaca status, bukan memeriksa atau mengurangi stok secara otomatis.
+
+**Hubungan dengan materi:** Atribut menyatakan keadaan. Method menggunakan keadaan itu untuk menghasilkan perilaku yang bermakna bagi pemakai.
+
+### Kasus 5. Keputusan akses melekat pada pengguna yang diperiksa
+
+**File:** [`users/access.py`](../../users/access.py#L6)
+
+**Class/method:** `StaffAccess`.
+
+**Situasi:** Halaman staf dan kasir memerlukan keputusan akses yang berbeda.
+
+**Urutan membaca kode:**
+
+1. Baca __init__(user) dan self._user.
+2. Baca can_manage_catalog dan is_cashier.
+3. Lanjutkan ke can_use_cashier dan home_route.
+4. Bedakan object StaffAccess dengan object user yang diperiksanya.
+
+**Hasil dan batasnya:** Hasil pemeriksaan mengikuti autentikasi, status staf, dan grup Cashier. Membuat StaffAccess tidak mengubah pengguna menjadi staf.
+
+**Hubungan dengan materi:** Object dapat membungkus pekerjaan pemeriksaan. Satu object memakai object lain tanpa menjadi turunan dari class object tersebut.
+
+## Pertanyaan untuk diskusi
+
+Coba jelaskan perbedaan MenuItem, sebuah object menu, dan variabel yang menunjuk object itu. Mengapa dua CartService belum tentu berarti dua keranjang berbeda?
+
+## Cara memakai contoh ini
+
+Tautan menunjuk kode proyek, bukan class latihan yang dibuat seolah-olah sudah ada. Nomor baris membantu pencarian pada versi yang diperiksa dan dapat bergeser setelah perubahan. Untuk kasus yang melibatkan database, sesi, penyimpanan, atau Gemini, telusuri kode terlebih dahulu. Gunakan database latihan terpisah bila ingin menjalankan operasi yang mengubah data.

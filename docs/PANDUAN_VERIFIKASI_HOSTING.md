@@ -23,6 +23,31 @@ Proses server bersama harus memilih profil deployment secara eksplisit.
 `config.settings` merupakan titik awal yang masih perlu ditinjau dan
 disesuaikan dengan layanan hosting.
 
+Pada `config.settings`, DEBUG nonaktif jika tidak diatur. Nilai environment
+`DEBUG` hanya menerima `true` atau `false`. Saat DEBUG nonaktif, aplikasi menolak
+berjalan jika `SECRET_KEY` belum diisi, kurang dari 50 karakter, memiliki kurang
+dari 5 karakter berbeda, atau diawali `django-insecure-`. Pesan penolakan tidak
+menampilkan nilai secret. Pemeriksaan dasar ini tidak menggantikan pembuatan
+secret acak yang kuat dan penyimpanan rahasianya.
+
+Sebelum menjalankan proses server atau pemeriksaan deployment:
+
+1. Siapkan secret acak khusus server tersebut melalui pengaturan rahasia hosting.
+   Jangan menulis nilai aslinya di source atau membagikannya dalam percakapan tim.
+2. Isi environment **`SECRET_KEY`** dan tetapkan **`DEBUG=false`**. Nama secret
+   profil ini berbeda dengan `DJANGO_SECRET_KEY` pada profil lokal.
+3. Isi `ALLOWED_HOSTS` dengan domain server serta `CHATBOT_REDIS_URL` dengan
+   alamat cache privat yang disiapkan pengelola. URL berkredensial juga rahasia.
+4. Pilih `config.settings` pada proses web, lalu jalankan pemeriksaan di bawah.
+
+Menambahkan `.env` saja tidak memuat konfigurasi ke profil ini. Gunakan fasilitas
+environment hosting atau pemuat yang sengaja disiapkan pengelola. Jangan
+mengatasi penolakan secret dengan mengaktifkan DEBUG pada server production.
+
+Untuk pekerjaan lokal anggota tim, tetap gunakan perintah pada README yang
+memakai `v1_settings`; tidak perlu menyiapkan secret production. Jika sengaja
+memakai `config.settings` untuk development, `DEBUG=true` harus diatur eksplisit.
+
 | Bagian | Yang disiapkan pengelola |
 |---|---|
 | Python dan dependency | Versi yang sesuai `requirements.txt` dan source proyek. |
@@ -79,8 +104,9 @@ Aplikasi dapat menggunakan mode lokal. Jika tim mengaktifkan Gemini:
 
 1. Tetapkan pemilik akun, model yang tersedia, serta batas penggunaan yang disepakati.
 2. Simpan API key hanya di backend melalui konfigurasi server.
-3. Aktifkan tugas yang diperlukan; ranking, interpretasi, dan wording mempunyai
-   pengaturan berbeda. Memasang SDK tidak otomatis mengaktifkan semuanya.
+3. Jika Gemini aktif dan tersedia, jalur AI-first akan didahulukan. Batasi putaran
+   fungsi melalui `GEMINI_MAX_TOOL_ITERATIONS`. Flag ranking/wording lama tidak
+   menonaktifkan percakapan AI-first. Memasang SDK saja tidak mengaktifkan Gemini.
 4. Periksa fallback lokal ketika layanan tidak tersedia.
 5. Pantau token, kuota, dan tagihan pada layanan penyedia. Jangan menganggap
    metadata token kosong atau biaya `null` berarti pemakaian gratis.

@@ -49,6 +49,12 @@ Lingkungan virtual menyimpan dependency proyek secara terpisah. Jika aktivasi
 PowerShell diblokir, gunakan `.\.venv\Scripts\python.exe` sebagai pengganti
 `python` pada perintah berikutnya. Tidak perlu mengubah kebijakan keamanan Windows.
 
+`requirements.txt` berisi daftar paket beserta versi yang dibutuhkan. Perintah
+instalasi membaca daftar itu dan memasang paket ke `.venv`; tidak mengisi file
+requirements secara otomatis. Gunakan file yang sama agar anggota tim memasang
+versi SDK Gemini dan pemuat konfigurasi yang sesuai proyek. SDK terpasang tetap
+tidak berarti Gemini aktif.
+
 ### 3. Buat database dan akun admin
 
 ```powershell
@@ -162,8 +168,32 @@ mengisi data katalog. Keduanya berbeda.
 | `.env`, `local_gemini_settings.py` | Konfigurasi Gemini opsional per laptop. Tidak diperlukan untuk mode lokal dan tidak masuk Git. |
 
 Mode lokal memakai `GEMINI_ENABLED=False`. Pemasangan SDK `google-genai` tidak
-otomatis mengirim pesan ke Gemini. Mode hybrid dijelaskan di
+otomatis mengirim pesan ke Gemini. Jika konfigurasi Gemini aktif dan tersedia,
+chatbot memakai alur **AI-first** dari `main`: Gemini menangani percakapan dan
+meminta fakta menu melalui fungsi Django. Mode lokal menjadi fallback.
+Alurnya dijelaskan di
 [panduan pengembangan](docs/PANDUAN_PENGEMBANGAN.md#8-chatbot-lokal-dan-hybrid).
+
+Contoh nama variabel tanpa rahasia tersedia di [.env.example](.env.example).
+File tersebut bukan konfigurasi siap pakai: secret, URL cache, model, dan key
+masih kosong. Mode lokal default tidak perlu menyalinnya. Profil
+settings dapat memuat `.env` melalui `python-dotenv`, dengan environment proses
+yang sudah ada tetap didahulukan;
+ikuti [panduan hosting](docs/PANDUAN_VERIFIKASI_HOSTING.md) bila menyiapkan server.
+
+## Membagikan source ke anggota tim
+
+Utamakan clone atau pembaruan melalui Git sesuai langkah di atas. Jika perlu
+mengirim ZIP, gunakan snapshot commit yang sudah diperiksa:
+
+```powershell
+git archive --format=zip --output=../rasakita-source.zip HEAD
+```
+
+Perintah tersebut hanya memasukkan file pada commit terakhir; perubahan yang
+belum dicommit tidak ikut. Jangan mengirim ZIP seluruh folder kerja karena
+database, foto privat, `.env`, dan lingkungan Python bukan bagian source tim.
+Data restoran yang memang perlu dipindahkan ditangani terpisah oleh pemiliknya.
 
 ## Jika mengalami kendala
 
