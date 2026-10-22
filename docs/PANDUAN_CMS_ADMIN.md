@@ -1,5 +1,7 @@
 # Panduan CMS dan Admin RasaKita
 
+Diselaraskan pada **23 Oktober 2026** dengan source project utama di branch `ahmad`.
+
 Panduan operator dan administrator untuk proyek bersama pada branch `ahmad`.
 Nama tombol mengikuti UI yang tersedia. Alamat contoh memakai port 8890;
 jika server memakai port lain, sesuaikan bagian alamatnya.
@@ -62,7 +64,10 @@ Panduan ini tidak menetapkan atau menyimpan password pengguna.
 1. Buka `/staff/`; bila belum login, halaman Masuk Staf tampil.
 2. Isi Username dan Password, lalu klik **Masuk**.
 3. Akun staf menuju Dashboard CMS. Akun khusus kelompok Cashier menuju kasir.
-4. Gunakan **Keluar** ketika selesai.
+4. Gunakan tombol **Keluar** ketika selesai. Navigasi CMS dan kasir memakai form
+   POST dengan token CSRF. Membuka `/staff/logout/` melalui address bar mengirim
+   GET dan ditolak untuk pengguna yang sudah login; ini perilaku yang disengaja.
+   Jika CSRF ditolak, muat ulang halaman dan gunakan tombol dari sesi yang sama.
 
 CMS memerlukan akun aktif dengan status staf. Pada aplikasi ini, akses CMS
 ditentukan oleh status staf dan mencakup seluruh halaman CMS; pembatasan per
@@ -145,8 +150,10 @@ Gunakan foto makanan/minuman terpisah, sebaiknya PNG/WebP transparan. Kartu,
 background, dan blob/liquid shape dibentuk oleh UI; tidak perlu menyatukannya
 ke dalam file foto. Hindari foto landscape besar sebagai foto utama.
 
-- Format yang diterima: JPEG, PNG, WebP.
-- Batas: 10 MB dan 20 juta piksel per foto.
+- Format yang diterima: JPEG, PNG, WebP. Server membatasi pemilihan parser pada
+  kedua tahap pembukaan gambar; mengganti ekstensi file tidak mengubah formatnya.
+- Batas: 10 MB dan 20 juta piksel per foto. Animasi ditolak; gambar hasil diproses
+  menjadi WebP dan metadata dibuang. Foto asli diarsipkan pada penyimpanan privat.
 - Foto berlatar tetap dapat diunggah, tetapi latarnya tidak otomatis dihapus.
 - **Gambar menu** dipakai untuk kartu, beranda, dan pilihan menu pelanggan.
 - **Foto lama (arsip opsional)** menyimpan foto arsip; tidak menjadi foto utama
@@ -446,3 +453,21 @@ orders/services.py. Panduan menjalankan: [README](../README.md).
 Pertanyaan latihan:
 1. Apa perbedaan menonaktifkan kategori dengan menandai satu menu habis?
 2. Mengapa tambahan harus dihubungkan ke menu dan grup wajib harus punya opsi aktif?
+
+## 14. Memeriksa hasil perubahan transaksi
+
+Checkout baru tetap membuat baris dan audit ITEM_ADDED, tetapi perhitungan total
+database ditunda hingga semua baris dibuat. Total berjalan pada audit tiap baris
+tetap dipertahankan. Bandingkan total akhir pada order, baris, dan bukti pembayaran
+menggunakan satu transaksi latihan. Jika suatu baris tidak valid, checkout harus
+gagal sebagai satu transaksi, bukan menyisakan order parsial.
+
+Batas 1–99 yang ditambahkan berlaku pada jalur keranjang pelanggan; jangan
+menyimpulkan seluruh operasi kuantitas kasir mempunyai kontrak identik tanpa
+memeriksa endpointnya. Model pesanan dan fungsi layanan tetap memeriksa aturan
+status, pilihan, harga, serta izin masing-masing.
+
+Log audit transaksi berbeda dengan JSON penggunaan Gemini di terminal. Yang
+pertama terkait aksi order dan operator; yang kedua metadata provider per
+panggilan. Untuk memahami kelas dan fungsinya, baca
+[modul OOP bernomor](oop/README.md), khususnya model, akses, dan SRP.

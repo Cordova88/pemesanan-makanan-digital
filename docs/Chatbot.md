@@ -1,5 +1,7 @@
 # Memahami Sistem Chatbot RasaKita
 
+Diselaraskan pada **23 Oktober 2026** dengan source project utama di branch `ahmad`.
+
 Panduan belajar untuk anggota tim. Kita mulai dari hal yang dilihat pelanggan,
 lalu menelusuri pekerjaan di belakangnya. Penjelasan mengikuti implementasi
 branch `ahmad`; konfigurasi lokal setiap laptop dapat berbeda.
@@ -73,6 +75,20 @@ Hasil mode lokal tidak mewakili semua kemampuan percakapan AI-first.
 | Apakah JSON dari AI otomatis dipakai? | Tidak. Bentuk dan isinya diperiksa dahulu. |
 
 ## 3. Perjalanan satu pesan
+
+### Saat halaman pertama kali dibuka
+
+Template chatbot memanggil `sendMessage("", "")` saat inisialisasi. Browser
+mengirim `POST /api/recommendation/chat/` meskipun pengguna belum mengetik.
+Pada jalur AI-first, pesan kosong diterjemahkan menjadi permintaan memulai
+percakapan. Instruksi sistem, deklarasi tool, dan konteks ikut dikirim sehingga
+input token tidak nol. Sapaan lokal tanpa API belum diterapkan; itu baru pilihan
+optimasi yang dibahas, bukan perilaku sekarang.
+
+Jadi, bedakan `GET /chatbot/` yang memuat halaman, POST inisialisasi, dan POST
+pesan berikutnya. Membuka atau me-refresh halaman dapat memakai kuota provider.
+
+### Setelah pengguna mengirim kebutuhan
 
 Ikuti pesan **`minuman maksimal 10 ribu`**:
 
@@ -249,9 +265,12 @@ konflik `409`; gangguan penyimpanan dapat menghasilkan `503`.
 Ini bukan alasan mereset semua sesi atau menonaktifkan pemeriksaan. Muat dan
 periksa keadaan terbaru sebelum mengulang tindakan.
 
-**Mulai Lagi** menghapus konteks dialog untuk memulai percakapan baru. Keranjang
-bukan bagian yang ikut dikosongkan oleh tombol itu, dan hitungan penggunaan
-provider tidak boleh dihapus hanya untuk melewati batas.
+**Mulai Lagi** menghapus konteks dialog dan teks `recommendation_last_message`
+serta `recommendation_last_response` yang lama. Keranjang, autentikasi, dan
+counter penggunaan dipertahankan. Setelah reset, `ChatbotService.reply` dapat
+meminta sapaan Gemini baru jika tersedia; karena itu reset juga dapat memakai
+kuota dan menghasilkan teks percakapan baru. Ini penghapusan konteks aplikasi,
+bukan jaminan menghapus data yang sebelumnya sudah diproses provider.
 
 ### Menambah menu saat pilihan sebelumnya belum pasti
 
@@ -401,12 +420,24 @@ Rincian langkah pengguna/operator ada di [panduan penggunaan](PANDUAN_PENGGUNAAN
 
 ## 12. Mengapa ada batas penggunaan dan pemeriksaan keamanan?
 
-### Satu balasan tidak boleh memanggil provider berkali-kali tanpa kendali
+### Bedakan batas komponen hybrid dan putaran AI-first
 
-`TurnGenerator` dipakai bersama bagian AI untuk membatasi satu upaya provider
-dalam satu balasan. Jika satu bagian sudah menggunakan jatahnya, bagian lain
-tidak boleh diam-diam menambah panggilan. Ini berbeda dengan batas per sesi,
-per klien/hari, dan global/hari yang juga dapat berlaku.
+`TurnGenerator` dipakai oleh interpreter/reranker/penjelasan pada komponen
+hybrid. Setelah reservasi, wrapper membatasi satu percobaan pada giliran itu;
+error atau hasil tidak valid tidak otomatis mengembalikan jatah.
+
+AI-first memakai `GeminiAssistant` dan `GeminiClient.converse` langsung, sehingga
+satu pesan dapat menghasilkan beberapa dispatch: permintaan tool, hasil tool,
+dan respons lanjutan. Loop dibatasi `GEMINI_MAX_TOOL_ITERATIONS` (default lokal 4).
+Setiap dispatch memeriksa callback budget sesi dan `_allow_provider` untuk
+penghitung global/klien/sesi bersama. Jangan menerangkan wrapper hybrid sebagai
+batas satu panggilan untuk semua AI-first.
+
+`UsageGuard` memakai bucket waktu UTC di cache. Default fallback kode untuk
+kuota harian global adalah 100 dan per klien 20; batas sesi lokal default 50.
+Nilai deployment dapat berbeda. Ini penghitung upaya, bukan total token atau
+salinan kuota Google. Dengan cache lokal, counter terpisah antarproses dan dapat
+hilang ketika proses berhenti; hosting perlu cache bersama yang diverifikasi.
 
 Jika kuota dibatasi, provider gagal, atau keluaran ditolak, bot dapat memakai
 jalur lokal atau meminta penjelasan. Jangan membuat loop retry tanpa batas.
@@ -519,10 +550,40 @@ Urutan membaca yang disarankan:
 
 Untuk presentasi, pilih satu cerita: “pelanggan menyebut budget, lalu mengganti
 kategori”. Tunjukkan perubahan catatan, penyaringan menu, dan kalimat respons.
-Hubungkan ke [enkapsulasi](oop/encapsulation.md),
-[composition](oop/composition.md), dan [polymorphism](oop/polymorphism.md)
+Hubungkan ke [enkapsulasi](oop/3.%20Enkapsulasi.md),
+[composition](oop/9.%20Pendalaman%20Komposisi.md), dan [polymorphism](oop/6.%20Polimorfisme%20dan%20Abstraksi.md)
 hanya pada bagian yang benar-benar memperlihatkan konsep tersebut.
 
 Pertanyaan diskusi: mengapa harga harus tetap diperiksa server setelah bantuan
 AI? Mengapa ranking dan wording perlu dibedakan? Bagaimana mengetahui masalah
 berasal dari penafsiran, data katalog, atau penyusunan kalimat?
+
+## 16. Mendiagnosis log yang tidak terlihat
+
+Baris `[tanggal] "GET/POST ..."` adalah log akses Django. JSON `chat_request`
+adalah metadata request chatbot, sedangkan `provider_attempt` adalah metadata
+upaya provider. HTTP 200 chat tidak selalu berarti Gemini dipanggil karena jalur
+lokal dapat memberi respons.
+
+Gunakan alamat dan port yang sama dengan terminal. Karena `--noreload`, restart
+setelah perubahan Python atau konfigurasi. Hindari beberapa runserver bersamaan
+pada alamat yang sama; pada sesi debugging sebelumnya ditemukan server lama
+dan baru sehingga akses tidak terlihat pada terminal yang sedang diamati.
+Periksa proses terlebih dahulu dan hentikan server lewat terminalnya; jangan
+mematikan semua proses Python tanpa memeriksa identitasnya.
+
+Timestamp JSON memakai UTC (`+00:00`), sedangkan log akses lokal memakai WITA.
+Contoh pukul 07:23 WITA sama dengan 23:23 UTC pada hari sebelumnya. Perbedaan
+tanggal itu bukan bukti request ganda atau waktu server rusak.
+
+Contoh 975 token input dan 57 token output menghasilkan 1.032 total pada satu
+respons yang diamati. Angka tersebut contoh, bukan tarif atau batas semua model.
+Sebagian besar input dapat berasal dari instruksi/tool/context, bukan ketikan
+pengguna. Pada free tier, pantau batas request per menit/hari sekaligus token;
+satu pesan dengan putaran tool dapat memakai beberapa request. Batas akun/model
+dibaca dari dashboard provider dan dapat berubah, sehingga tidak dihardcode
+sebagai janji kuota tetap dalam panduan ini.
+
+Panduan OOP yang membedah adapter dan perangkaian provider tersedia di
+[indeks OOP](oop/README.md). Cara uji tanpa API asli ada di
+[pemeriksaan lokal](PANDUAN_TESTING_LOKAL.md).

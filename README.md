@@ -1,5 +1,7 @@
 # RasaKita — Pemesanan Makanan Digital
 
+Diselaraskan pada **23 Oktober 2026** dengan source project utama di branch `ahmad`.
+
 Aplikasi restoran berbasis Django: pelanggan memilih menu dan membuat pesanan,
 staf mengelola katalog, dan kasir mencatat pembayaran. Chatbot membantu mencari
 menu; pemesanan tetap dilanjutkan melalui pilihan menu dan keranjang.
@@ -218,3 +220,21 @@ Data restoran yang memang perlu dipindahkan ditangani terpisah oleh pemiliknya.
 - [Pemeriksaan lokal](docs/PANDUAN_TESTING_LOKAL.md) dan
   [verifikasi hosting](docs/PANDUAN_VERIFIKASI_HOSTING.md).
 - [Indeks seluruh panduan](docs/README.md).
+
+## Perilaku terbaru dan bahan pembelajaran
+
+Jumlah keranjang pelanggan divalidasi 1–99 per baris, termasuk penggabungan.
+Logout operator melalui tombol POST + CSRF. Parser unggahan hanya JPEG/PNG/WebP.
+Checkout mempertahankan transaksi atomic serta audit sambil mengurangi agregasi
+total berulang. Perubahan ini tidak membutuhkan migrasi schema baru.
+
+Jika Gemini aktif, membuka halaman chatbot atau menekan Mulai Lagi dapat
+memanggil API untuk sapaan. Kuota dan log token mencakup setiap dispatch serta
+putaran tool. Log JSON muncul di terminal server, dengan timestamp UTC; log
+akses lokal memakai WITA. Sapaan lokal tanpa API belum diterapkan.
+
+[Modul OOP](docs/oop/README.md) sekarang memakai nama berkas `1. ...` sampai
+`10. ...`. Tujuh modul utama berisi 35 pembahasan, lima berkas nyata berbeda
+pada setiap modul. Panduan menjalankan tes dummy dan batas hasil regresi ada di
+[pemeriksaan lokal](docs/PANDUAN_TESTING_LOKAL.md); riwayat security ada di
+[SECURITY-TRANSFER.md](docs/SECURITY-TRANSFER.md).

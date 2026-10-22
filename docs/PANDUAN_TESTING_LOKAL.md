@@ -1,5 +1,7 @@
 # Panduan Pemeriksaan Lokal RasaKita
 
+Diselaraskan pada **23 Oktober 2026** dengan source project utama di branch `ahmad`.
+
 Panduan ini dipakai anggota tim untuk memeriksa fitur melalui browser setelah
 menjalankan proyek. Semua perintah dimulai dari folder repository yang berisi
 `manage.py`. Instalasi pertama mengikuti [README](../README.md).
@@ -90,3 +92,58 @@ Seharusnya tetap di keranjang, tetapi halaman berpindah ke katalog.”
 Jangan membagikan API key, password, cookie, atau isi sesi. Keberhasilan mencoba
 satu alur belum membuktikan seluruh fitur benar; fokuskan pemeriksaan pada
 bagian yang berubah dan alur yang bergantung padanya.
+
+## 6. Pemeriksaan terfokus perubahan terbaru
+
+| Area | Contoh pemeriksaan | Hasil yang diharapkan |
+|---|---|---|
+| Keranjang | 98 porsi + 1, lalu tambah 1 lagi pada pilihan/catatan sama | 99 berhasil; tambah berikutnya ditolak tanpa perubahan |
+| Keranjang | Edit jumlah 100, bool, atau string melalui payload uji | Ditolak pada jalur validasi; jangan menganggap input HTML satu-satunya kontrol |
+| Checkout | Beberapa baris dummy; salah satu selection tidak valid | Tidak meninggalkan order/baris/audit parsial |
+| Logout | GET, POST tanpa CSRF, lalu tombol resmi | GET terautentikasi 405; POST tanpa token 403; tombol berhasil |
+| Foto | JPEG/PNG/WebP, format lain, animasi, ukuran berlebih | Format sesuai diterima bila batas lain sah; kasus terlarang ditolak |
+| Reset | Dialog lama, cart, dan counter yang diketahui | Teks lama hilang; cart/counter tetap; sapaan AI baru masih mungkin |
+| Provider | Respons fake SDK dan beberapa putaran tool | Kuota serta log berlaku per dispatch; tidak perlu API asli |
+
+Gunakan tes otomatis untuk payload, query capture, dan kondisi gagal yang tidak
+mudah dibuat melalui UI. Jangan mengirim request pengubahan data ke instalasi
+orang lain untuk meniru tes.
+
+## 7. Menjalankan profil dummy tanpa konfigurasi aplikasi
+
+`config.audit_test_settings` memakai SQLite di memori, cache lokal khusus tes,
+media sementara, credential dummy, dan Gemini nonaktif secara default. Tes
+provider mengaktifkan flag hanya bersama transport palsu. Profil ini tidak
+mengimpor v1_settings/config.settings sehingga tidak memuat `.env` keduanya.
+Ini pemisahan storage/config, bukan sandbox OS/jaringan lengkap.
+
+Dari repository dengan interpreter proyek:
+
+```powershell
+python -B -m django test --settings=config.audit_test_settings recommendation.tests.test_audit_regressions cart.tests.test_audit_regressions orders.tests.test_audit_regressions users.tests.test_logout_security menu.tests.test_image_processing --verbosity=1
+```
+
+Jika folder sementara bawaan Windows tidak dapat ditulis, arahkan TEMP/TMP
+**pada proses terminal tes itu** ke folder kerja sementara yang dapat ditulis.
+Tidak perlu mengubah profil production atau menghapus database aplikasi.
+
+Riwayat penerapan security mencatat 45 tes terfokus lulus. Regresi luas pada
+profil yang sama menjalankan 1.099 tes dengan 39 failure dan 637 error yang juga
+muncul pada baseline 1.069 tes. Di antaranya fake provider lama tidak memiliki
+available, kontrak anotasi lama belum lengkap, serta host localhost tidak
+diizinkan profil dummy. Jangan melaporkan seluruh suite lulus. Rincian dan log
+dicatat di [SECURITY-TRANSFER.md](SECURITY-TRANSFER.md).
+
+## 8. Memeriksa Gemini asli dan terminal
+
+Pilih pengujian ini hanya bila ingin menilai jawaban provider nyata. Gunakan
+konfigurasi akun sendiri, pesan latihan, dan pantau kuota proyek/model. Membuka
+halaman mengirim POST awal untuk sapaan; reset juga dapat memanggil provider.
+API asli tidak dibutuhkan untuk menjalankan 45 tes dummy di atas.
+
+Perhatikan tiga jenis log: akses GET/POST Django, JSON chat_request, dan JSON
+provider_attempt. Satu pesan bisa mempunyai beberapa log provider dengan
+request_id sama. Timestamp JSON UTC berbeda delapan jam dari WITA. Pastikan
+hanya server yang dimaksud melayani port browser; restart karena --noreload
+tidak memuat perubahan Python otomatis. Jangan menyimpulkan provider mati hanya
+dari bentuk kalimat, atau menyimpulkan biaya nol dari estimated_cost=null.

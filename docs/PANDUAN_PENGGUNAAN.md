@@ -1,5 +1,7 @@
 # Panduan Penggunaan RasaKita
 
+Diselaraskan pada **23 Oktober 2026** dengan source project utama di branch `ahmad`.
+
 Alur pelanggan, staf, dan kasir untuk branch `ahmad`. Contoh memakai
 `http://127.0.0.1:8890`; sesuaikan port dengan server. Instalasi pertama mengikuti
 [lima langkah README](../README.md#instalasi-pertama--lima-langkah).
@@ -111,12 +113,17 @@ divalidasi server, bukan nominal yang diketik sendiri oleh pelanggan.
 5. Lanjutkan ke keranjang dan checkout seperti pada katalog.
 
 **Cari Menu Lain** mencari alternatif dalam konteks yang masih berlaku.
-**Mulai Lagi** memulai percakapan baru, bukan mengosongkan keranjang.
+**Mulai Lagi** menghapus konteks dan teks dialog lama tanpa mengosongkan keranjang
+atau menghapus login/counter penggunaan. Jika Gemini aktif, pembukaan halaman
+dan reset dapat meminta sapaan AI baru; keduanya bisa memakai kuota meskipun
+belum ada pesan yang diketik.
 Kalimat `es kelapa tambah susu` belum otomatis memasang tambahan; pilih tambahan
 yang tersedia pada halaman menu/keranjang.
 
-Mode lokal dapat menjawab tanpa Gemini. Pada mode hybrid, tidak semua pesan
-dikirim ke AI dan template lokal masih dapat dipakai. Untuk alergi, konfirmasi
+Mode lokal dapat menjawab tanpa Gemini. Jika Gemini aktif dan tersedia, jalur
+AI-first mencoba memproses pesan biasa lebih dahulu; instruksi, konteks, dan
+hasil fungsi katalog dapat diproses provider. Jalur lokal/hybrid tetap menjadi
+cadangan dan tidak semua tindakan melalui jalur yang sama. Untuk alergi, konfirmasi
 bahan serta kontak silang kepada staf; kartu rekomendasi bukan jaminan aman.
 
 ## 4. Makan di tempat dan QR meja
@@ -238,3 +245,20 @@ coba varian/tambahan, uang kurang, pembatalan, serta makan di tempat dengan QR.
 | Foto/menu berbeda antar-laptop | Data katalog dan upload tidak disinkronkan Git. |
 | Chatbot layanan belum tersedia | Periksa terminal, migrasi, profil, dan penyimpanan sesi; belum tentu karena Gemini. |
 | Modal/pemindai gagal dimuat | Periksa koneksi CDN dan error browser selain server Django. |
+
+## 9. Catatan penggunaan setelah pembaruan
+
+Jumlah tambah/edit keranjang dibatasi bilangan bulat 1–99 per baris. Jika pilihan
+dan catatan sama, penambahan dapat digabung; hasil gabungan juga tidak boleh
+melebihi 99. Menghapus baris tetap dilakukan melalui aksi hapus/jalur yang
+disediakan. Batas ini bukan jumlah maksimal seluruh baris pesanan kasir.
+
+Keluar dari CMS/kasir memakai tombol **Keluar**. Tombol mengirim form POST dengan
+token CSRF; membuka URL logout secara langsung lewat address bar bukan cara
+logout. Jika menerima 403, muat ulang halaman operator dan gunakan tombol pada
+sesi yang sama; jangan menonaktifkan CSRF.
+
+Untuk memantau AI, lihat terminal server yang benar. Log JSON provider berisi
+token per panggilan, bukan isi chat atau total tagihan. Jika hanya membuka
+halaman sudah muncul log, itu dapat berasal dari sapaan awal. Panduan teknis
+log ada di [Chatbot.md](Chatbot.md#13-memahami-catatan-proses).

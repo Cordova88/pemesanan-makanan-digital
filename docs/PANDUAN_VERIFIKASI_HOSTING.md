@@ -1,5 +1,7 @@
 # Panduan Persiapan Hosting RasaKita
 
+Diselaraskan pada **23 Oktober 2026** dengan source project utama di branch `ahmad`.
+
 Panduan untuk anggota tim yang mengelola server bersama. Instalasi lokal
 mengikuti [README](../README.md); profil lokal bukan konfigurasi hosting siap
 pakai. Dokumen ini menjelaskan pekerjaan pengelola, bukan menyatakan aplikasi
@@ -40,9 +42,12 @@ Sebelum menjalankan proses server atau pemeriksaan deployment:
    alamat cache privat yang disiapkan pengelola. URL berkredensial juga rahasia.
 4. Pilih `config.settings` pada proses web, lalu jalankan pemeriksaan di bawah.
 
-Menambahkan `.env` saja tidak memuat konfigurasi ke profil ini. Gunakan fasilitas
-environment hosting atau pemuat yang sengaja disiapkan pengelola. Jangan
-mengatasi penolakan secret dengan mengaktifkan DEBUG pada server production.
+`config.settings` dan `v1_settings` saat ini memanggil `load_dotenv` jika
+python-dotenv tersedia. Environment proses yang sudah ada tetap didahulukan.
+Pada hosting, gunakan pengelolaan secret/environment layanan dan pastikan `.env`
+lokal tidak ikut dibagikan. Profil dummy `config.audit_test_settings` sengaja
+tidak mengimpor kedua profil tersebut. Jangan mengatasi penolakan secret dengan
+mengaktifkan DEBUG pada server production.
 
 Untuk pekerjaan lokal anggota tim, tetap gunakan perintah pada README yang
 memakai `v1_settings`; tidak perlu menyiapkan secret production. Jika sengaja
@@ -146,3 +151,23 @@ Untuk kembali ke versi source sebelumnya, gunakan revisi rilis yang sudah
 dikenal tim. Jangan memulihkan database lama tanpa perencanaan karena transaksi
 baru dapat hilang. Sebelum rilis ulang, periksa alur yang terdampak dan catat
 hasil pemulihannya.
+
+## 8. Hal terbaru yang perlu diuji saat deployment
+
+Pastikan logout staf/kasir dikirim melalui POST dengan CSRF; bookmark atau link
+GET logout tidak lagi merupakan alur yang sah. Uji unggahan JPEG/PNG/WebP dummy
+dan pastikan arsip asli tetap privat. Periksa kuantitas cart, rollback checkout,
+serta konsistensi running total audit pada data latihan.
+
+Penghitung provider kini mencakup setiap dispatch AI-first dan putaran tool.
+Membuka halaman/reset juga dapat meminta sapaan AI. Karena itu perkiraan beban
+harus memperhitungkan lebih dari pesan yang diketik. Batas counter aplikasi
+bukan jaminan sama dengan kuota free/paid tier Google dan tidak menetapkan tarif.
+Periksa batas proyek/model pada akun penyedia yang digunakan pengelola.
+
+Log provider mencatat token per respons SDK dan kategori kegagalan. Timestamp
+JSON UTC perlu dikorelasikan dengan waktu WITA saat insiden. Console logging
+belum berarti retensi file, agregasi token sesi, atau sistem alarm sudah ada.
+Tiga kandidat audit pada catatan asal tetap membutuhkan validasi; lulus tes
+terfokus bukan pengesahan keamanan deployment. Lihat
+[riwayat penerapan](SECURITY-TRANSFER.md) dan [catatan audit asal](AUDIT-FOLLOWUP.md).

@@ -1,5 +1,7 @@
 # Penerapan perubahan security ke project utama
 
+> Dokumen historis perubahan security, 22 Oktober 2026. Penyelarasan panduan pada 23 Oktober 2026 tidak mengubah status kandidat audit atau mengulang tes aplikasi. Untuk perilaku/petunjuk terkini, gunakan [indeks dokumentasi](README.md). Hasil pengujian project utama dicatat di [SECURITY-TRANSFER.md](SECURITY-TRANSFER.md).
+
 Tanggal: 22 Oktober 2026 (Asia/Makassar).
 
 Perubahan aplikasi dari `pemesanan-makanan-digital-security` diterapkan ke

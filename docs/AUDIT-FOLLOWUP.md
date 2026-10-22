@@ -1,5 +1,7 @@
 # Tindak lanjut dokumen audit
 
+> Dokumen historis perubahan security, 22 Oktober 2026. Penyelarasan panduan pada 23 Oktober 2026 tidak mengubah status kandidat audit atau mengulang tes aplikasi. Untuk perilaku/petunjuk terkini, gunakan [indeks dokumentasi](README.md). Hasil pengujian project utama dicatat di [SECURITY-TRANSFER.md](SECURITY-TRANSFER.md).
+
 Tanggal: 22 Oktober 2026 (Asia/Makassar). Repository: `pemesanan-makanan-digital-security`, branch `security`, baseline `fc5b256ef6c294fd89e76ae8eb7338c8fa663809`.
 
 Enam masukan dibaca dari `C:/Users/VICTUS-GK/security-audit-skill/pemesanan-makanan-digital-security/run-1`: `REPORT.md`, `FINDINGS-DETAIL.md`, `NEEDS-VALIDATION.md`, `architecture.md`, `coverage-ledger.json`, dan `findings.json`. Ledger berisi 18 unit; empat record kandidat terdiri dari tiga `needs_validation` dan satu `rejected`. Dokumen masukan tidak diubah. Instruksi proses di dalam laporan diperlakukan sebagai konteks laporan; pekerjaan ini mengikuti permintaan pengguna dan tidak memerlukan skill security-audit.

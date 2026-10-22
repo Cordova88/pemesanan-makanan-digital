@@ -1,5 +1,7 @@
 # Panduan Pengembangan RasaKita
 
+Diselaraskan pada **23 Oktober 2026** dengan source project utama di branch `ahmad`.
+
 Panduan untuk anggota tim RasaKita, **Universitas Mulawarman, Samarinda,
 Kalimantan Timur**, pada branch `ahmad`. Isinya membantu anggota memahami
 pembagian modul dan mengembangkan fitur bersama. Semua perintah dijalankan
@@ -172,6 +174,25 @@ untuk makan di tempat.
 
 ## 6. Keranjang, harga, dan checkout
 
+### Perubahan validasi dan efisiensi terbaru
+
+- Tambah/gabung/edit cart yang relevan memakai `_validate_quantity`: integer
+  1–99, bukan bool atau string angka. Hasil gabungan divalidasi sebelum baris
+  berubah. Integer <= 0 pada `update_quantity` tetap berarti hapus.
+- `_response` pada cart/views.py memanggil `get_items` sekali, lalu
+  `CartService.total_for(items)`. `get_total()` tetap tersedia bagi caller lain.
+  Baris bertanda tidak valid tidak dijumlahkan oleh total_for.
+- `create_order` memanggil helper `_add_item(..., defer_total=True)` untuk order
+  baru, menjaga running total audit tiap baris, lalu menjalankan `recalculate`
+  satu kali di akhir. API `add_item` standalone tetap merekalkulasi dari database.
+- Seluruh checkout tetap atomic. Jika baris berikutnya gagal, order, baris,
+  dan audit transaksi tersebut di-rollback. Jangan memakai defer_total sembarang
+  pada edit order atau transaksi di luar alur yang dirancang.
+- Belum ada batas baru jumlah baris cart. Penanda valid pada tampilan bukan
+  pengganti validasi katalog saat checkout.
+
+### Aturan harga dan penyimpanan
+
 `CartService` menyimpan pilihan pada sesi browser. `MenuSelection` memeriksa
 menu/varian/tambahan terhadap katalog saat ini. Pada implementasi terbaru aturan
 order berupa **fungsi dalam `orders/services.py`**, seperti `create_order`,
@@ -217,6 +238,7 @@ Tabel ini peta endpoint, bukan salinan seluruh kontrak JSON.
 | `POST /api/orders/<public_id>/pay/` | Catat pembayaran | Staf/kasir |
 | `POST /api/orders/<public_id>/cancel/` | Batalkan pending | Staf/kasir |
 | `POST /api/orders/<public_id>/refund/` | Refund order dibayar | Staf (`is_staff`) |
+| `POST /staff/logout/` | Keluar dari sesi operator | Login + CSRF; GET ditolak untuk pengguna terautentikasi |
 | `POST /api/recommendation/chat/` | Percakapan/rekomendasi | Sesi percakapan + CSRF |
 | `POST /api/recommendation/add/` | Pilihan rekomendasi masuk keranjang bersama | Sesi pelanggan + CSRF |
 
@@ -289,7 +311,18 @@ konfirmasi bahan dan risiko kontak silang kepada staf tetap diperlukan.
 - **Proposal v3:** jalur interpretasi opsional dengan validasi; pemasangan SDK
   atau keberadaan key saja tidak mengaktifkan jalur ini.
 
-Key/model/flag ada pada profil lokal terpisah, bukan frontend. Pilih model yang
+Profil lokal default memuat `.env` jika pemuat tersedia; nilai environment
+proses yang sudah ada didahulukan. Key/model/flag berada pada konfigurasi backend,
+bukan frontend. Membuka halaman chatbot mengirim pesan kosong untuk sapaan, dan
+reset dapat meminta sapaan baru. Ketika Gemini tersedia, keduanya dapat memakai
+API walaupun pengguna belum mengetik pesan baru.
+
+Setiap putaran `converse` kini memeriksa kuota bersama dan mencatat metadata
+token seperti jalur generate. `TurnGenerator` membatasi komponen hybrid, bukan
+seluruh AI-first. Lihat bagian 12–13 pada [Chatbot.md](Chatbot.md).
+
+Key/model/flag dapat memakai profil lokal tambahan yang disiapkan pemilik laptop,
+bukan frontend. Pilih model yang
 tersedia untuk proyek Gemini sendiri; jangan menyalin key anggota lain.
 `provider_attempt` mencatat upaya. Timeout/fallback tetap dapat memakai kuota;
 token tidak tersedia bukan berarti nol. Reset chat bukan cara menghapus batas
@@ -386,3 +419,20 @@ atau membuat ulang akun setiap menerima perubahan source.
   kombinasi yang mungkin sudah didukung.
 - Profil lokal bukan konfigurasi hosting siap pakai. Lihat
   [verifikasi hosting](PANDUAN_VERIFIKASI_HOSTING.md).
+
+## 13. Membaca OOP dan bukti pengujian saat ini
+
+[Indeks OOP](oop/README.md) mengurutkan sepuluh dokumen bernomor. Tujuh materi
+utama berisi 35 kasus dari lima berkas utama berbeda per modul. Cuplikan dan
+simbol mengikuti kode, termasuk `_validate_quantity`, `total_for`, helper
+`_add_item`, `_allow_provider`, dan penghapusan teks pada reset.
+
+Pemeriksaan terfokus perubahan security sebelumnya: 45 tes lulus memakai
+`config.audit_test_settings`. Regresi luas pada profil yang sama menjalankan
+1.099 tes dengan 39 failure dan 637 error, identik dengan baseline 1.069 tes.
+Angka kegagalan mencakup subtest; jangan mengurangkannya dari jumlah test method
+untuk mengarang jumlah tes sukses. Ini bukan suite seluruhnya hijau.
+
+Riwayat lengkap ada di [SECURITY-TRANSFER.md](SECURITY-TRANSFER.md). Pada pekerjaan
+dokumentasi ini, backend tidak diubah. Pemeriksaan dokumen memeriksa tautan,
+cuplikan, simbol, dan contoh murni; bukan menggantikan pengujian web/deployment.
