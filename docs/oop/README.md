@@ -142,7 +142,7 @@ pekerjaannya; enkapsulasi menjaga jalur perubahan; dependency menjelaskan siapa
 memakai siapa. Inheritance tidak perlu dipaksakan pada seluruh alur. Fungsi
 create_order tetap merupakan fungsi biasa yang mengoordinasikan beberapa object.
 
-## Penyelarasan dengan perubahan aplikasi terakhir
+## Perilaku aplikasi yang dipakai dalam contoh
 
 - Validasi cart memakai integer 1–99, termasuk hasil penggabungan baris. Boolean
   ditolak. Update jumlah integer <= 0 tetap menghapus baris melalui jalurnya.
@@ -159,13 +159,12 @@ create_order tetap merupakan fungsi biasa yang mengoordinasikan beberapa object.
 - Log provider berisi metadata/token per panggilan. Tidak ada jumlah biaya pasti
   dari estimated_cost=null dan tidak ada total token sesi otomatis di halaman.
 
-## Apa yang telah diverifikasi dan apa yang belum
+## Cara memeriksa pemahaman
 
-Penyelarasan materi dilakukan dengan membaca source, mengekstrak cuplikan asli,
-memeriksa keberadaan simbol serta tautan, dan menjalankan contoh latihan murni.
-Tidak diperlukan perubahan backend atau database untuk merapikan materi ini.
-Hasil tes aplikasi pada perubahan sebelumnya dicatat sebagai riwayat di
-[SECURITY-TRANSFER.md](../SECURITY-TRANSFER.md), bukan sebagai tes baru pekerjaan dokumentasi.
+Cocokkan cuplikan dengan simbol pada berkas sumber, lalu prediksi hasil contoh
+sebelum menjalankan latihan. Untuk operasi yang memakai database atau provider,
+ikuti [panduan pemeriksaan lokal](../PANDUAN_TESTING_LOKAL.md). Membaca source
+menjelaskan implementasi; menjalankan tes membantu memeriksa perilakunya.
 
 Urutan tujuh topik mempertahankan susunan materi kuliah pada dokumentasi lama.
 PDF acuan tidak tersedia di repository ini, sehingga kesesuaian halaman PDF tidak

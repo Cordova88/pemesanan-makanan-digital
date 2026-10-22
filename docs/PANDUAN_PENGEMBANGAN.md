@@ -420,19 +420,15 @@ atau membuat ulang akun setiap menerima perubahan source.
 - Profil lokal bukan konfigurasi hosting siap pakai. Lihat
   [verifikasi hosting](PANDUAN_VERIFIKASI_HOSTING.md).
 
-## 13. Membaca OOP dan bukti pengujian saat ini
+## 13. Membaca OOP dan memeriksa perilaku
 
 [Indeks OOP](oop/README.md) mengurutkan sepuluh dokumen bernomor. Tujuh materi
 utama berisi 35 kasus dari lima berkas utama berbeda per modul. Cuplikan dan
 simbol mengikuti kode, termasuk `_validate_quantity`, `total_for`, helper
 `_add_item`, `_allow_provider`, dan penghapusan teks pada reset.
 
-Pemeriksaan terfokus perubahan security sebelumnya: 45 tes lulus memakai
-`config.audit_test_settings`. Regresi luas pada profil yang sama menjalankan
-1.099 tes dengan 39 failure dan 637 error, identik dengan baseline 1.069 tes.
-Angka kegagalan mencakup subtest; jangan mengurangkannya dari jumlah test method
-untuk mengarang jumlah tes sukses. Ini bukan suite seluruhnya hijau.
-
-Riwayat lengkap ada di [SECURITY-TRANSFER.md](SECURITY-TRANSFER.md). Pada pekerjaan
-dokumentasi ini, backend tidak diubah. Pemeriksaan dokumen memeriksa tautan,
-cuplikan, simbol, dan contoh murni; bukan menggantikan pengujian web/deployment.
+Untuk memeriksa perilaku, baca assertion pada tes modul terkait dan jalankan
+tes dengan data latihan. Profil `config.audit_test_settings` menyediakan
+database di memori serta provider palsu pada tes yang sesuai; langkahnya ada di
+[panduan pemeriksaan lokal](PANDUAN_TESTING_LOKAL.md). Catat hasil eksekusi pada
+revisi yang diuji, bukan menganggap keberadaan berkas tes membuktikan tes lulus.

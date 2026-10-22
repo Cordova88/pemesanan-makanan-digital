@@ -235,6 +235,5 @@ akses lokal memakai WITA. Sapaan lokal tanpa API belum diterapkan.
 
 [Modul OOP](docs/oop/README.md) sekarang memakai nama berkas `1. ...` sampai
 `10. ...`. Tujuh modul utama berisi 35 pembahasan, lima berkas nyata berbeda
-pada setiap modul. Panduan menjalankan tes dummy dan batas hasil regresi ada di
-[pemeriksaan lokal](docs/PANDUAN_TESTING_LOKAL.md); riwayat security ada di
-[SECURITY-TRANSFER.md](docs/SECURITY-TRANSFER.md).
+pada setiap modul. Panduan menjalankan tes dummy ada di
+[pemeriksaan lokal](docs/PANDUAN_TESTING_LOKAL.md).

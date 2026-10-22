@@ -168,6 +168,6 @@ Periksa batas proyek/model pada akun penyedia yang digunakan pengelola.
 Log provider mencatat token per respons SDK dan kategori kegagalan. Timestamp
 JSON UTC perlu dikorelasikan dengan waktu WITA saat insiden. Console logging
 belum berarti retensi file, agregasi token sesi, atau sistem alarm sudah ada.
-Tiga kandidat audit pada catatan asal tetap membutuhkan validasi; lulus tes
-terfokus bukan pengesahan keamanan deployment. Lihat
-[riwayat penerapan](SECURITY-TRANSFER.md) dan [catatan audit asal](AUDIT-FOLLOWUP.md).
+Tes terfokus tidak menggantikan pemeriksaan konfigurasi dan alur pada lingkungan
+deployment. Catat hasil pemeriksaan server, akses operator, penyimpanan, dan
+provider sebelum layanan dipakai bersama.

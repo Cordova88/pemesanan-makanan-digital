@@ -49,15 +49,6 @@ TurnGenerator berlaku pada komponen hybrid, bukan seluruh putaran AI-first.
 Perilaku ini dijelaskan bersama batas pengujiannya, bukan dianggap jaminan
 seluruh jawaban AI atau deployment selalu benar.
 
-## Catatan historis dan hasil verifikasi
-
-- [AUDIT-FOLLOWUP.md](AUDIT-FOLLOWUP.md): catatan asal dari project security,
-  termasuk status kandidat audit. Bagian "belum dijalankan" adalah riwayat saat itu.
-- [SECURITY-TRANSFER.md](SECURITY-TRANSFER.md): pemindahan perubahan ke project
-  utama dan hasil 45 tes terfokus serta perbandingan regresi baseline.
-- [PENYELARASAN_DOKUMENTASI.md](PENYELARASAN_DOKUMENTASI.md): cakupan penyelarasan
-  panduan, pemetaan rename modul, dan hasil pemeriksaan dokumentasi.
-
 ## Diagram
 
 Folder `diagrams/` memuat SVG pendamping panduan, bukan source Python. Mermaid

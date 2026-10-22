@@ -127,19 +127,18 @@ Jika folder sementara bawaan Windows tidak dapat ditulis, arahkan TEMP/TMP
 **pada proses terminal tes itu** ke folder kerja sementara yang dapat ditulis.
 Tidak perlu mengubah profil production atau menghapus database aplikasi.
 
-Riwayat penerapan security mencatat 45 tes terfokus lulus. Regresi luas pada
-profil yang sama menjalankan 1.099 tes dengan 39 failure dan 637 error yang juga
-muncul pada baseline 1.069 tes. Di antaranya fake provider lama tidak memiliki
-available, kontrak anotasi lama belum lengkap, serta host localhost tidak
-diizinkan profil dummy. Jangan melaporkan seluruh suite lulus. Rincian dan log
-dicatat di [SECURITY-TRANSFER.md](SECURITY-TRANSFER.md).
+Periksa ringkasan hasil setiap kali menjalankan tes. `OK` menyatakan seluruh
+tes yang dipilih selesai tanpa kegagalan; `FAILED` perlu ditelusuri dari nama
+tes dan traceback. Bedakan error konfigurasi, keterbatasan fake provider,
+dan kegagalan aturan bisnis. Catat revisi, perintah, serta hasil aktual agar
+anggota lain dapat mengulang pemeriksaan.
 
 ## 8. Memeriksa Gemini asli dan terminal
 
 Pilih pengujian ini hanya bila ingin menilai jawaban provider nyata. Gunakan
 konfigurasi akun sendiri, pesan latihan, dan pantau kuota proyek/model. Membuka
 halaman mengirim POST awal untuk sapaan; reset juga dapat memanggil provider.
-API asli tidak dibutuhkan untuk menjalankan 45 tes dummy di atas.
+API asli tidak dibutuhkan untuk menjalankan tes dummy di atas.
 
 Perhatikan tiga jenis log: akses GET/POST Django, JSON chat_request, dan JSON
 provider_attempt. Satu pesan bisa mempunyai beberapa log provider dengan
