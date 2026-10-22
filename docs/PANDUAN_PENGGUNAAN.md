@@ -1,10 +1,19 @@
 # Panduan Penggunaan RasaKita
 
-Diselaraskan pada **23 Oktober 2026** dengan source project utama di branch `ahmad`.
+Diselaraskan pada **23 Oktober 2026** dengan kode proyek utama di branch `ahmad`.
 
-Alur pelanggan, staf, dan kasir untuk branch `ahmad`. Contoh memakai
-`http://127.0.0.1:8890`; sesuaikan port dengan server. Instalasi pertama mengikuti
-[lima langkah README](../README.md#instalasi-pertama--lima-langkah).
+Alur pelanggan, staf, dan kasir untuk branch `ahmad`. Contoh memakai `http://127.0.0.1:8890`;
+sesuaikan port dengan server. Pemasangan pertama mengikuti [lima langkah
+README](../README.md#pemasangan-pertama--lima-langkah).
+
+## Cara membaca
+
+Pilih bagian yang sesuai peranmu: pelanggan, staf pengelola menu, atau kasir. Alamat seperti
+`/staff/` adalah bagian belakang alamat web. Jika server ada di `http://127.0.0.1:8890`, maka
+`/staff/` berarti membuka alamat server itu ditambah `/staff/`.
+
+Checkout berarti tahap mengisi dan memeriksa pesanan sebelum dikirim. Membuat pesanan belum
+sama dengan membayarnya; pembayaran dicatat oleh kasir.
 
 ## Daftar isi
 
@@ -19,21 +28,20 @@ Alur pelanggan, staf, dan kasir untuk branch `ahmad`. Contoh memakai
 
 ## 1. Menjalankan web
 
-Setelah instalasi, buka PowerShell pada folder proyek:
+Setelah pemasangan, buka PowerShell pada folder proyek:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 .\start.ps1
 ```
 
-Biarkan terminal terbuka. Pelanggan membuka `/`, staf `/staff/`, dan kasir
-`/kasir/`. Gunakan server yang sama untuk latihan bersama. Pakai dua browser
-atau jendela privat saat mencoba sebagai pelanggan dan operator agar sesinya terpisah.
+Biarkan terminal terbuka. Pelanggan membuka `/`, staf `/staff/`, dan kasir `/kasir/`. Gunakan
+server yang sama untuk latihan bersama. Pakai dua browser atau jendela privat saat mencoba
+sebagai pelanggan dan operator agar sesinya terpisah.
 
-Setiap laptop yang menjalankan server sendiri mempunyai data sendiri. Alamat
-`127.0.0.1` menunjuk ke perangkat masing-masing. Demo lintas perangkat perlu
-alamat jaringan/host dan konfigurasi tersendiri; bukan cukup membuka loopback
-yang sama pada dua laptop.
+Setiap laptop yang menjalankan server sendiri mempunyai data sendiri. Alamat `127.0.0.1`
+menunjuk ke perangkat masing-masing. Demo lintas perangkat perlu alamat jaringan/host dan
+konfigurasi tersendiri; bukan cukup membuka alamat yang menunjuk komputer sendiri yang sama pada dua laptop.
 
 ## 2. Akun dan pembagian akses
 
@@ -72,8 +80,8 @@ Dilakukan oleh admin, bukan pelanggan:
    diberikan sesuai kebutuhan; CMS custom memeriksa `is_staff`.
 6. Pastikan akun aktif, simpan, lalu coba login pada browser lain.
 
-Kasir biasa tidak mendapat hak refund atau pengelolaan katalog. Fixture tidak
-membuat username/password demo. Rincian form ada di [panduan CMS/Admin](PANDUAN_CMS_ADMIN.md).
+Kasir biasa tidak mendapat hak refund atau pengelolaan katalog. Fixture tidak membuat
+username/password demo. Rincian form ada di [panduan CMS/Admin](PANDUAN_CMS_ADMIN.md).
 
 ## 3. Alur pelanggan
 
@@ -101,8 +109,8 @@ flowchart TD
 
 [Buka diagram SVG](diagrams/alur-pelanggan.svg).
 
-Membuat pesanan belum berarti membayar. Harga akhir mengikuti pilihan yang
-divalidasi server, bukan nominal yang diketik sendiri oleh pelanggan.
+Membuat pesanan belum berarti membayar. Harga akhir mengikuti pilihan yang diperiksa server,
+bukan nominal yang diketik sendiri oleh pelanggan.
 
 ### Memilih melalui chatbot
 
@@ -112,19 +120,19 @@ divalidasi server, bukan nominal yang diketik sendiri oleh pelanggan.
 4. Tekan **Lihat pilihan menu** pada kartu rekomendasi, lalu tentukan opsi.
 5. Lanjutkan ke keranjang dan checkout seperti pada katalog.
 
-**Cari Menu Lain** mencari alternatif dalam konteks yang masih berlaku.
-**Mulai Lagi** menghapus konteks dan teks dialog lama tanpa mengosongkan keranjang
-atau menghapus login/counter penggunaan. Jika Gemini aktif, pembukaan halaman
-dan reset dapat meminta sapaan AI baru; keduanya bisa memakai kuota meskipun
-belum ada pesan yang diketik.
-Kalimat `es kelapa tambah susu` belum otomatis memasang tambahan; pilih tambahan
-yang tersedia pada halaman menu/keranjang.
+**Cari Menu Lain** mencari alternatif dalam konteks yang masih berlaku. **Mulai Lagi**
+menghapus konteks dan teks dialog lama tanpa mengosongkan keranjang atau menghapus
+login/penghitung penggunaan. Jika Gemini aktif, pembukaan halaman dan reset dapat meminta
+sapaan AI baru; keduanya bisa memakai kuota meskipun belum ada pesan yang diketik.
 
-Mode lokal dapat menjawab tanpa Gemini. Jika Gemini aktif dan tersedia, jalur
-AI-first mencoba memproses pesan biasa lebih dahulu; instruksi, konteks, dan
-hasil fungsi katalog dapat diproses provider. Jalur lokal/hybrid tetap menjadi
-cadangan dan tidak semua tindakan melalui jalur yang sama. Untuk alergi, konfirmasi
-bahan serta kontak silang kepada staf; kartu rekomendasi bukan jaminan aman.
+Kalimat `es kelapa tambah susu` belum otomatis memasang tambahan; pilih tambahan yang tersedia
+pada halaman menu/keranjang.
+
+Mode lokal dapat menjawab tanpa Gemini. Jika Gemini aktif dan tersedia, jalur AI-first mencoba
+memproses pesan biasa lebih dahulu; instruksi, konteks, dan hasil fungsi katalog dapat diproses
+layanan AI. Jalur lokal/hybrid tetap menjadi cadangan dan tidak semua tindakan melalui jalur
+yang sama. Untuk alergi, konfirmasi bahan serta kontak silang kepada staf; kartu rekomendasi
+bukan jaminan aman.
 
 ## 4. Makan di tempat dan QR meja
 
@@ -135,15 +143,18 @@ Fixture awal tidak membuat meja. Siapkan melalui akun staf:
 3. Pelanggan memilih **Makan di Tempat** pada checkout dan memindai QR meja.
 4. Pastikan nomor meja benar sebelum membuat pesanan.
 
-QR berisi konteks meja; pemindaian tidak membuat pesanan atau pembayaran.
-Meja tidak aktif/tidak dikenal tidak boleh dipakai checkout.
+QR berisi konteks meja; pemindaian tidak membuat pesanan atau pembayaran. Meja tidak
+aktif/tidak dikenal tidak boleh dipakai checkout.
 
-Untuk latihan, tampilkan QR pada perangkat/layar lain agar terlihat kamera.
-Kamera memerlukan izin browser dan konteks yang didukung. Loopback/localhost
-dapat dipakai untuk demo lokal; HTTP lewat LAN belum tentu mengizinkan kamera.
-Demo banyak perangkat memerlukan alamat server yang dapat dijangkau dan HTTPS
-yang sesuai, bukan QR beralamat loopback. Jangan menonaktifkan keamanan browser.
-Jika QR belum siap, coba **Bawa Pulang** untuk latihan transaksi pertama.
+Untuk latihan, tampilkan QR pada perangkat/layar lain agar terlihat kamera. Kamera memerlukan
+izin browser dan konteks yang didukung.
+
+Alamat yang menunjuk komputer sendiri/localhost dapat dipakai untuk demo lokal; HTTP lewat LAN belum tentu mengizinkan
+kamera. Demo banyak perangkat memerlukan alamat server yang dapat dijangkau dan HTTPS yang
+sesuai, bukan QR beralamat alamat yang menunjuk komputer sendiri.
+
+Jangan menonaktifkan keamanan browser. Jika QR belum siap, coba **Bawa Pulang** untuk latihan
+transaksi pertama.
 
 ## 5. Alur staf
 
@@ -167,9 +178,9 @@ Jika QR belum siap, coba **Bawa Pulang** untuk latihan transaksi pertama.
 | `/staff/orders/` | Pesanan dan aksi yang ditampilkan. |
 | `/staff/audit-log/` | Catatan aksi transaksi. |
 
-Untuk menu habis sementara, ubah ketersediaan. Perubahan katalog tidak menulis
-ulang snapshot pesanan lama. Menu aktif dalam kategori nonaktif tetap dapat
-tidak muncul. Detail editor foto dan form ada di [panduan CMS/Admin](PANDUAN_CMS_ADMIN.md).
+Untuk menu habis sementara, ubah ketersediaan. Perubahan katalog tidak menulis ulang salinan
+data pesanan lama. Menu aktif dalam kategori dimatikan tetap dapat tidak muncul. Detail editor
+foto dan form ada di [panduan CMS/Admin](PANDUAN_CMS_ADMIN.md).
 
 ## 6. Alur kasir
 
@@ -183,8 +194,8 @@ tidak muncul. Detail editor foto dan form ada di [panduan CMS/Admin](PANDUAN_CMS
 6. Tekan **Konfirmasi pembayaran** dan pastikan status **Dibayar**.
 7. Periksa nominal/kembalian. Order yang dibayar tidak bisa dibayar ulang.
 
-Contoh: total Rp18.000, tunai Rp20.000, kembalian Rp2.000. Gunakan total yang
-tampil pada order karena opsi/tambahan dapat mengubahnya.
+Contoh: total Rp18.000, tunai Rp20.000, kembalian Rp2.000. Gunakan total yang tampil pada order
+karena opsi/tambahan dapat mengubahnya.
 
 ```mermaid
 stateDiagram-v2
@@ -205,22 +216,21 @@ stateDiagram-v2
 | `EXPIRED` | Order pending melewati masa berlaku. |
 | `REFUNDED` | Order yang dibayar telah direfund staf. |
 
-Order baru berlaku satu jam. Kedaluwarsa dapat diperbarui ketika order dibaca
-atau melalui `python -B manage.py expire_orders`. Jadwal berkala perlu disiapkan
-operator; server tidak otomatis membuat jadwal tersebut.
+Order baru berlaku satu jam. Kedaluwarsa dapat diperbarui ketika order dibaca atau melalui
+`python -B manage.py expire_orders`. Jadwal berkala perlu disiapkan operator; server tidak
+otomatis membuat jadwal tersebut.
 
-Pembatalan untuk `PENDING`, refund untuk `PAID` oleh staf. Refund tersedia
-melalui endpoint staf `POST /api/orders/<public_id>/refund/`, tetapi belum
-mempunyai tombol operasional pada CMS atau dashboard kasir. Pelaksanaan melalui
-API perlu operator teknis dengan sesi staf dan CSRF yang sah. Jangan mengubah
-status langsung di database untuk meniru transaksi.
+Pembatalan untuk `PENDING`, refund untuk `PAID` oleh staf. Refund tersedia melalui alamat layanan
+staf `POST /api/orders/<public_id>/refund/`, tetapi belum mempunyai tombol operasional pada CMS
+atau dashboard kasir. Pelaksanaan melalui API perlu operator teknis dengan sesi staf dan CSRF
+yang sah. Jangan mengubah status langsung di database untuk meniru transaksi.
 
-CARD/QRIS/OTHER mencatat metode pilihan operator. Aplikasi belum otomatis
-memverifikasi pembayaran dengan bank atau penyedia pembayaran.
+CARD/QRIS/OTHER mencatat metode pilihan operator. Aplikasi belum otomatis memverifikasi
+pembayaran dengan bank atau penyedia pembayaran.
 
 ## 7. Simulasi satu pesanan
 
-Gunakan instalasi latihan, bukan database transaksi nyata:
+Gunakan pemasangan latihan, bukan database transaksi nyata:
 
 1. Jalankan satu server; browser A sebagai pelanggan, browser B sebagai admin/kasir.
 2. Pelanggan memilih Ayam Geprek, melengkapi opsi wajib, lalu **Bawa Pulang**.
@@ -230,8 +240,8 @@ Gunakan instalasi latihan, bukan database transaksi nyata:
 6. Kasir melihat status Dibayar; pelanggan memuat ulang konfirmasi untuk memeriksa status.
 7. Staf memeriksa audit. Untuk mengulang latihan, buat pesanan baru; jangan membayar lagi order yang sama.
 
-Latihan menambah order, pembayaran, dan audit di database latihan. Selanjutnya
-coba varian/tambahan, uang kurang, pembatalan, serta makan di tempat dengan QR.
+Latihan menambah order, pembayaran, dan audit di database latihan. Selanjutnya coba
+varian/tambahan, uang kurang, pembatalan, serta makan di tempat dengan QR.
 
 ## 8. Kendala yang sering ditemui
 
@@ -248,17 +258,16 @@ coba varian/tambahan, uang kurang, pembatalan, serta makan di tempat dengan QR.
 
 ## 9. Catatan penggunaan setelah pembaruan
 
-Jumlah tambah/edit keranjang dibatasi bilangan bulat 1–99 per baris. Jika pilihan
-dan catatan sama, penambahan dapat digabung; hasil gabungan juga tidak boleh
-melebihi 99. Menghapus baris tetap dilakukan melalui aksi hapus/jalur yang
-disediakan. Batas ini bukan jumlah maksimal seluruh baris pesanan kasir.
+Jumlah tambah/edit keranjang dibatasi bilangan bulat 1–99 per baris. Jika pilihan dan catatan
+sama, penambahan dapat digabung; hasil gabungan juga tidak boleh melebihi 99. Menghapus baris
+tetap dilakukan melalui aksi hapus/jalur yang disediakan. Batas ini bukan jumlah maksimal
+seluruh baris pesanan kasir.
 
-Keluar dari CMS/kasir memakai tombol **Keluar**. Tombol mengirim form POST dengan
-token CSRF; membuka URL logout secara langsung lewat address bar bukan cara
-logout. Jika menerima 403, muat ulang halaman operator dan gunakan tombol pada
-sesi yang sama; jangan menonaktifkan CSRF.
+Keluar dari CMS/kasir memakai tombol **Keluar**. Tombol mengirim form POST dengan token CSRF;
+membuka URL logout secara langsung lewat address bar bukan cara logout. Jika menerima 403, muat
+ulang halaman operator dan gunakan tombol pada sesi yang sama; jangan menonaktifkan CSRF.
 
-Untuk memantau AI, lihat terminal server yang benar. Log JSON provider berisi
-token per panggilan, bukan isi chat atau total tagihan. Jika hanya membuka
-halaman sudah muncul log, itu dapat berasal dari sapaan awal. Panduan teknis
-log ada di [Chatbot.md](Chatbot.md#13-memahami-catatan-proses).
+Untuk memantau AI, lihat terminal server yang benar. Log JSON layanan AI berisi token per
+panggilan, bukan isi chat atau total tagihan. Jika hanya membuka halaman sudah muncul log, itu
+dapat berasal dari sapaan awal. Panduan teknis log ada di
+[Chatbot.md](Chatbot.md#13-memahami-catatan-proses).

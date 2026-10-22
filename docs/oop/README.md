@@ -1,71 +1,85 @@
 # Panduan Belajar OOP dari Kode RasaKita
 
-Dokumen ini mengikuti source project utama pada branch `ahmad`, diselaraskan
-pada **23 Oktober 2026**. Tujuannya membantu anggota tim memahami, menelusuri,
-dan mempresentasikan implementasi yang benar-benar ada, bukan menghafal definisi.
+Materi ini ditujukan untuk anggota tim yang sedang belajar. Kita mulai dari masalah yang
+terlihat pada web, lalu membuka kode yang mengerjakannya. Kamu tidak perlu menghafal semua
+istilah sebelum mulai membaca.
 
-Ada **tujuh modul utama, 35 kasus, dan tepat lima berkas utama berbeda pada
-setiap modul**. Berkas yang sama dapat dipakai lagi di modul lain untuk membahas
-konsep berbeda. Modul 8–9 merupakan pendalaman dan modul 10 berisi latihan.
-Angka 35 tidak menghitung latihan sebagai kasus tambahan.
+OOP adalah singkatan dari pemrograman berorientasi object. Kita mengelompokkan data dan
+pekerjaan yang berkaitan ke dalam class agar lebih mudah digunakan dan dipahami.
+
+Ada **tujuh modul utama dengan 35 kasus**. Setiap modul memakai lima berkas utama berbeda.
+Modul 8 dan 9 memperdalam pembahasan, sedangkan modul 10 berisi latihan. Contoh-contohnya
+memakai class dan method yang benar-benar ada.
+
+## Pegangan awal
+
+- **Class** adalah rancangan data dan pekerjaan. Contohnya rancangan menu.
+- **Object** adalah sesuatu yang dibuat dari class, misalnya satu menu nasi.
+- **Atribut** adalah datanya, misalnya nama dan harga.
+- **Method** adalah fungsi di dalam class, misalnya menghitung harga.
+- **Parameter** adalah nilai yang diberikan ketika fungsi atau method dipanggil.
+- **self** menunjuk object yang sedang dikerjakan oleh method.
+
+- **None** berarti belum ada nilai atau hasil yang dapat dipakai.
+- **True/False** berarti benar/salah.
+- **List** adalah daftar data. **Dictionary** menyimpan pasangan nama dan nilai.
+- **Tuple** adalah daftar yang anggotanya tidak ditambah atau dihapus seperti list.
+- **Database** adalah tempat data aplikasi disimpan, misalnya katalog dan pesanan.
+
+Jika bertemu istilah lain, lihat artinya pada awal modul. Nama kode tetap memakai penulisan
+asli agar dapat dicari pada berkas proyek.
 
 ## Urutan membaca
 
-Nama berkas diberi nomor agar mudah ditemukan. Gunakan urutan tabel ini;
-beberapa file explorer menyortir teks sehingga nomor 10 bisa tampil setelah 1.
-Nama bernomor adalah dokumen Markdown, bukan nama modul Python yang diimpor.
+| Modul | Yang dipelajari |
+|---|---|
+| [1. Class dan Object.md](1.%20Class%20dan%20Object.md) | Mengenal rancangan class, object yang dibuat, dan data masing-masing. |
+| [2. Atribut dan Method.md](2.%20Atribut%20dan%20Method.md) | Membedakan data dengan pekerjaan, serta cara memanggil method. |
+| [3. Enkapsulasi.md](3.%20Enkapsulasi.md) | Mengatur perubahan data supaya aturan tetap dipenuhi. |
+| [4. Relasi Kelas dan UML.md](4.%20Relasi%20Kelas%20dan%20UML.md) | Menggambar siapa berhubungan dengan siapa dan berapa jumlahnya. |
+| [5. Inheritance.md](5.%20Inheritance.md) | Memakai kemampuan class induk dan menambahkan kebutuhan turunan. |
+| [6. Polimorfisme dan Abstraksi.md](6.%20Polimorfisme%20dan%20Abstraksi.md) | Memahami pemanggilan yang sama dengan pekerjaan yang berbeda. |
+| [7. Prinsip SOLID.md](7.%20Prinsip%20SOLID.md) | Membaca lima prinsip agar kode lebih mudah diubah. |
+| [8. Pendalaman Abstraksi.md](8.%20Pendalaman%20Abstraksi.md) | Memisahkan kemampuan yang diperlukan dari cara mengerjakannya. |
+| [9. Pendalaman Komposisi.md](9.%20Pendalaman%20Komposisi.md) | Melihat kerja sama object tanpa memaksakan hubungan induk dan turunan. |
+| [10. Latihan dan Presentasi.md](10.%20Latihan%20dan%20Presentasi.md) | Mencoba contoh sederhana dan berlatih menjelaskan satu kasus. |
 
-| Urutan dan berkas | Fokus | Peta kasus |
-|---|---|---|
-| [1. Class dan Object.md](1.%20Class%20dan%20Object.md) | Class, instans, constructor, dan self | MenuItem, BudgetConstraint, CartService, StaffAccess, MenuSelection |
-| [2. Atribut dan Method.md](2.%20Atribut%20dan%20Method.md) | Atribut kelas/instans, method, factory, property | CartService, BudgetConstraint, MenuItemAlias, MenuSelection, GeminiClient |
-| [3. Enkapsulasi.md](3.%20Enkapsulasi.md) | Invariant, salinan, tuple, dan kepemilikan state | BudgetConstraint, MenuSelection, CartService, StaffAccess, ConversationSession |
-| [4. Relasi Kelas dan UML.md](4.%20Relasi%20Kelas%20dan%20UML.md) | Asosiasi, agregasi, dependency, dan inheritance | menu/models, orders/models, MenuSelection, ChatbotService, TextGenerator |
-| [5. Inheritance.md](5.%20Inheritance.md) | Superclass, override, super, dan batas framework | GeminiClient, TurnGenerator, MenuItem, MenuPhotoForm, MenuPhotoWidget |
-| [6. Polimorfisme dan Abstraksi.md](6.%20Polimorfisme%20dan%20Abstraksi.md) | ABC, dispatch, protokol string, dan kesamaan nilai | TextGenerator, TurnGenerator, model katalog, BudgetConstraint, MenuPhotoWidget |
-| [7. Prinsip SOLID.md](7.%20Prinsip%20SOLID.md) | Satu kasus per prinsip dengan batas desain | MenuSelection, TextGenerator, GeminiClient, StaffAccess, RecommendationExplanationService |
-| [8. Pendalaman Abstraksi.md](8.%20Pendalaman%20Abstraksi.md) | Kontrak teks dan kontrak percakapan AI-first | Materi pendamping; tidak menambah hitungan 35 kasus |
-| [9. Pendalaman Komposisi.md](9.%20Pendalaman%20Komposisi.md) | Perangkaian object dan siklus hidup UML | Materi pendamping; tidak menambah hitungan 35 kasus |
-| [10. Latihan dan Presentasi.md](10.%20Latihan%20dan%20Presentasi.md) | Latihan, contoh tanpa API, dan rubrik penjelasan | Latihan lintas modul; bukan implementasi fitur baru |
+Nama berkas diberi nomor 1 sampai 10. Jika pengelola file menampilkan nomor 10 setelah nomor 1,
+tetap ikuti urutan tabel ini.
 
-## Cara membedah satu kasus
+## Cara mengikuti satu kasus
 
-1. Mulai dari masalah pelanggan atau operator yang dijelaskan, bukan dari istilah OOP.
-2. Buka berkas utama dan cari simbol class/method. Tautan baris membantu pada revisi ini;
-   nomor baris dapat berubah ketika source berikutnya diedit.
-3. Baca cuplikan bersama konteks berkas. Cuplikan panjang hanya mengambil bagian awal
-   dan diberi keterangan; itu bukan implementasi lengkap yang siap disalin sendiri.
-4. Tandai input, atribut/state, method yang dipanggil, nilai hasil, dan efek penyimpanan.
-5. Hubungkan mekanismenya dengan konsep: misalnya validasi sebelum mutasi menjelaskan
-   enkapsulasi lebih baik daripada hanya menunjuk underscore.
-6. Uji pemahaman dengan kondisi gagal. Jelaskan apa yang ditolak dan state mana yang tetap.
-7. Sebutkan batasnya: yang merupakan konvensi, yang dibantu framework, dan yang perlu
-   dibuktikan saat runtime.
+1. Baca masalahnya. Bayangkan tindakan yang dilakukan pelanggan atau operator.
+2. Buka tautan berkas dan cari class atau method yang disebutkan.
+3. Ikuti langkah pembacaan di bawah potongan kode.
+4. Cocokkan masukan dan hasil pada contohnya.
+5. Baca alasan kasus itu menunjukkan konsep OOP yang dibahas.
+6. Coba jawab pertanyaannya dengan kata sendiri.
 
-Setiap kasus mempunyai masalah, cuplikan source, langkah penelusuran, contoh
-input/hasil, pembahasan OOP, batas penerapan, dan latihan khusus. Contoh harga,
-nama, dan akun adalah data ilustrasi; bukan klaim isi katalog yang sedang berjalan.
+Potongan kode panjang kadang hanya menampilkan bagian awal. Lanjutkan membaca berkas aslinya
+jika ingin mengikuti seluruh method. Nama dan harga pada contoh adalah data latihan, bukan isi
+katalog yang wajib ada di setiap laptop.
 
-## Peta kode yang dipakai
+## Mulai mencari kode dari sini
 
-| Berkas | Tanggung jawab | Konsep utama |
-|---|---|---|
-| [menu/models.py](../../menu/models.py) | Katalog, tag, alias, opsi, tambahan | Model, instans, override, relasi |
-| [menu/selection.py](../../menu/selection.py) | Pilihan tervalidasi dan perhitungan harga | Class biasa, factory, property, tuple |
-| [cart/services.py](../../cart/services.py) | Keranjang sesi dan mutasi terkontrol | State instans, defensive copy, staticmethod |
-| [orders/models.py](../../orders/models.py) | Data pesanan dan snapshot transaksi | Relasi, field, perilaku model |
-| [orders/services.py](../../orders/services.py) | Fungsi transaksi atomic dan audit | Pemisahan tanggung jawab; bukan class OrderService |
-| [users/access.py](../../users/access.py) | Keputusan staf/kasir | Object kebijakan dan property |
-| [budget.py](../../recommendation/services/budget.py) | Batas uang dan serialisasi | Object nilai, enkapsulasi, `__eq__` |
-| [text_generator.py](../../recommendation/services/text_generator.py) | Kontrak pembuat teks | ABC dan abstractmethod |
-| [gemini.py](../../recommendation/services/gemini.py) | Adapter SDK, kuota, telemetry | Implementasi kontrak dan helper kebijakan |
-| [turn_generator.py](../../recommendation/services/ai/turn_generator.py) | Satu percobaan pada komponen hybrid | Inheritance, delegation, state giliran |
-| [explanations.py](../../recommendation/services/ai/explanations.py) | Penjelasan dari fakta yang diperiksa | Injection dependency dan validasi |
-| [assistant.py](../../recommendation/services/ai/assistant.py) | Percakapan AI-first serta tool katalog | Kontrak kemampuan di luar generate |
-| [chatbot.py](../../recommendation/services/chatbot.py) | Pengarah AI-first/lokal/hybrid | Perangkaian layanan dan batas dependency |
-| [conversation_session.py](../../recommendation/services/conversation_session.py) | Konteks percakapan pada sesi eksternal | Kepemilikan state dan reset terarah |
-| [menu/forms.py](../../menu/forms.py) | Validasi dan konfigurasi form foto | ModelForm, super, override |
-| [menu/widgets.py](../../menu/widgets.py) | Konteks input/preview foto | Inheritance dan dispatch widget |
+| Berkas | Pekerjaannya |
+|---|---|
+| [menu/models.py](../../menu/models.py) | Menjelaskan data kategori, menu, tag, varian, dan tambahan. |
+| [menu/selection.py](../../menu/selection.py) | Memeriksa pilihan dan menghitung harganya. |
+| [cart/services.py](../../cart/services.py) | Mengubah dan menyimpan isi keranjang pada sesi browser. |
+| [orders/models.py](../../orders/models.py) | Menjelaskan data pesanan dan baris makanan. |
+| [orders/services.py](../../orders/services.py) | Menjalankan pembuatan pesanan, pembayaran, pembatalan, dan refund. |
+| [users/access.py](../../users/access.py) | Memeriksa apakah pengguna boleh mengelola katalog atau memakai kasir. |
+| [budget.py](../../recommendation/services/budget.py) | Menyimpan dan memeriksa batas harga. |
+| [text_generator.py](../../recommendation/services/text_generator.py) | Menentukan kemampuan dasar pembuat teks. |
+| [gemini.py](../../recommendation/services/gemini.py) | Menghubungi Gemini dan mencatat pemakaiannya. |
+| [turn_generator.py](../../recommendation/services/ai/turn_generator.py) | Membatasi percobaan AI pada bagian hybrid yang memakainya. |
+| [explanations.py](../../recommendation/services/ai/explanations.py) | Meminta dan memeriksa penjelasan rekomendasi. |
+| [assistant.py](../../recommendation/services/ai/assistant.py) | Mengatur percakapan Gemini dan fungsi pencarian menu. |
+| [chatbot.py](../../recommendation/services/chatbot.py) | Menghubungkan bagian-bagian percakapan. |
+| [conversation_session.py](../../recommendation/services/conversation_session.py) | Mengelola data percakapan yang perlu diingat sementara. |
+| [menu/forms.py](../../menu/forms.py) | Menyiapkan dan memeriksa form foto menu. |
+| [menu/widgets.py](../../menu/widgets.py) | Menyiapkan tampilan input foto dan pratinjau. |
 
 ## Daftar 35 kasus beserta simbol sumber
 
@@ -125,52 +139,25 @@ nama, dan akun adalah data ilustrasi; bukan klaim isi katalog yang sedang berjal
 4. [`StaffAccess`](../../users/access.py#L18) — `users/access.py`.
 5. [`RecommendationExplanationService.__init__`](../../recommendation/services/ai/explanations.py#L74) — `recommendation/services/ai/explanations.py`.
 
-## Hubungan konsep pada satu alur
 
-```mermaid
-flowchart TD
-    A[Browser mengirim ID pilihan dan jumlah] --> B[CartService: validasi dan state sesi]
-    B --> C[MenuSelection.from_ids: pilihan katalog sah]
-    C --> D[Property unit_price: hitung dari katalog]
-    B --> E[Respons: satu snapshot items dan total_for]
-    E --> F[Checkout: create_order atomic]
-    F --> G[Order dan OrderItem: snapshot transaksi]
-```
+## Menghubungkan konsep dengan tindakan pengguna
 
-Class dan object tampak pada layanan, pilihan, serta model. Method menyatakan
-pekerjaannya; enkapsulasi menjaga jalur perubahan; dependency menjelaskan siapa
-memakai siapa. Inheritance tidak perlu dipaksakan pada seluruh alur. Fungsi
-create_order tetap merupakan fungsi biasa yang mengoordinasikan beberapa object.
+Pelanggan memilih makanan, varian, tambahan, dan jumlah. CartService menerima pilihan tersebut.
+MenuSelection memeriksa apakah pilihannya sesuai katalog dan membantu menghitung harga. Ketika
+checkout, fungsi pesanan memeriksa lagi lalu menyimpan pesanan beserta harga saat itu.
 
-## Perilaku aplikasi yang dipakai dalam contoh
+Dari alur ini kita dapat melihat class, object, data, method, dan kerja sama antarbagian. Tidak
+semua langkah perlu memakai inheritance. Fungsi biasa juga dapat tepat untuk pekerjaan
+tertentu; orders/services.py tidak mempunyai class OrderService yang perlu dihafal.
 
-- Validasi cart memakai integer 1–99, termasuk hasil penggabungan baris. Boolean
-  ditolak. Update jumlah integer <= 0 tetap menghapus baris melalui jalurnya.
-- Respons cart memakai items yang sama untuk total_for; checkout baru menunda
-  agregasi total sampai akhir dengan audit running total tiap item tetap tersedia.
-- Logout staf/kasir memakai POST + CSRF. Kontrol HTTP ini berbeda dari konsep private Python.
-- Pemilihan parser foto dibatasi sejak Image.open; widget preview bukan validator keamanan.
-- Reset dialog menghapus teks lama tetapi mempertahankan counter, cart, dan login.
-  Chatbot bisa meminta sapaan AI baru setelah reset.
-- Pembukaan halaman mengirim pesan kosong. Jika Gemini tersedia, sapaan awal
-  juga dapat memanggil provider sebelum pengguna mengetik.
-- AI-first memakai converse langsung, mempunyai batas putaran tool, serta kuota
-  bersama per dispatch. TurnGenerator hanya membatasi komponen hybrid yang memakainya.
-- Log provider berisi metadata/token per panggilan. Tidak ada jumlah biaya pasti
-  dari estimated_cost=null dan tidak ada total token sesi otomatis di halaman.
+## Menyiapkan penjelasan sendiri
 
-## Cara memeriksa pemahaman
+Pilih satu kasus dan ceritakan masalah, data awal, pemeriksaan, serta hasilnya. Tunjukkan kode
+yang mendukung penjelasanmu. Sebutkan juga satu hal yang belum dijamin oleh contoh itu.
+Misalnya, tuple menjaga daftar anggota tetapi tidak membuat seluruh object di dalamnya tidak
+bisa berubah.
 
-Cocokkan cuplikan dengan simbol pada berkas sumber, lalu prediksi hasil contoh
-sebelum menjalankan latihan. Untuk operasi yang memakai database atau provider,
-ikuti [panduan pemeriksaan lokal](../PANDUAN_TESTING_LOKAL.md). Membaca source
-menjelaskan implementasi; menjalankan tes membantu memeriksa perilakunya.
-
-Urutan tujuh topik mempertahankan susunan materi kuliah pada dokumentasi lama.
-PDF acuan tidak tersedia di repository ini, sehingga kesesuaian halaman PDF tidak
-diverifikasi ulang dan tidak dijadikan bukti isi source. Jika rubrik dosen berbeda,
-bandingkan kembali dengan modul asli; jangan mengarang kelas proyek agar cocok contoh.
-
-Gunakan [latihan dan presentasi](10.%20Latihan%20dan%20Presentasi.md) untuk menguji
-pemahaman. Panduan sistem ada pada [Chatbot.md](../Chatbot.md) dan
-[panduan pengembangan](../PANDUAN_PENGEMBANGAN.md).
+Latihan ada di [Modul 10](10.%20Latihan%20dan%20Presentasi.md). Untuk memahami web lebih
+lengkap, baca [panduan pengembangan](../PANDUAN_PENGEMBANGAN.md) atau [penjelasan
+chatbot](../Chatbot.md). Cara menjalankan tes ada di [pemeriksaan
+lokal](../PANDUAN_TESTING_LOKAL.md).
