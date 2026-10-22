@@ -118,13 +118,7 @@ class GeminiClient(TextGenerator):
 
             return None
 
-        guard = UsageGuard()
-
-        if not guard.allow_provider():
-            self.last_event = provider_event(
-                model, 'guard_unavailable' if guard.unavailable else 'quota_exhausted', 0
-            )
-
+        if not self._allow_provider(model):
             return None
 
         started = perf_counter()
@@ -164,6 +158,16 @@ class GeminiClient(TextGenerator):
 
             return None
 
+    def _allow_provider(self, model: str) -> bool:
+        """Apply shared daily accounting to every SDK dispatch, including tool turns."""
+        guard = UsageGuard()
+        if guard.allow_provider():
+            return True
+        self.last_event = provider_event(
+            model, 'guard_unavailable' if guard.unavailable else 'quota_exhausted', 0
+        )
+        return False
+
     def converse(
         self,
         message: str,
@@ -194,6 +198,9 @@ class GeminiClient(TextGenerator):
         for _ in range(max(1, max_iterations)):
             if before_request and not before_request():
                 return None, tool_results
+            if not self._allow_provider(model):
+                return None, tool_results
+            started = perf_counter()
             try:
                 response = self.client.models.generate_content(
                     model=model,
@@ -202,11 +209,25 @@ class GeminiClient(TextGenerator):
                 )
             except Exception as exc:
                 category, status = self._failure_metadata(exc)
+                self.last_event = provider_event(
+                    model,
+                    'TimeoutError' if category == 'timeout' else 'provider_error',
+                    (perf_counter() - started) * 1000,
+                    failed=True,
+                )
                 provider_failure_event(category, status)
                 return None, tool_results
 
             candidate = (response.candidates or [None])[0]
             content = candidate.content if candidate else None
+            # Record each SDK response before tools run or another turn can replace it.
+            # Metadata only: never log message/context, tool arguments, or response text.
+            self.last_event = provider_event(
+                model,
+                'success' if content and content.parts else 'empty_or_rejected',
+                (perf_counter() - started) * 1000,
+                getattr(response, 'usage_metadata', None),
+            )
             if content is None:
                 return None, tool_results
             contents.append(content)

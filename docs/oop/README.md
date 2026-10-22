@@ -1,188 +1,163 @@
-# Panduan belajar OOP dari kode RasaKita
+# Panduan Belajar OOP dari Kode RasaKita
 
-Panduan ini untuk anggota proyek bersama Universitas Mulawarman, Samarinda.
-Tujuannya supaya anggota dapat membuka file nyata, menemukan bagian kodenya,
-lalu menjelaskan hubungan kode dengan materi kuliah menggunakan bahasa sendiri.
+Materi ini ditujukan untuk anggota tim yang sedang belajar. Kita mulai dari masalah yang
+terlihat pada web, lalu membuka kode yang mengerjakannya. Kamu tidak perlu menghafal semua
+istilah sebelum mulai membaca.
 
-Ada **7 materi utama dan 35 kasus**, tepat lima kasus pada setiap materi.
-Urutannya mengikuti tujuh PDF yang diberikan. Contoh laptop, bank, tim, dan hero
-pada modul kuliah dipakai sebagai acuan konsep, lalu dipetakan ke implementasi
-restoran yang benar-benar ada. Dokumen ini tidak menyalin seluruh modul kuliah.
+OOP adalah singkatan dari pemrograman berorientasi object. Kita mengelompokkan data dan
+pekerjaan yang berkaitan ke dalam class agar lebih mudah digunakan dan dipahami.
 
-## 1. Mulai membaca dari sini
+Ada **tujuh modul utama dengan 35 kasus**. Setiap modul memakai lima berkas utama berbeda.
+Modul 8 dan 9 memperdalam pembahasan, sedangkan modul 10 berisi latihan. Contoh-contohnya
+memakai class dan method yang benar-benar ada.
 
-1. Kenali struktur folder pada bagian berikut.
-2. Baca Modul 1, lalu lanjut sesuai urutan tabel.
-3. Buka tautan file pada kasus yang dipelajari.
-4. Cari nama class/method yang disebutkan. Jangan hanya membaca nama filenya.
-5. Ikuti langkah pembacaan, lalu cocokkan dengan hasil dan batas yang dijelaskan.
-6. Sampaikan kembali konsep dan alurnya tanpa menghafal kalimat panduan.
+## Pegangan awal
 
-## 2. Peta folder dan file yang dipakai
+- **Class** adalah rancangan data dan pekerjaan. Contohnya rancangan menu.
+- **Object** adalah sesuatu yang dibuat dari class, misalnya satu menu nasi.
+- **Atribut** adalah datanya, misalnya nama dan harga.
+- **Method** adalah fungsi di dalam class, misalnya menghitung harga.
+- **Parameter** adalah nilai yang diberikan ketika fungsi atau method dipanggil.
+- **self** menunjuk object yang sedang dikerjakan oleh method.
 
-| Folder/file | Isinya | Mulai memperhatikan bagian ini |
-|---|---|---|
-| [menu/models.py](../../menu/models.py) | Kategori, menu, tag, alias, varian, tambahan | Field data, relasi model, save, __str__. |
-| [menu/selection.py](../../menu/selection.py) | Pilihan menu dan perhitungan harganya | MenuSelection, MinimumQuote, from_ids, unit_price. |
-| [menu/forms.py](../../menu/forms.py) | Form foto menu | MenuPhotoForm dan super().__init__. |
-| [menu/widgets.py](../../menu/widgets.py) | Input foto untuk form | MenuPhotoWidget dan get_context. |
-| [cart/services.py](../../cart/services.py) | Keranjang berbasis sesi | CartService, SESSION_KEY, _lines, add_item, clear. |
-| [orders/models.py](../../orders/models.py) | Pesanan, baris, pembayaran, meja, audit | Order, OrderItem, ForeignKey, PROTECT, save. |
-| [orders/services.py](../../orders/services.py) | Fungsi layanan transaksi pesanan | Pemakaian MenuSelection dan transaksi database. |
-| [users/access.py](../../users/access.py) | Keputusan akses staf dan kasir | StaffAccess dan property hak akses. |
-| [recommendation/services/budget.py](../../recommendation/services/budget.py) | Nilai batas harga | BudgetConstraint, validasi, property, __eq__. |
-| [recommendation/services/text_generator.py](../../recommendation/services/text_generator.py) | Kontrak pembuat teks | ABC, abstractmethod, generate, generate_ranking. |
-| [recommendation/services/gemini.py](../../recommendation/services/gemini.py) | Implementasi Gemini | GeminiClient, generate, converse. |
-| [recommendation/services/ai/turn_generator.py](../../recommendation/services/ai/turn_generator.py) | Pembatas pemakaian generator dalam giliran hybrid | TurnGenerator, reserve, _generate. |
-| [recommendation/services/ai/explanations.py](../../recommendation/services/ai/explanations.py) | Penyusunan penjelasan rekomendasi | Constructor yang menerima TextGenerator. |
-| [recommendation/services/ai/assistant.py](../../recommendation/services/ai/assistant.py) | Percakapan AI-first dan tool katalog | GeminiAssistant, respond, pencarian menu. |
-| [recommendation/services/chatbot.py](../../recommendation/services/chatbot.py) | Pengarah percakapan | ChatbotService dan pemilihan jalur AI/lokal. |
+- **None** berarti belum ada nilai atau hasil yang dapat dipakai.
+- **True/False** berarti benar/salah.
+- **List** adalah daftar data. **Dictionary** menyimpan pasangan nama dan nilai.
+- **Tuple** adalah daftar yang anggotanya tidak ditambah atau dihapus seperti list.
+- **Database** adalah tempat data aplikasi disimpan, misalnya katalog dan pesanan.
 
-Tidak setiap file harus berisi class. Contohnya orders/services.py berisi fungsi
-layanan; jangan menyebut ada class OrderService di sana. Fungsi biasa tetap tepat
-bila sesuai tanggung jawabnya. Memakai OOP juga tidak mengharuskan setiap fungsi
-dibungkus class.
+Jika bertemu istilah lain, lihat artinya pada awal modul. Nama kode tetap memakai penulisan
+asli agar dapat dicari pada berkas proyek.
 
-## 3. Urutan materi sesuai PDF
+## Urutan membaca
 
-| Modul | Dokumen proyek | Jumlah kasus | Acuan materi |
-|---|---|---|---|
-| 1 | [Pengantar OOP, class, dan object](class-dan-object.md) | 5 | Modul 1 Pengantar OOP, Class, dan Object.pdf |
-| 2 | [Atribut dan method](atribut-dan-method.md) | 5 | Modul 2 Atribut dan Method.pdf |
-| 3 | [Enkapsulasi](encapsulation.md) | 5 | Modul 3 Encapsulation.pdf |
-| 4 | [Relasi antarkelas dan diagram UML](uml-class-relationships.md) | 5 | Modul 4 UML class relationships-1.pdf |
-| 5 | [Inheritance atau pewarisan](inheritance.md) | 5 | Modul 5 Inheritance-1.pdf |
-| 6 | [Polimorfisme dan abstraksi](polymorphism.md) | 5 | Modul 6 Polimorfisme & Abstraksi-1.pdf |
-| 7 | [Lima prinsip SOLID](solid.md) | 5 | Modul 7 - Prinsip SOLID.pdf |
+| Modul | Yang dipelajari |
+|---|---|
+| [1. Class dan Object.md](1.%20Class%20dan%20Object.md) | Mengenal rancangan class, object yang dibuat, dan data masing-masing. |
+| [2. Atribut dan Method.md](2.%20Atribut%20dan%20Method.md) | Membedakan data dengan pekerjaan, serta cara memanggil method. |
+| [3. Enkapsulasi.md](3.%20Enkapsulasi.md) | Mengatur perubahan data supaya aturan tetap dipenuhi. |
+| [4. Relasi Kelas dan UML.md](4.%20Relasi%20Kelas%20dan%20UML.md) | Menggambar siapa berhubungan dengan siapa dan berapa jumlahnya. |
+| [5. Inheritance.md](5.%20Inheritance.md) | Memakai kemampuan class induk dan menambahkan kebutuhan turunan. |
+| [6. Polimorfisme dan Abstraksi.md](6.%20Polimorfisme%20dan%20Abstraksi.md) | Memahami pemanggilan yang sama dengan pekerjaan yang berbeda. |
+| [7. Prinsip SOLID.md](7.%20Prinsip%20SOLID.md) | Membaca lima prinsip agar kode lebih mudah diubah. |
+| [8. Pendalaman Abstraksi.md](8.%20Pendalaman%20Abstraksi.md) | Memisahkan kemampuan yang diperlukan dari cara mengerjakannya. |
+| [9. Pendalaman Komposisi.md](9.%20Pendalaman%20Komposisi.md) | Melihat kerja sama object tanpa memaksakan hubungan induk dan turunan. |
+| [10. Latihan dan Presentasi.md](10.%20Latihan%20dan%20Presentasi.md) | Mencoba contoh sederhana dan berlatih menjelaskan satu kasus. |
 
-Modul 6 menggabungkan polimorfisme dan abstraksi sesuai PDF. Lima kasusnya
-mencakup ABC, pertukaran implementasi generate, __str__, __eq__, dan widget Django.
-Catatan [abstraksi](abstraction.md) serta [komposisi](composition.md) adalah
-pendamping, bukan tambahan kasus yang dihitung sebagai modul kedelapan.
+Nama berkas diberi nomor 1 sampai 10. Jika pengelola file menampilkan nomor 10 setelah nomor 1,
+tetap ikuti urutan tabel ini.
 
-## 4. Cara membaca satu potongan kode
+## Cara mengikuti satu kasus
 
-```python
-class CartService:
-    SESSION_KEY: ClassVar[str] = "cart"
+1. Baca masalahnya. Bayangkan tindakan yang dilakukan pelanggan atau operator.
+2. Buka tautan berkas dan cari class atau method yang disebutkan.
+3. Ikuti langkah pembacaan di bawah potongan kode.
+4. Cocokkan masukan dan hasil pada contohnya.
+5. Baca alasan kasus itu menunjukkan konsep OOP yang dibahas.
+6. Coba jawab pertanyaannya dengan kata sendiri.
 
-    def __init__(self, session: SessionBase) -> None:
-        self.session: SessionBase = session
-        self._lines: list[CartLine] = deepcopy(session.get(self.SESSION_KEY, []))
-```
+Potongan kode panjang kadang hanya menampilkan bagian awal. Lanjutkan membaca berkas aslinya
+jika ingin mengikuti seluruh method. Nama dan harga pada contoh adalah data latihan, bukan isi
+katalog yang wajib ada di setiap laptop.
 
-Ini cuplikan dari cart/services.py; import dan method lain tidak ditampilkan.
+## Mulai mencari kode dari sini
 
-1. class CartService menyatakan rancangan layanan keranjang.
-2. SESSION_KEY adalah atribut kelas untuk nama penyimpanan bersama.
-3. __init__ menerima sesi saat object dibuat.
-4. self.session menyimpan sesi milik object itu.
-5. self._lines menyimpan salinan baris yang dibaca dari sesi.
-6. Awalan _ menyatakan bagian internal secara konvensi, bukan larangan akses mutlak.
-7. : SessionBase dan -> None merupakan keterangan tipe, bukan nilai yang diberikan.
+| Berkas | Pekerjaannya |
+|---|---|
+| [menu/models.py](../../menu/models.py) | Menjelaskan data kategori, menu, tag, varian, dan tambahan. |
+| [menu/selection.py](../../menu/selection.py) | Memeriksa pilihan dan menghitung harganya. |
+| [cart/services.py](../../cart/services.py) | Mengubah dan menyimpan isi keranjang pada sesi browser. |
+| [orders/models.py](../../orders/models.py) | Menjelaskan data pesanan dan baris makanan. |
+| [orders/services.py](../../orders/services.py) | Menjalankan pembuatan pesanan, pembayaran, pembatalan, dan refund. |
+| [users/access.py](../../users/access.py) | Memeriksa apakah pengguna boleh mengelola katalog atau memakai kasir. |
+| [budget.py](../../recommendation/services/budget.py) | Menyimpan dan memeriksa batas harga. |
+| [text_generator.py](../../recommendation/services/text_generator.py) | Menentukan kemampuan dasar pembuat teks. |
+| [gemini.py](../../recommendation/services/gemini.py) | Menghubungi Gemini dan mencatat pemakaiannya. |
+| [turn_generator.py](../../recommendation/services/ai/turn_generator.py) | Membatasi percobaan AI pada bagian hybrid yang memakainya. |
+| [explanations.py](../../recommendation/services/ai/explanations.py) | Meminta dan memeriksa penjelasan rekomendasi. |
+| [assistant.py](../../recommendation/services/ai/assistant.py) | Mengatur percakapan Gemini dan fungsi pencarian menu. |
+| [chatbot.py](../../recommendation/services/chatbot.py) | Menghubungkan bagian-bagian percakapan. |
+| [conversation_session.py](../../recommendation/services/conversation_session.py) | Mengelola data percakapan yang perlu diingat sementara. |
+| [menu/forms.py](../../menu/forms.py) | Menyiapkan dan memeriksa form foto menu. |
+| [menu/widgets.py](../../menu/widgets.py) | Menyiapkan tampilan input foto dan pratinjau. |
 
-Setelah memahami bagian ini, lanjutkan ke method yang memakai _lines. Di situlah
-terlihat hubungan data dengan perilaku object.
+## Daftar 35 kasus beserta simbol sumber
 
-## 5. Daftar lengkap 35 kasus dan lokasi kode
+### Modul 1: Class dan Object
 
-### Modul 1: Pengantar OOP, class, dan object
+1. [`MenuItem`](../../menu/models.py#L68) — `menu/models.py`.
+2. [`BudgetConstraint`](../../recommendation/services/budget.py#L53) — `recommendation/services/budget.py`.
+3. [`CartService`](../../cart/services.py#L25) — `cart/services.py`.
+4. [`StaffAccess`](../../users/access.py#L18) — `users/access.py`.
+5. [`MenuSelection`](../../menu/selection.py#L34) — `menu/selection.py`.
 
-1. **Dua menu, satu rancangan** — [`MenuItem`](../../menu/models.py#L48) di `menu/models.py`.
-2. **Dua pelanggan mempunyai budget berbeda** — [`BudgetConstraint`](../../recommendation/services/budget.py#L14) di `recommendation/services/budget.py`.
-3. **Keranjang mengikuti sesi pelanggan** — [`CartService`](../../cart/services.py#L17) di `cart/services.py`.
-4. **Satu tambahan menu menyimpan statusnya** — [`AddOn`](../../menu/models.py#L168) di `menu/models.py`.
-5. **Keputusan akses melekat pada pengguna yang diperiksa** — [`StaffAccess`](../../users/access.py#L6) di `users/access.py`.
+### Modul 2: Atribut dan Method
 
-### Modul 2: Atribut dan method
-
-1. **Nama tempat penyimpanan bersama, isi keranjang berbeda** — [`CartService`](../../cart/services.py#L17) di `cart/services.py`.
-2. **Mengosongkan satu keranjang melalui instance method** — [`CartService.clear`](../../cart/services.py#L150) di `cart/services.py`.
-3. **Membuat object budget dari dictionary** — [`BudgetConstraint.from_dict`](../../recommendation/services/budget.py#L82) di `recommendation/services/budget.py`.
-4. **Menormalkan alias tanpa membuat object** — [`MenuItemAlias.normalize_phrase`](../../menu/models.py#L107) di `menu/models.py`.
-5. **Membaca property berbeda dari memanggil method** — [`MenuSelection`](../../menu/selection.py#L33) di `menu/selection.py`.
+1. [`CartService`](../../cart/services.py#L20) — `cart/services.py`.
+2. [`BudgetConstraint.from_dict`](../../recommendation/services/budget.py#L81) — `recommendation/services/budget.py`.
+3. [`MenuItemAlias.normalize_phrase`](../../menu/models.py#L106) — `menu/models.py`.
+4. [`MenuSelection.unit_price`](../../menu/selection.py#L101) — `menu/selection.py`.
+5. [`GeminiClient.available`](../../recommendation/services/gemini.py#L29) — `recommendation/services/gemini.py`.
 
 ### Modul 3: Enkapsulasi
 
-1. **Batas harga tidak diganti sembarangan** — [`BudgetConstraint`](../../recommendation/services/budget.py#L14) di `recommendation/services/budget.py`.
-2. **Daftar pilihan dikembalikan sebagai tuple** — [`MenuSelection`](../../menu/selection.py#L33) di `menu/selection.py`.
-3. **Keranjang mengembalikan salinan baris** — [`CartService.add_item`](../../cart/services.py#L35) di `cart/services.py`.
-4. **Keputusan hak akses dibaca melalui property** — [`StaffAccess`](../../users/access.py#L6) di `users/access.py`.
-5. **Hasil perkiraan minimum mempunyai antarmuka baca** — [`MinimumQuote`](../../menu/selection.py#L12) di `menu/selection.py`.
+1. [`BudgetConstraint`](../../recommendation/services/budget.py#L17) — `recommendation/services/budget.py`.
+2. [`MenuSelection`](../../menu/selection.py#L97) — `menu/selection.py`.
+3. [`CartService.add_item`](../../cart/services.py#L36) — `cart/services.py`.
+4. [`StaffAccess`](../../users/access.py#L10) — `users/access.py`.
+5. [`ConversationSession.reset`](../../recommendation/services/conversation_session.py#L977) — `recommendation/services/conversation_session.py`.
 
-### Modul 4: Relasi antarkelas dan diagram UML
+### Modul 4: Relasi Kelas dan UML
 
-1. **Kategori mempunyai banyak menu** — [`MenuItem`](../../menu/models.py#L48) di `menu/models.py`.
-2. **Menu dan tag berhubungan banyak-ke-banyak** — [`MenuItem`](../../menu/models.py#L48) di `menu/models.py`.
-3. **Pilihan menu menampung object dari luar** — [`MenuSelection`](../../menu/selection.py#L33) di `menu/selection.py`.
-4. **Pesanan dan baris pesanan harus dibaca bersama aturan hapus** — [`OrderItem`](../../orders/models.py#L135) di `orders/models.py`.
-5. **Pembuat teks adalah hubungan inheritance, bukan isi keranjang** — [`TextGenerator`](../../recommendation/services/text_generator.py#L6) di `recommendation/services/text_generator.py`.
+1. [`MenuItem`](../../menu/models.py#L68) — `menu/models.py`.
+2. [`OrderItem`](../../orders/models.py#L135) — `orders/models.py`.
+3. [`MenuSelection.__init__`](../../menu/selection.py#L34) — `menu/selection.py`.
+4. [`ChatbotService.__init__`](../../recommendation/services/chatbot.py#L114) — `recommendation/services/chatbot.py`.
+5. [`TextGenerator`](../../recommendation/services/text_generator.py#L6) — `recommendation/services/text_generator.py`.
 
-### Modul 5: Inheritance atau pewarisan
+### Modul 5: Inheritance
 
-1. **GeminiClient mengkhususkan pembuat teks** — [`GeminiClient`](../../recommendation/services/gemini.py#L16) di `recommendation/services/gemini.py`.
-2. **TurnGenerator juga turunan pembuat teks** — [`TurnGenerator`](../../recommendation/services/ai/turn_generator.py#L9) di `recommendation/services/ai/turn_generator.py`.
-3. **MenuItem mewarisi model Django** — [`MenuItem`](../../menu/models.py#L48) di `menu/models.py`.
-4. **Form foto meneruskan inisialisasi induk** — [`MenuPhotoForm`](../../menu/forms.py#L9) di `menu/forms.py`.
-5. **Widget foto memperluas konteks tampilan** — [`MenuPhotoWidget`](../../menu/widgets.py#L5) di `menu/widgets.py`.
+1. [`GeminiClient.generate`](../../recommendation/services/gemini.py#L61) — `recommendation/services/gemini.py`.
+2. [`TurnGenerator`](../../recommendation/services/ai/turn_generator.py#L69) — `recommendation/services/ai/turn_generator.py`.
+3. [`MenuItem.save`](../../menu/models.py#L71) — `menu/models.py`.
+4. [`MenuPhotoForm.__init__`](../../menu/forms.py#L34) — `menu/forms.py`.
+5. [`MenuPhotoWidget.get_context`](../../menu/widgets.py#L12) — `menu/widgets.py`.
 
-### Modul 6: Polimorfisme dan abstraksi
+### Modul 6: Polimorfisme dan Abstraksi
 
-1. **Kontrak pembuat teks dinyatakan dengan ABC** — [`TextGenerator`](../../recommendation/services/text_generator.py#L6) di `recommendation/services/text_generator.py`.
-2. **Pemanggilan generate menjalankan implementasi berbeda** — [`TurnGenerator.generate`](../../recommendation/services/ai/turn_generator.py#L63) di `recommendation/services/ai/turn_generator.py`.
-3. **str memilih representasi tiap model** — [`MenuItem.__str__`](../../menu/models.py#L68) di `menu/models.py`.
-4. **Kesamaan budget ditentukan dari isinya** — [`BudgetConstraint.__eq__`](../../recommendation/services/budget.py#L107) di `recommendation/services/budget.py`.
-5. **Pemanggilan widget memakai implementasi khusus** — [`MenuPhotoWidget.get_context`](../../menu/widgets.py#L12) di `menu/widgets.py`.
+1. [`TextGenerator`](../../recommendation/services/text_generator.py#L6) — `recommendation/services/text_generator.py`.
+2. [`TurnGenerator._generate`](../../recommendation/services/ai/turn_generator.py#L69) — `recommendation/services/ai/turn_generator.py`.
+3. [`VariantGroup.__str__`](../../menu/models.py#L142) — `menu/models.py`.
+4. [`BudgetConstraint.__eq__`](../../recommendation/services/budget.py#L107) — `recommendation/services/budget.py`.
+5. [`MenuPhotoWidget.get_context`](../../menu/widgets.py#L12) — `menu/widgets.py`.
 
-### Modul 7: Lima prinsip SOLID
+### Modul 7: Prinsip SOLID
 
-1. **SRP: aturan pilihan menu mempunyai tempat tersendiri** — [`MenuSelection`](../../menu/selection.py#L33) di `menu/selection.py`.
-2. **OCP: pemakai kontrak generate dapat menerima implementasi lain** — [`TextGenerator`](../../recommendation/services/text_generator.py#L6) di `recommendation/services/text_generator.py`.
-3. **LSP: None adalah hasil yang sah, bukan pelanggaran kontrak** — [`GeminiClient.generate`](../../recommendation/services/gemini.py#L63) di `recommendation/services/gemini.py`.
-4. **ISP: kontrak dasar kecil, kemampuan AI-first terpisah** — [`TextGenerator`](../../recommendation/services/text_generator.py#L6) di `recommendation/services/text_generator.py`.
-5. **DIP: alat pembuat penjelasan dapat diberikan dari luar** — [`RecommendationExplanationService.__init__`](../../recommendation/services/ai/explanations.py#L74) di `recommendation/services/ai/explanations.py`.
+1. [`MenuSelection.from_ids`](../../menu/selection.py#L44) — `menu/selection.py`.
+2. [`TextGenerator`](../../recommendation/services/text_generator.py#L17) — `recommendation/services/text_generator.py`.
+3. [`GeminiClient._generate`](../../recommendation/services/gemini.py#L61) — `recommendation/services/gemini.py`.
+4. [`StaffAccess`](../../users/access.py#L18) — `users/access.py`.
+5. [`RecommendationExplanationService.__init__`](../../recommendation/services/ai/explanations.py#L74) — `recommendation/services/ai/explanations.py`.
 
 
-## 6. Contoh alur yang menghubungkan beberapa konsep
+## Menghubungkan konsep dengan tindakan pengguna
 
-```mermaid
-flowchart TD
-    A[Pelanggan memilih menu dan opsi] --> B[CartService menerima pilihan]
-    B --> C[MenuSelection.from_ids memeriksa ID pilihan]
-    C --> D[MenuSelection menghitung unit_price]
-    B --> E[CartService menyimpan ID dan jumlah dalam sesi]
-    E --> F[Saat checkout layanan pesanan memeriksa pilihan kembali]
-    F --> G[Order dan OrderItem menyimpan pesanan]
-```
+Pelanggan memilih makanan, varian, tambahan, dan jumlah. CartService menerima pilihan tersebut.
+MenuSelection memeriksa apakah pilihannya sesuai katalog dan membantu menghitung harga. Ketika
+checkout, fungsi pesanan memeriksa lagi lalu menyimpan pesanan beserta harga saat itu.
 
-Class/object terlihat pada layanan dan model. Atribut/method terlihat pada data
-serta pekerjaan masing-masing. Enkapsulasi terlihat pada jalur perubahan dan
-salinan data. Relasi terlihat ketika keranjang memakai pilihan menu. SRP terlihat
-pada pemisahan pemilihan, sesi, dan transaksi. Tidak semua langkah pada alur ini
-memerlukan inheritance; jangan memaksakan satu konsep pada setiap baris kode.
+Dari alur ini kita dapat melihat class, object, data, method, dan kerja sama antarbagian. Tidak
+semua langkah perlu memakai inheritance. Fungsi biasa juga dapat tepat untuk pekerjaan
+tertentu; orders/services.py tidak mempunyai class OrderService yang perlu dihafal.
 
-## 7. Batas yang harus dipahami saat belajar
+## Menyiapkan penjelasan sendiri
 
-- Field model Django adalah mekanisme framework; bedakan dari atribut kelas biasa.
-- PROTECT menjaga referensi database dan bukan cascade delete.
-- _ dan __ bukan tempat menyembunyikan API key dari orang yang dapat membaca program.
-- Property tanpa setter tidak membuat seluruh object di dalamnya immutable.
-- Type hint dan ABC tidak otomatis membuktikan logika bisnis benar.
-- TextGenerator.generate tidak menjanjikan converse. AI-first memakai kemampuan
-  percakapan tool yang lebih luas daripada kontrak generator dasar.
-- TurnGenerator dipakai pada komponen hybrid. Jangan menyimpulkan semua percakapan
-  AI-first melewati pembatas tersebut.
-- SOLID adalah alat menilai desain. Ada bagian yang mendukung suatu prinsip dan
-  ada keterbatasan yang tetap perlu dijelaskan.
-- Harga dan nama pada cerita pembelajaran merupakan ilustrasi; bukan jaminan isi
-  katalog restoran saat ini.
+Pilih satu kasus dan ceritakan masalah, data awal, pemeriksaan, serta hasilnya. Tunjukkan kode
+yang mendukung penjelasanmu. Sebutkan juga satu hal yang belum dijamin oleh contoh itu.
+Misalnya, tuple menjaga daftar anggota tetapi tidak membuat seluruh object di dalamnya tidak
+bisa berubah.
 
-## 8. Latihan dan cara presentasi
-
-Lanjutkan ke [latihan.md](latihan.md). Pilih satu kasus dan jelaskan dalam urutan:
-**masalah → lokasi file → class/method → alur → konsep → batas penerapan**.
-
-Untuk alur aplikasi yang lebih lengkap, baca [Chatbot.md](../Chatbot.md),
-[panduan pengembangan](../PANDUAN_PENGEMBANGAN.md), dan
-[indeks dokumentasi](../README.md). Panduan ini membaca kode yang ada; tidak
-mengubah backend, database, atau mengaktifkan panggilan Gemini untuk pembelajaran.
+Latihan ada di [Modul 10](10.%20Latihan%20dan%20Presentasi.md). Untuk memahami web lebih
+lengkap, baca [panduan pengembangan](../PANDUAN_PENGEMBANGAN.md) atau [penjelasan
+chatbot](../Chatbot.md). Cara menjalankan tes ada di [pemeriksaan
+lokal](../PANDUAN_TESTING_LOKAL.md).

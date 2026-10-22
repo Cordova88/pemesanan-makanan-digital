@@ -117,11 +117,12 @@
             >{{ request.user.get_full_name|default:request.user.username
             }}</span
           >
-          <a
-            class="btn btn-outline-secondary btn-sm btn-pill px-3"
-            href="{% url 'staff:logout' %}"
-            >Keluar</a
-          >
+          <form method="post" action="{% url 'staff:logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-secondary btn-sm btn-pill px-3">
+              Keluar
+            </button>
+          </form>
         </div>
       </div>
     </nav>

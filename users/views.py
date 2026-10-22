@@ -19,7 +19,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from menu.models import AddOn, Category, MenuItem, MenuTag, VariantGroup, VariantOption
@@ -78,6 +78,7 @@ def staff_login(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@require_POST
 def staff_logout(request: HttpRequest) -> HttpResponse:
     logout(request)
 

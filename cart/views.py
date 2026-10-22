@@ -15,7 +15,7 @@ def _body(request: HttpRequest) -> dict[str, object]:
 def _response(cart: CartService) -> JsonResponse:
     items = cart.get_items()
 
-    return JsonResponse({"items": items, "total": format(cart.get_total(), ".2f")})
+    return JsonResponse({"items": items, "total": format(cart.total_for(items), ".2f")})
 
 
 @require_GET
