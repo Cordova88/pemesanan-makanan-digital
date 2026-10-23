@@ -20,10 +20,10 @@
       </select>
     </div>
     <div class="col-6 col-lg-3">
-      <label class="form-label" for="order-type">Jenis pesanan</label>
-      <select class="form-select" id="order-type" name="type">
-        <option value="">Semua jenis</option>
-        {% for value, label in type_choices %}<option value="{{ value }}"{% if value == order_type %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      <label class="form-label small fw-semibold" for="method">Metode bayar</label>
+      <select id="method" class="form-select k-input mb-2">
+        <option value="CASH">Tunai</option><option value="CARD">Kartu</option>
+        <option value="QRIS">QRIS</option><option value="OTHER">Lainnya</option>
       </select>
     </div>
     <div class="col-6 col-lg-3">
