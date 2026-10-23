@@ -1,0 +1,29 @@
+<nav class="nav flex-column gap-1 flex-grow-1">
+  <span class="nav-label mt-3 px-3">PESANAN</span>
+  <a class="px-3 py-2 {% if request.resolver_match.namespace == 'kasir' %}active{% endif %}" href="{% url 'kasir:dashboard' %}"><i class="bi bi-receipt me-2"></i>Pesanan</a>
+</nav>
+<div class="cms-profile pt-3 mt-3 small">
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <div class="cms-avatar rounded-circle d-flex align-items-center justify-content-center fw-semibold" style="width: 34px; height: 34px">
+      {{ request.user.username|slice:":1"|upper }}
+    </div>
+    <div>
+      <div class="fw-semibold lh-sm">
+        {{ request.user.username }}
+      </div>
+      <div class="cms-profile-role">
+        {% if request.user.is_staff %}
+        Administrator
+        {% else %}
+        Kasir
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <form method="post" action="{% url 'staff:logout' %}">
+    {% csrf_token %}
+    <button type="submit" class="px-2 py-1 d-inline-block border-0 bg-transparent">
+      <i class="bi bi-box-arrow-left me-1"></i>Keluar
+    </button>
+  </form>
+</div>

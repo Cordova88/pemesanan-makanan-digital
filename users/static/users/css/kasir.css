@@ -1,0 +1,54 @@
+/* Gaya halaman kasir. Shell (sidebar, topbar, profil) memakai cms-shell.css. */
+:root {
+  --kasir-primary: #b3302a;        /* samakan dengan merah tombol "Tambah menu" di admin */
+  --kasir-primary-hover: #962520;
+  --kasir-ink: #14213d;
+  --kasir-muted: #64748b;
+  --kasir-soft: #f6f2ea;
+  --kasir-line: #ece7dc;
+}
+
+.k-title { font-weight: 800; letter-spacing: -0.01em; color: var(--kasir-ink); }
+
+.k-card { background: #fff; border: 1px solid var(--kasir-line); border-radius: 18px; }
+.k-label {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+  color: var(--kasir-muted); text-transform: uppercase;
+}
+
+/* btn-primary-app dipertahankan sebagai alias agar order.html tidak perlu diubah */
+.btn-kasir, .btn-primary-app {
+  background: var(--kasir-primary); border: 1px solid var(--kasir-primary);
+  color: #fff; border-radius: 12px; font-weight: 700; padding: 0.6rem 1.2rem;
+}
+.btn-kasir:hover, .btn-kasir:focus, .btn-kasir:active,
+.btn-primary-app:hover, .btn-primary-app:focus, .btn-primary-app:active {
+  background: var(--kasir-primary-hover); border-color: var(--kasir-primary-hover); color: #fff;
+}
+.btn-kasir:disabled, .btn-primary-app:disabled { opacity: 0.55; }
+.btn-kasir.btn-sm { padding: 0.35rem 0.9rem; }
+.btn-pill { border-radius: 12px; }
+
+.k-input {
+  background: #fff; border: 1px solid #d9d4c7; border-radius: 12px; padding: 0.7rem 1rem;
+}
+.k-input:focus {
+  border-color: var(--kasir-primary); box-shadow: 0 0 0 0.2rem rgba(179, 48, 42, 0.15);
+}
+
+.k-chip {
+  white-space: nowrap; border: 1px solid var(--kasir-line); background: #fff;
+  color: var(--kasir-muted); font-weight: 600; border-radius: 999px;
+  padding: 0.5rem 1.1rem; text-decoration: none; transition: all 0.15s ease;
+}
+.k-chip:hover { border-color: var(--kasir-primary); color: var(--kasir-primary); }
+.k-chip.active { background: var(--kasir-primary); border-color: var(--kasir-primary); color: #fff; }
+
+.k-table thead th {
+  background: var(--kasir-soft); color: var(--kasir-muted);
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; border-bottom: 1px solid var(--kasir-line); padding: 0.9rem 1rem;
+}
+.k-table td { padding: 1rem; border-color: var(--kasir-line); }
+
+.content code { color: var(--kasir-primary); font-weight: 700; background: transparent; }
