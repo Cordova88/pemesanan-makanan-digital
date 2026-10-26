@@ -53,7 +53,7 @@ def prepare_photo(upload: File) -> PreparedPhoto:
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
 
-            with Image.open(io.BytesIO(raw)) as probe:
+            with Image.open(io.BytesIO(raw), formats=list(FORMATS)) as probe:
                 kind = probe.format
 
                 if kind not in FORMATS:
@@ -74,7 +74,7 @@ def prepare_photo(upload: File) -> PreparedPhoto:
 
                 probe.verify()
 
-            with Image.open(io.BytesIO(raw)) as source:
+            with Image.open(io.BytesIO(raw), formats=list(FORMATS)) as source:
                 source.load()
                 oriented = ImageOps.exif_transpose(source)
                 mode = (

@@ -92,6 +92,19 @@ def add_item(
     addon_ids: Collection[int] = (),
     actor: AbstractUser | None = None,
 ) -> OrderItem:
+    return _add_item(order, item_id, quantity, variant_ids, addon_ids, actor)
+
+
+def _add_item(
+    order: Order,
+    item_id: int,
+    quantity: int,
+    variant_ids: Collection[int] = (),
+    addon_ids: Collection[int] = (),
+    actor: AbstractUser | None = None,
+    *,
+    defer_total: bool = False,
+) -> OrderItem:
     if quantity < 1:
         raise ValidationError("Quantity must be positive.")
 
@@ -126,7 +139,12 @@ def add_item(
             for a in addons
         ]
     )
-    recalculate(order)
+    if defer_total:
+        # Only create_order uses this for a new order inside its atomic transaction.
+        # Keep the running total for ITEM_ADDED audit records; persist it once below.
+        order.total += line.line_total
+    else:
+        recalculate(order)
     _audit(
         order,
         AuditLog.Action.ITEM_ADDED,
@@ -161,14 +179,16 @@ def create_order(payload: OrderInput) -> Order:
         raise ValidationError("Cart cannot be empty.")
 
     for entry in items:
-        add_item(
+        _add_item(
             order,
             entry["menu_item_id"],
             int(entry["quantity"]),
             entry.get("variant_ids", []),
             entry.get("addon_ids", []),
+            defer_total=True,
         )
 
+    recalculate(order)
     _audit(order, AuditLog.Action.CREATED, after={"total": str(order.total)})
 
     return order

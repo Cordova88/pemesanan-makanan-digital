@@ -83,19 +83,11 @@
 
       {% if order.status == "PENDING" %}
         {% if order.items.all %}
-          <label class="form-label small fw-semibold" for="method">Metode bayar</label>
-          <select id="method" class="form-select k-input mb-2">
-            <option value="CASH">Tunai</option><option value="CARD">Kartu</option>
-            <option value="QRIS">QRIS</option><option value="OTHER">Lainnya</option>
-          </select>
-          <div id="cash-box" class="mb-2">
+          <div class="small text-secondary mb-2">Pembayaran tunai</div>
+          <div class="mb-2">
             <label class="form-label small fw-semibold" for="received">Uang diterima</label>
             <input id="received" type="number" min="0" step="0.01" required class="form-control k-input">
             <div id="change" class="small mt-1 text-secondary"></div>
-          </div>
-          <div id="ref-box" class="mb-2 d-none">
-            <label class="form-label small fw-semibold" for="ref">No. referensi</label>
-            <input id="ref" maxlength="128" class="form-control k-input">
           </div>
           <button id="btn-pay" class="btn btn-primary-app w-100 mb-2">Konfirmasi pembayaran</button>
         {% endif %}
@@ -156,35 +148,17 @@ document.querySelectorAll("[data-act]").forEach(btn => btn.addEventListener("cli
 document.getElementById("btn-table")?.addEventListener("click", () =>
   api("table", {table_token: document.getElementById("table-select").value}));
 
-const method = document.getElementById("method");
 const received = document.getElementById("received");
-function refreshPayUI() {
-  if (!method) return;
-  const cash = method.value === "CASH";
-  document.getElementById("cash-box").classList.toggle("d-none", !cash);
-  document.getElementById("ref-box").classList.toggle("d-none", cash);
-}
-function refreshChange() {
+received?.addEventListener("input", () => {
   const v = Number(received.value || 0), el = document.getElementById("change");
   el.textContent = !v ? "" : v >= total ? "Kembalian: " + rp(v - total) : "Kurang: " + rp(total - v);
-}
-method?.addEventListener("change", refreshPayUI);
-received?.addEventListener("input", refreshChange);
-refreshPayUI();
+});
 
 document.getElementById("btn-pay")?.addEventListener("click", () => {
-  if (method.value === "CASH" && !received.value) {
-    alert("Masukkan jumlah uang yang diterima."); return;
-  }
-  if (method.value === "CASH" && Number(received.value) < total) {
-    alert("Uang yang diterima kurang dari total."); return;
-  }
+  if (!received.value) { alert("Masukkan jumlah uang yang diterima."); return; }
+  if (Number(received.value) < total) { alert("Uang yang diterima kurang dari total."); return; }
   if (confirm("Konfirmasi pembayaran " + rp(total) + "?"))
-    api("pay", {
-      method: method.value,
-      amount_received: method.value === "CASH" ? received.value : null,
-      external_reference: document.getElementById("ref").value
-    });
+    api("pay", {method: "CASH", amount_received: received.value});
 });
 document.getElementById("btn-cancel")?.addEventListener("click", () => {
   if (confirm("Batalkan pesanan ini?")) api("cancel");

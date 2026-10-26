@@ -987,6 +987,8 @@ class ConversationSession:
             self.SEARCH_KEY,
             self.LAST_RESULT_EMPTY_KEY,
             "recommendation_response_templates",
+            "recommendation_last_message",
+            "recommendation_last_response",
             self.ENTITY_KEY,
             self.REJECTED_KEY,
             self.INFERRED_KEY,

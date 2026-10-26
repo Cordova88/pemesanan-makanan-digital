@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -26,13 +28,29 @@ except ImportError:
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get("SECRET_KEY", "unsafe-development-key-change-me")
+# manage.py uses v1_settings for local development. This profile defaults to
+# production safeguards; development here requires an explicit DEBUG=true.
+_debug_value = os.environ.get('DEBUG', 'false').strip().lower()
 
-# Local development needs Django's static-file server for the extracted
-# storefront CSS/ES modules. Deployments must explicitly set DEBUG=false and
-# serve collected static files from the web server/CDN.
-DEBUG = os.environ.get("DEBUG", "true").lower() == "true"
+if _debug_value not in {'true', 'false'}:
+    raise ImproperlyConfigured('DEBUG harus bernilai true atau false.')
+
+DEBUG = _debug_value == 'true'
+SECRET_KEY = os.environ.get('SECRET_KEY', '')
+
+if DEBUG:
+    SECRET_KEY = SECRET_KEY or 'unsafe-development-key-change-me'
+elif (
+    len(SECRET_KEY.strip()) < 50
+    or len(set(SECRET_KEY)) < 5
+    or SECRET_KEY.lower().startswith('django-insecure-')
+):
+    # Never include the supplied value in startup errors or logs.
+    raise ImproperlyConfigured(
+        'Konfigurasi production memerlukan SECRET_KEY khusus lingkungan ini: '
+        'minimal 50 karakter, minimal 5 karakter berbeda, tanpa prefix django-insecure-. '
+        'Simpan melalui konfigurasi rahasia server.'
+    )
 
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
