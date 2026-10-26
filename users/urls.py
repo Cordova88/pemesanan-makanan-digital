@@ -23,5 +23,6 @@ urlpatterns = [
     path('addons/', views.addons, name='addons'),
     path('addons/<int:pk>/edit/', views.addon_edit, name='addon-edit'),
     path('orders/', views.orders, name='orders'),
+    path('orders/<str:public_id>/', views.order_detail, name='order-detail'),
     path('audit-log/', views.audit_log, name='audit-log'),
 ]

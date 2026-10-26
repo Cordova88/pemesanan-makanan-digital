@@ -166,3 +166,26 @@ class CMSOrderAuditWorkflowTests(TestCase):
 
         for url in (self.orders, self.audit):
             self.assertEqual(self.client.get(url).status_code, 302)
+
+    def test_admin_order_detail_view_and_order_list_link(self):
+        detail_url = reverse('staff:order-detail', kwargs={'public_id': self.paid.public_id})
+        response = self.client.get(detail_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'users/order_detail.html')
+        self.assertContains(response, self.paid.public_id)
+        self.assertContains(response, self.paid.customer_name)
+
+        # Check order list links to detail
+        list_response = self.client.get(self.orders)
+        self.assertContains(list_response, detail_url)
+
+    def test_cashier_receipt_view_renders_printable_receipt(self):
+        # Add Cashier group or staff user
+        receipt_url = reverse('kasir:receipt', kwargs={'public_id': self.paid.public_id})
+        response = self.client.get(receipt_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'users/kasir/receipt.html')
+        self.assertContains(response, 'RASAKITA')
+        self.assertContains(response, self.paid.public_id)
+        self.assertContains(response, 'Cetak Struk')
+

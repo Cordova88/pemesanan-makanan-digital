@@ -5,4 +5,5 @@ app_name = 'kasir'
 urlpatterns = [
     path('', v.dashboard, name='dashboard'),
     path('<str:public_id>/', v.order_detail, name='order'),
+    path('<str:public_id>/receipt/', v.order_receipt, name='receipt'),
 ]

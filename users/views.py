@@ -534,6 +534,28 @@ def orders(request: HttpRequest) -> HttpResponse:
 
 
 @cms_required
+def order_detail(request: HttpRequest, public_id: str) -> HttpResponse:
+    public_id = public_id.upper()
+    order = get_object_or_404(
+        Order.objects.select_related(
+            'table', 'payment', 'processed_by_cashier', 'cancelled_by_cashier', 'refunded_by'
+        ).prefetch_related('items__variants', 'items__addons'),
+        public_id=public_id,
+    )
+    audit_logs = order.audit_logs.select_related('actor').order_by('-created_at')[:20]
+
+    return render(
+        request,
+        'users/order_detail.html',
+        {
+            'order': order,
+            'audit_logs': audit_logs,
+        },
+    )
+
+
+
+@cms_required
 def audit_log(request: HttpRequest) -> HttpResponse:
     records = AuditLog.objects.select_related('order', 'actor').order_by('-created_at', '-pk')
     q = request.GET.get('q', '').strip()

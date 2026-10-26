@@ -52,13 +52,17 @@
           <th>Jenis</th>
           <th>Status</th>
           <th class="text-end">Total</th>
-          <th>Riwayat</th>
+          <th>Aksi</th>
         </tr>
       </thead>
       <tbody>
         {% for order in orders %}
         <tr>
-          <td class="fw-semibold"><code class="text-body">{{ order.public_id }}</code></td>
+          <td class="fw-semibold">
+            <a href="{% url 'staff:order-detail' order.public_id %}" class="text-decoration-none" title="Lihat rincian pesanan {{ order.public_id }}">
+              <code class="text-primary fw-bold">{{ order.public_id }}</code>
+            </a>
+          </td>
           <td class="text-secondary">{{ order.created_at|date:'d M Y H:i' }}</td>
           <td>{{ order.customer_name }}</td>
           <td>{{ order.get_order_type_display }}{% if order.table %} · Meja {{ order.table.number }}{% endif %}</td>
@@ -66,7 +70,12 @@
             <span class="badge rounded-pill {% if order.status == 'PAID' %}text-bg-success{% elif order.status == 'PENDING' %}text-bg-warning{% elif order.status == 'CANCELLED' or order.status == 'EXPIRED' %}text-bg-danger{% else %}text-bg-secondary{% endif %}">{{ order.get_status_display }}</span>
           </td>
           <td class="text-end">Rp {{ order.total|floatformat:"0g" }}</td>
-          <td><a class="btn btn-sm btn-outline-secondary" href="{% url 'staff:audit-log' %}?q={{ order.public_id|urlencode }}" aria-label="Log Audit pesanan {{ order.public_id }}">Log Audit</a></td>
+          <td>
+            <div class="d-flex gap-1">
+              <a class="btn btn-sm btn-primary" href="{% url 'staff:order-detail' order.public_id %}">Detail</a>
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'staff:audit-log' %}?q={{ order.public_id|urlencode }}" aria-label="Log Audit pesanan {{ order.public_id }}">Log Audit</a>
+            </div>
+          </td>
         </tr>
         {% empty %}
         <tr>

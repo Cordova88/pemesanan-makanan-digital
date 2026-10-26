@@ -1,0 +1,174 @@
+{% extends 'users/base.html' %}
+{% block title %}Detail Pesanan #{{ order.public_id }} — RasaKita CMS{% endblock %}
+{% block content %}
+<div class="mb-3">
+  <a href="{% url 'staff:orders' %}" class="btn btn-sm btn-outline-secondary mb-2">&larr; Kembali ke daftar pesanan</a>
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <h1 class="h3 mb-0">Pesanan <code class="text-body fs-4">{{ order.public_id }}</code></h1>
+      <span class="badge rounded-pill {% if order.status == 'PAID' %}text-bg-success{% elif order.status == 'PENDING' %}text-bg-warning{% elif order.status == 'CANCELLED' or order.status == 'EXPIRED' %}text-bg-danger{% else %}text-bg-secondary{% endif %}">
+        {{ order.get_status_display }}
+      </span>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'kasir:receipt' order.public_id %}?print=1" target="_blank" class="btn btn-sm btn-outline-dark d-flex align-items-center gap-1">
+        <i class="bi bi-printer" aria-hidden="true"></i> Cetak Struk
+      </a>
+      <a href="{% url 'staff:audit-log' %}?q={{ order.public_id|urlencode }}" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1">
+        <i class="bi bi-clock-history" aria-hidden="true"></i> Log Audit
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <div class="card stat card-body h-100">
+      <h2 class="h6 fw-bold text-uppercase text-secondary mb-3" style="letter-spacing: 0.5px;">Informasi Pesanan</h2>
+      <div class="row g-2 small">
+        <div class="col-5 text-secondary">Pelanggan:</div>
+        <div class="col-7 fw-semibold text-dark">{{ order.customer_name }}</div>
+
+        <div class="col-5 text-secondary">No. WhatsApp / HP:</div>
+        <div class="col-7 text-dark">{{ order.phone|default:"-" }}</div>
+
+        <div class="col-5 text-secondary">Tipe Pesanan:</div>
+        <div class="col-7 text-dark">
+          {{ order.get_order_type_display }}
+          {% if order.table %} · <strong class="text-success">Meja {{ order.table.number }}</strong>{% endif %}
+        </div>
+
+        <div class="col-5 text-secondary">Waktu Pemesanan:</div>
+        <div class="col-7 text-dark">{{ order.created_at|date:"d M Y H:i:s" }} WITA</div>
+
+        <div class="col-5 text-secondary">Batas Pembayaran:</div>
+        <div class="col-7 text-dark">{{ order.expires_at|date:"d M Y H:i:s" }} WITA</div>
+
+        <div class="col-5 text-secondary">Catatan Pesanan:</div>
+        <div class="col-7 text-dark">{{ order.note|default:"-" }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card stat card-body h-100">
+      <h2 class="h6 fw-bold text-uppercase text-secondary mb-3" style="letter-spacing: 0.5px;">Rincian Pembayaran</h2>
+      <div class="row g-2 small">
+        <div class="col-5 text-secondary">Total Tagihan:</div>
+        <div class="col-7 fs-5 fw-bold text-dark">Rp {{ order.total|floatformat:"0g" }}</div>
+
+        <div class="col-5 text-secondary">Status Pembayaran:</div>
+        <div class="col-7">
+          <span class="badge {% if order.status == 'PAID' %}text-bg-success{% elif order.status == 'PENDING' %}text-bg-warning{% elif order.status == 'CANCELLED' or order.status == 'EXPIRED' %}text-bg-danger{% else %}text-bg-secondary{% endif %}">
+            {{ order.get_status_display }}
+          </span>
+        </div>
+
+        {% if order.payment %}
+        <div class="col-5 text-secondary">Metode Bayar:</div>
+        <div class="col-7 fw-semibold text-dark">{{ order.payment.get_method_display }}</div>
+
+        <div class="col-5 text-secondary">Waktu Dibayar:</div>
+        <div class="col-7 text-dark">{{ order.payment.paid_at|date:"d M Y H:i:s" }} WITA</div>
+
+        <div class="col-5 text-secondary">Kasir / Pemroses:</div>
+        <div class="col-7 text-dark">{{ order.processed_by_cashier.username|default:"Online Gateway" }}</div>
+
+        {% if order.payment.amount_received is not None %}
+        <div class="col-5 text-secondary">Uang Diterima:</div>
+        <div class="col-7 text-dark">Rp {{ order.payment.amount_received|floatformat:"0g" }}</div>
+
+        <div class="col-5 text-secondary">Kembalian:</div>
+        <div class="col-7 text-dark">Rp {{ order.payment.change_given|floatformat:"0g" }}</div>
+        {% endif %}
+
+        {% if order.payment.external_reference %}
+        <div class="col-5 text-secondary">No. Referensi / QR:</div>
+        <div class="col-7 font-monospace text-dark">{{ order.payment.external_reference }}</div>
+        {% endif %}
+        {% else %}
+        <div class="col-5 text-secondary">Keterangan:</div>
+        <div class="col-7 text-muted">Belum ada pembayaran yang dicatat.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card stat mb-4">
+  <div class="card-header bg-white py-3 border-bottom">
+    <h2 class="h5 mb-0 fw-bold">Menu yang Dipesan</h2>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Menu</th>
+          <th class="text-center">Jumlah</th>
+          <th class="text-end">Harga Satuan</th>
+          <th class="text-end">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for line in order.items.all %}
+        <tr>
+          <td>
+            <div class="fw-semibold text-dark">{{ line.item_name }}</div>
+            {% for v in line.variants.all %}
+            <div class="small text-secondary">• {{ v.group_name }}: {{ v.option_name }}</div>
+            {% endfor %}
+            {% for a in line.addons.all %}
+            <div class="small text-secondary">+ {{ a.addon_name }}{% if a.quantity > 1 %} ×{{ a.quantity }}{% endif %} (Rp {{ a.unit_price|floatformat:"0g" }})</div>
+            {% endfor %}
+          </td>
+          <td class="text-center fw-semibold">{{ line.quantity }}</td>
+          <td class="text-end text-secondary">Rp {{ line.unit_price|floatformat:"0g" }}</td>
+          <td class="text-end fw-bold text-dark">Rp {{ line.line_total|floatformat:"0g" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" class="text-center text-secondary py-4">Pesanan tidak memiliki item.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-group-divider">
+        <tr>
+          <th colspan="3" class="text-end fs-6">TOTAL AKHIR:</th>
+          <th class="text-end fs-5 fw-bold text-primary">Rp {{ order.total|floatformat:"0g" }}</th>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+{% if audit_logs %}
+<div class="card stat">
+  <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+    <h2 class="h5 mb-0 fw-bold">Riwayat Tindakan (Log Audit)</h2>
+    <a href="{% url 'staff:audit-log' %}?q={{ order.public_id|urlencode }}" class="btn btn-sm btn-link text-decoration-none">Lihat semua &rarr;</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0 small">
+      <thead class="table-light">
+        <tr>
+          <th>Waktu (WITA)</th>
+          <th>Tindakan</th>
+          <th>Aktor</th>
+          <th>Peran</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in audit_logs %}
+        <tr>
+          <td class="text-secondary">{{ log.created_at|date:"d M Y H:i:s" }}</td>
+          <td><span class="badge text-bg-light border">{{ log.get_action_display }}</span></td>
+          <td>{{ log.actor.username|default:"Sistem" }}</td>
+          <td><code class="text-secondary">{{ log.actor_role }}</code></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

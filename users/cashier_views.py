@@ -5,7 +5,7 @@ from functools import wraps
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db.models import Sum
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
@@ -91,3 +91,16 @@ def order_detail(request: HttpRequest, public_id: str) -> HttpResponse:
     tables = Table.objects.filter(is_active=True).order_by("number") if order.is_pending else []
 
     return render(request, "users/kasir/order.html", {"order": order, "tables": tables})
+
+
+@cashier_page_required
+def order_receipt(request: HttpRequest, public_id: str) -> HttpResponse:
+    """Printable receipt view for cashier."""
+    public_id = public_id.upper()
+    order = get_object_or_404(
+        Order.objects.select_related("table", "payment", "processed_by_cashier")
+        .prefetch_related("items__variants", "items__addons"),
+        public_id=public_id,
+    )
+    return render(request, "users/kasir/receipt.html", {"order": order})
+
