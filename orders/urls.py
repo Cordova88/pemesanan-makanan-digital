@@ -10,6 +10,7 @@ urlpatterns = [
     path("<str:public_id>/customer/", views.change_customer, name="order-customer"),
     path("<str:public_id>/table/", views.change_order_table, name="order-change-table"),
     path("<str:public_id>/pay/", views.confirm_payment, name="order-pay"),
+    path("<str:public_id>/pay-qr/", views.qr_payment, name="order-qr-payment"),
     path("<str:public_id>/cancel/", views.cancel_order, name="order-cancel"),
     path("<str:public_id>/refund/", views.refund_order, name="order-refund"),
 ]

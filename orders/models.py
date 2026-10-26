@@ -226,7 +226,11 @@ class Payment(models.Model):
     )
     paid_at = models.DateTimeField(default=timezone.now)
     cashier = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="payments"
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="payments",
     )
     external_reference = models.CharField(max_length=128, blank=True)
 

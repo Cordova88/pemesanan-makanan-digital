@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from cart.services import CartService
 from .models import Order, Table
@@ -17,6 +18,7 @@ from .services import (
     edit_item,
     expire_order_if_due,
     pay,
+    process_qr_payment,
     refund,
     update_customer,
 )
@@ -31,12 +33,27 @@ def _money(value: Decimal) -> str:
 
 
 def _order(order: Order) -> dict[str, object]:
+    payment_info = None
+    try:
+        if hasattr(order, "payment") and order.payment:
+            payment_info = {
+                "method": order.payment.method,
+                "amount": _money(order.payment.amount),
+                "paid_at": order.payment.paid_at.isoformat(),
+                "external_reference": order.payment.external_reference,
+            }
+    except Exception:
+        payment_info = None
+
     return {
         "public_id": order.public_id,
         "status": order.status,
+        "is_paid": order.is_paid,
         "total": _money(order.total),
         "expires_at": order.expires_at.isoformat(),
         "qr_reference": order.public_id,
+        "pay_qr_url": f"/orders/{order.public_id}/pay-qr/",
+        "payment": payment_info,
         "note": order.note,
         "order_type": order.order_type,
         "table": (
@@ -199,3 +216,64 @@ def refund_order(request: HttpRequest, public_id: str) -> JsonResponse:
         return JsonResponse(_order(refund(public_id, request.user)))
     except (ValidationError, Order.DoesNotExist) as exc:
         return JsonResponse({"error": str(exc)}, status=400)
+
+
+@csrf_exempt
+def qr_payment(request: HttpRequest, public_id: str) -> HttpResponse:
+    """
+    Fake online payment gateway:
+    When the QR code is scanned (or simulated via GET/POST),
+    it automatically completes the transaction for the exact required amount.
+    """
+    wants_json = (
+        request.headers.get("Accept") == "application/json"
+        or request.content_type == "application/json"
+        or request.GET.get("format") == "json"
+        or request.method == "POST"
+    )
+
+    try:
+        order = process_qr_payment(public_id)
+
+        if wants_json:
+            return JsonResponse({
+                "success": True,
+                "message": "Pembayaran berhasil diselesaikan.",
+                "order": _order(order),
+            })
+
+        return render(
+            request,
+            "orders/payment_success.html",
+            {
+                "order": order,
+                "public_id": public_id,
+                "total_formatted": _money(order.total),
+                "paid_at": order.paid_at,
+                "reference": (
+                    order.payment.external_reference
+                    if hasattr(order, "payment") and order.payment
+                    else ""
+                ),
+            },
+        )
+    except Order.DoesNotExist:
+        if wants_json:
+            return JsonResponse({"error": "Order not found."}, status=404)
+        return render(
+            request,
+            "orders/payment_error.html",
+            {"error": "Pesanan tidak ditemukan.", "public_id": public_id},
+            status=404,
+        )
+    except ValidationError as exc:
+        msg = "; ".join(exc.messages) if hasattr(exc, "messages") else str(exc)
+        if wants_json:
+            return JsonResponse({"error": msg}, status=400)
+        return render(
+            request,
+            "orders/payment_error.html",
+            {"error": msg, "public_id": public_id},
+            status=400,
+        )
+

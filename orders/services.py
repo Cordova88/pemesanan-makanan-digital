@@ -2,6 +2,7 @@
 
 from collections.abc import Collection, Mapping
 from django.contrib.auth.models import AbstractUser
+import secrets
 from .payloads import OrderInput, OrderItemInput
 from decimal import Decimal, InvalidOperation
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -287,7 +288,7 @@ def _cash_amount(value: object) -> Decimal:
 @transaction.atomic
 def pay(
     public_id: str,
-    cashier: AbstractUser,
+    cashier: AbstractUser | None = None,
     method: str = 'CASH',
     external_reference: object = '',
     amount_received: object = None,
@@ -338,6 +339,58 @@ def pay(
         )
 
     _audit(order, AuditLog.Action.PAID, cashier, after=audit_after)
+
+    return order
+
+
+@transaction.atomic
+def process_qr_payment(public_id: str, reference: str = "") -> Order:
+    """
+    Fake online payment gateway: automatically completes the transaction
+    with the exact required amount of the order upon scanning the QR code.
+    """
+    order = Order.objects.select_for_update().get(public_id=public_id)
+
+    # Safe and idempotent if already paid
+    if order.status == Order.Status.PAID:
+        return order
+
+    _pending(order)
+
+    if not order.items.exists():
+        raise ValidationError("An empty order cannot be paid.")
+
+    amount_due = recalculate(order)
+    payment_reference = reference or f"QRIS-{public_id}-{secrets.token_hex(4).upper()}"
+
+    order.status = Order.Status.PAID
+    order.paid_at = timezone.now()
+    order.processed_by_cashier = None
+    order.save(update_fields=["status", "paid_at", "processed_by_cashier", "updated_at"])
+
+    Payment.objects.create(
+        order=order,
+        cashier=None,
+        amount=amount_due,
+        amount_received=amount_due,
+        change_given=Decimal("0.00"),
+        method=Payment.Method.QRIS,
+        external_reference=payment_reference,
+    )
+
+    _audit(
+        order,
+        AuditLog.Action.PAID,
+        actor=None,
+        after={
+            "amount": format(amount_due, ".2f"),
+            "amount_received": format(amount_due, ".2f"),
+            "change_given": "0.00",
+            "method": "QRIS",
+            "gateway": "FAKE_ONLINE_QRIS",
+            "reference": payment_reference,
+        },
+    )
 
     return order
 

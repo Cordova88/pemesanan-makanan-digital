@@ -20,11 +20,12 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import include, path
 from menu.views import storefront
-from orders.views import confirmation
+from orders.views import confirmation, qr_payment
 
 urlpatterns = [
     path('', storefront, name='storefront'),
     path('orders/<str:public_id>/', confirmation, name='order-confirmation'),
+    path('orders/<str:public_id>/pay-qr/', qr_payment, name='order-qr-payment-web'),
     path('admin/', admin.site.urls),
     path('staff/', include('users.urls')),
     path('api/menu/', include('menu.urls')),

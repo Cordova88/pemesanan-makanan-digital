@@ -131,13 +131,52 @@ async function submitCheckout(event) {
       document.querySelector("#checkoutModal"),
     ).hide();
     toast("Pesanan berhasil dibuat!");
-    window.location.href = `/orders/${result.public_id}/`;
+    const payChoice = document.querySelector('input[name="payment_choice"]:checked')?.value || "CASHIER";
+    const payMode = payChoice === "ONLINE" ? "online" : "cashier";
+    window.location.href = `/orders/${result.public_id}/?pay_mode=${payMode}`;
   } catch (error) {
     errorMessage.textContent = error.message;
     errorMessage.classList.remove("d-none");
   } finally {
     submitting = false;
     document.querySelector("#btnSubmitCheckout").disabled = false;
+  }
+}
+
+function updatePaymentMethodUI() {
+  const isOnline = document.querySelector('input[name="payment_choice"]:checked')?.value === "ONLINE";
+  const title = document.querySelector("#selectedPaymentTitle");
+  const desc = document.querySelector("#selectedPaymentDesc");
+  const exp = document.querySelector("#selectedPaymentExp");
+  const icon = document.querySelector("#selectedPaymentIcon");
+  const noticeTitle = document.querySelector("#reviewNoticeTitle");
+  const noticeDesc = document.querySelector("#reviewNoticeDesc");
+  const submitBtn = document.querySelector("#btnSubmitCheckout");
+
+  if (isOnline) {
+    if (title) title.textContent = "Bayar Online (QRIS)";
+    if (desc) desc.textContent = "Scan kode QR untuk bayar otomatis.";
+    if (exp) exp.innerHTML = "Kode QR pembayaran otomatis akan muncul setelah pesanan dibuat. <span class='text-danger fw-semibold'>Ubah ›</span>";
+    if (noticeTitle) noticeTitle.textContent = "Bayar Online Otomatis";
+    if (noticeDesc) noticeDesc.textContent = "Scan kode QR setelah pesanan dibuat untuk menyelesaikan transaksi.";
+    if (reviewing && submitBtn) submitBtn.textContent = "Buat pesanan & Bayar QR";
+    if (icon) {
+      icon.className = "";
+      icon.style.cssText = "width:44px;height:44px;flex:0 0 44px;border-radius:12px;background:#fee2e2;color:#b91c1c;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;border:1px solid #fca5a5;";
+      icon.textContent = "QRIS";
+    }
+  } else {
+    if (title) title.textContent = "Bayar di kasir";
+    if (desc) desc.textContent = "Tunjukkan kode pesanan ke kasir.";
+    if (exp) exp.innerHTML = "Pesanan dibuat setelah kamu menekan tombol. <span class='text-danger fw-semibold'>Pilih cara bayar ›</span>";
+    if (noticeTitle) noticeTitle.textContent = "Belum dibayar";
+    if (noticeDesc) noticeDesc.textContent = "Lanjutkan pembayaran langsung ke kasir.";
+    if (reviewing && submitBtn) submitBtn.textContent = "Buat pesanan";
+    if (icon) {
+      icon.className = "payment-bag";
+      icon.style.cssText = "";
+      icon.textContent = "";
+    }
   }
 }
 
@@ -148,4 +187,27 @@ export function bindCheckout() {
   document
     .querySelector("#checkoutForm")
     .addEventListener("submit", submitCheckout);
+
+  const trigger = document.querySelector("#paymentMethodTrigger");
+  const optionsContainer = document.querySelector("#paymentOptionsContainer");
+  const chevron = document.querySelector("#paymentMethodChevron");
+  if (trigger && optionsContainer) {
+    trigger.addEventListener("click", () => {
+      const isHidden = optionsContainer.classList.toggle("d-none");
+      if (chevron) {
+        chevron.style.transform = isHidden ? "rotate(0deg)" : "rotate(90deg)";
+      }
+    });
+  }
+
+  document.querySelectorAll('input[name="payment_choice"]').forEach((radio) => {
+    radio.addEventListener("change", () => {
+      updatePaymentMethodUI();
+      if (optionsContainer) {
+        optionsContainer.classList.add("d-none");
+        if (chevron) chevron.style.transform = "rotate(0deg)";
+      }
+    });
+  });
 }
+
