@@ -1,4 +1,7 @@
 from django import forms
+from django.contrib.auth.models import Group, User
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from menu.forms import MenuPhotoForm
 
 from menu.models import AddOn, Category, MenuItem, MenuTag, VariantGroup, VariantOption
@@ -160,6 +163,109 @@ class AddOnForm(BootstrapModelForm):
     def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
         self.fields['menu_items'].queryset = MenuItem.objects.order_by('name', 'pk')
+
+
+class AccountForm(BootstrapModelForm):
+    ROLE_SUPERUSER = 'superuser'
+    ROLE_ADMIN = 'admin'
+    ROLE_CASHIER = 'cashier'
+    ROLE_NONE = 'none'
+
+    role = forms.ChoiceField(
+        choices=(
+            (ROLE_ADMIN, 'Administrator'),
+            (ROLE_CASHIER, 'Kasir'),
+            (ROLE_SUPERUSER, 'Superuser'),
+            (ROLE_NONE, 'Tanpa akses staf'),
+        ),
+        label='Peran',
+        help_text='Administrator dapat mengelola katalog. Kasir hanya dapat membuka area kasir.',
+    )
+    password1 = forms.CharField(
+        widget=forms.PasswordInput,
+        required=False,
+        label='Kata sandi',
+        help_text='Minimal 8 karakter. Kosongkan saat mengedit jika tidak ingin menggantinya.',
+    )
+    password2 = forms.CharField(
+        widget=forms.PasswordInput,
+        required=False,
+        label='Ulangi kata sandi',
+    )
+
+    class Meta:
+        model = User
+        fields = ('username', 'first_name', 'last_name', 'email', 'is_active')
+        labels = {
+            'username': 'Nama pengguna',
+            'first_name': 'Nama depan',
+            'last_name': 'Nama belakang',
+            'email': 'Email',
+            'is_active': 'Akun aktif',
+        }
+
+    def __init__(self, *args: object, actor: User | None = None, **kwargs: object) -> None:
+        self.actor = actor
+        super().__init__(*args, **kwargs)
+        self.fields['role'].widget.attrs['class'] = 'form-select'
+
+        if self.instance.pk:
+            self.fields['role'].initial = self._role_of(self.instance)
+        else:
+            self.fields['password1'].required = True
+            self.fields['password2'].required = True
+
+    @classmethod
+    def _role_of(cls, user: User) -> str:
+        if user.is_superuser:
+            return cls.ROLE_SUPERUSER
+
+        if user.is_staff:
+            return cls.ROLE_ADMIN
+
+        return cls.ROLE_CASHIER if user.groups.filter(name='Cashier').exists() else cls.ROLE_NONE
+
+    def clean(self) -> dict[str, object]:
+        data = super().clean()
+        password1 = data.get('password1')
+        password2 = data.get('password2')
+
+        if password1 or password2:
+            if password1 != password2:
+                self.add_error('password2', 'Kata sandi tidak sama.')
+            elif password1:
+                try:
+                    validate_password(password1, self.instance)
+                except ValidationError as exc:
+                    self.add_error('password1', exc)
+
+        if self.actor and self.instance.pk == self.actor.pk:
+            if data.get('role') != self.ROLE_SUPERUSER:
+                self.add_error('role', 'Tidak dapat mengubah peran akun sendiri.')
+            if not data.get('is_active'):
+                self.add_error('is_active', 'Tidak dapat menonaktifkan akun sendiri.')
+
+        return data
+
+    def save(self, commit: bool = True) -> User:
+        user = super().save(commit=False)
+        role = self.cleaned_data['role']
+        user.is_superuser = role == self.ROLE_SUPERUSER
+        user.is_staff = role in {self.ROLE_SUPERUSER, self.ROLE_ADMIN}
+
+        if self.cleaned_data.get('password1'):
+            user.set_password(self.cleaned_data['password1'])
+
+        if commit:
+            user.save()
+            cashier_group, _ = Group.objects.get_or_create(name='Cashier')
+
+            if role == self.ROLE_CASHIER:
+                user.groups.add(cashier_group)
+            else:
+                user.groups.remove(cashier_group)
+
+        return user
 
 
 class TableForm(BootstrapModelForm):

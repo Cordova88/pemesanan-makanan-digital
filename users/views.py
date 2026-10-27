@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from django.contrib.auth.models import AbstractUser, AnonymousUser
+from django.contrib.auth.models import AbstractUser, AnonymousUser, User
 from django.db.models import Model
 from django.forms import ModelForm
 from django.http import HttpRequest
@@ -27,6 +27,7 @@ from orders.models import AuditLog, Order, Table
 from recommendation.services.tag_extractor import TagExtractor
 from .access import StaffAccess
 from .forms import (
+    AccountForm,
     AddOnForm,
     CategoryForm,
     MenuItemForm,
@@ -43,6 +44,13 @@ def _cms_user(user: AbstractUser | AnonymousUser) -> bool:
 
 
 cms_required = user_passes_test(_cms_user, login_url='staff:login')
+
+
+def _accounts_user(user: AbstractUser | AnonymousUser) -> bool:
+    return StaffAccess(user).can_manage_accounts
+
+
+accounts_required = user_passes_test(_accounts_user, login_url='staff:login')
 
 
 def _is_cashier(user: AbstractUser | AnonymousUser) -> bool:
@@ -554,6 +562,60 @@ def order_detail(request: HttpRequest, public_id: str) -> HttpResponse:
         },
     )
 
+
+def _account_role(user: User) -> tuple[str, str]:
+    if user.is_superuser:
+        return 'superuser', 'Superuser'
+
+    if user.is_staff:
+        return 'admin', 'Administrator'
+
+    if any(group.name == 'Cashier' for group in user.groups.all()):
+        return 'cashier', 'Kasir'
+
+    return 'none', 'Tanpa akses staf'
+
+
+@accounts_required
+@require_http_methods(['GET', 'POST'])
+def accounts(request: HttpRequest) -> HttpResponse:
+    records = list(User.objects.prefetch_related('groups').order_by('username'))
+
+    for record in records:
+        record.role_key, record.role_label = _account_role(record)
+
+    form = AccountForm(request.POST or None, actor=request.user)
+
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Akun berhasil dibuat.')
+
+        return redirect('staff:accounts')
+
+    return render(request, 'users/accounts.html', {'form': form, 'accounts': records})
+
+
+@accounts_required
+@require_http_methods(['GET', 'POST'])
+def account_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    account = get_object_or_404(User, pk=pk)
+    form = AccountForm(request.POST or None, instance=account, actor=request.user)
+
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Akun berhasil diperbarui.')
+
+        return redirect('staff:accounts')
+
+    return render(
+        request,
+        'users/form.html',
+        {
+            'form': form,
+            'title': 'Edit Akun %s' % account.username,
+            'cancel_url': reverse('staff:accounts'),
+        },
+    )
 
 
 @cms_required

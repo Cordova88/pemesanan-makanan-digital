@@ -52,6 +52,13 @@
     href="{% url 'staff:audit-log' %}"
     ><i class="bi bi-clock-history me-2"></i>Log Audit</a
   >
+  {% if request.user.is_superuser %}
+  <a
+    class="px-3 py-2 {% if 'account' in request.resolver_match.url_name %}active{% endif %}"
+    href="{% url 'staff:accounts' %}"
+    ><i class="bi bi-people me-2"></i>Akun</a
+  >
+  {% endif %}
 </nav>
 
 <div class="cms-profile pt-3 mt-3 small">

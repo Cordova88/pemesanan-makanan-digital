@@ -20,6 +20,10 @@ class StaffAccess:
         return self._user.is_authenticated and (self._user.is_staff or self.is_cashier)
 
     @property
+    def can_manage_accounts(self) -> bool:
+        return self._user.is_authenticated and self._user.is_superuser
+
+    @property
     def home_route(self) -> str:
         if self._user.is_staff:
             return "staff:dashboard"
