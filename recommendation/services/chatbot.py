@@ -3893,6 +3893,8 @@ class ChatbotService:
             preferences.excluded_tags.update(constraints.excluded_tags)
             preferences.max_price = constraints.max_price
             preferences.category = constraints.category
+            if context.get("prefer_affordable") or self.tag_extractor.price_parser.prefers_affordable(message):
+                preferences.prefer_affordable = True
             self.session[self.SEARCH_KEY] = constraints.to_dict()
             self.session["recommendation_required_tags"] = sorted(
                 constraints.required_tags

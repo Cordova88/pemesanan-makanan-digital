@@ -626,5 +626,18 @@ class IndonesianPriceParser:
         normalized = normalize_text(text)
 
         return any(
-            phrase in normalized for phrase in ("murah", "hemat", "jangan mahal", "tidak mahal")
+            phrase in normalized
+            for phrase in (
+                "murah",
+                "hemat",
+                "jangan mahal",
+                "tidak mahal",
+                "ramah di kantong",
+                "ramah dikantong",
+                "pas di kantong",
+                "pas dikantong",
+                "pas di dompet",
+                "terjangkau",
+                "ekonomis",
+            )
         )

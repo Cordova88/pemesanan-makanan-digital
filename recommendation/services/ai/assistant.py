@@ -30,6 +30,11 @@ class GeminiAssistant:
                     "required_tags": {
                         "type": "array",
                         "items": {"type": "string"},
+                        "description": (
+                            "Tags to require, e.g. 'sweet' (or 'manis'), 'spicy' (or 'pedas'), "
+                            "'drink' (or 'minuman'), 'chicken' (or 'ayam'), 'rice' (or 'nasi'), "
+                            "'crispy' (or 'renyah'). Do NOT include budget words like 'hemat' or 'murah' here."
+                        ),
                         "maxItems": 8,
                     },
                     "excluded_tags": {
@@ -47,7 +52,10 @@ class GeminiAssistant:
                         "items": {"type": "string"},
                         "maxItems": 8,
                     },
-                    "category": {"type": ["string", "null"]},
+                    "category": {
+                        "type": ["string", "null"],
+                        "description": "Category name: 'Makanan' or 'Minuman'. Use null if not specified.",
+                    },
                     "max_price": {"type": ["integer", "null"]},
                     "exclude_shown": {"type": "boolean"},
                 },
@@ -79,6 +87,19 @@ class GeminiAssistant:
         ),
     ]
 
+    AFFORDABLE_TERMS = frozenset({
+        "hemat",
+        "murah",
+        "affordable",
+        "terjangkau",
+        "ekonomis",
+        "ramah di kantong",
+        "ramah dikantong",
+        "pas di kantong",
+        "pas dikantong",
+        "pas di dompet",
+    })
+
     def __init__(self, gemini_client, recommender, tag_extractor, session=None):
         self.gemini_client = gemini_client
         self.recommender = recommender
@@ -87,7 +108,7 @@ class GeminiAssistant:
 
     @property
     def available(self):
-        return self.gemini_client.available
+        return getattr(self.gemini_client, "available", False)
 
     def respond(self, message, context, request_budget):
         tool_results = []
@@ -139,7 +160,10 @@ class GeminiAssistant:
         if not isinstance(arguments, dict):
             return {"ok": False, "error": "Tool arguments must be an object."}
         allowed_tags = set(self.tag_extractor._aliases)
-        required = self._validated_tags(arguments.get("required_tags"), allowed_tags)
+        validated_required = self._validated_tags(arguments.get("required_tags"), allowed_tags)
+        if validated_required is None:
+            return {"ok": False, "error": "Invalid catalog tags."}
+        required, tag_prefer_affordable = validated_required
         excluded, legacy_excluded_names = self._validated_exclusions(
             arguments.get("excluded_tags", []),
             allowed_tags,
@@ -155,18 +179,30 @@ class GeminiAssistant:
         if category is not None:
             if not isinstance(category, str) or len(category) > 100:
                 return {"ok": False, "error": "Invalid category."}
-            category_name = next(
-                (
-                    name
-                    for name in Category.objects.filter(is_active=True)
-                    .values_list("name", flat=True)
-                    if name.casefold() == category.casefold()
-                ),
-                None,
-            )
-            if category_name is None:
+            cat_norm = normalize_text(category)
+            active_cats = {
+                name.casefold(): name
+                for name in Category.objects.filter(is_active=True).values_list("name", flat=True)
+            }
+            if category.casefold() in active_cats:
+                category = active_cats[category.casefold()]
+            elif cat_norm in ("drink", "beverage", "minum", "minuman") and "minuman" in active_cats:
+                category = active_cats["minuman"]
+            elif cat_norm in ("food", "makan", "makanan") and "makanan" in active_cats:
+                category = active_cats["makanan"]
+            elif cat_norm in ("dessert", "hidangan penutup", "pencuci mulut"):
+                category = active_cats.get("makanan", next(iter(active_cats.values()), None))
+                if "sweet" in allowed_tags and "sweet" not in required:
+                    required.append("sweet")
+            elif cat_norm in ("snack", "camilan", "cemilan"):
+                if "camilan" in active_cats:
+                    category = active_cats["camilan"]
+                else:
+                    category = active_cats.get("makanan", None)
+                    if "snack" in allowed_tags and "snack" not in required:
+                        required.append("snack")
+            else:
                 return {"ok": False, "error": "Category is not in the catalog."}
-            category = category_name
         if max_price is not None and (
             type(max_price) is not int or max_price <= 0 or max_price > 1_000_000
         ):
@@ -191,6 +227,9 @@ class GeminiAssistant:
         self._persist_excluded_item_ids(context, persisted_ids)
 
         current = Preferences.from_dict(context.get("preferences", {}))
+        if tag_prefer_affordable:
+            current.prefer_affordable = True
+            context["prefer_affordable"] = True
         if (
             not required
             and not excluded
@@ -276,19 +315,43 @@ class GeminiAssistant:
             "constraints": constraints.to_dict(),
         }
 
-    @staticmethod
-    def _validated_tags(value, allowed):
-        if (
-            not isinstance(value, list)
-            or len(value) > 8
-            or any(not isinstance(tag, str) or tag not in allowed for tag in value)
-            or len(value) != len(set(value))
-        ):
-            return None
-        return value
+    def _get_tag_alias_map(self, allowed):
+        alias_map = {}
+        for canonical in allowed:
+            alias_map[canonical.casefold()] = canonical
+            alias_map[normalize_text(canonical)] = canonical
+        for canonical, aliases in getattr(self.tag_extractor, "_aliases", {}).items():
+            if canonical in allowed:
+                for alias in aliases:
+                    alias_map[normalize_text(alias)] = canonical
+                    alias_map[alias.casefold()] = canonical
+        return alias_map
 
-    @staticmethod
-    def _validated_exclusions(value, allowed):
+    def _validated_tags(self, value, allowed):
+        if not isinstance(value, list) or len(value) > 8:
+            return None
+        alias_map = self._get_tag_alias_map(allowed)
+        resolved = []
+        prefer_affordable = False
+        for tag in value:
+            if not isinstance(tag, str) or not tag.strip():
+                return None
+            norm = normalize_text(tag)
+            if norm in self.AFFORDABLE_TERMS or tag.strip().casefold() in self.AFFORDABLE_TERMS:
+                prefer_affordable = True
+                continue
+            canonical = alias_map.get(norm) or alias_map.get(tag.strip().casefold())
+            if canonical and canonical in allowed:
+                if canonical not in resolved:
+                    resolved.append(canonical)
+            elif tag in allowed:
+                if tag not in resolved:
+                    resolved.append(tag)
+            else:
+                return None
+        return resolved, prefer_affordable
+
+    def _validated_exclusions(self, value, allowed):
         if (
             not isinstance(value, list)
             or len(value) > 8
@@ -296,11 +359,18 @@ class GeminiAssistant:
             or len({normalize_text(item) for item in value}) != len(value)
         ):
             return None, []
+        alias_map = self._get_tag_alias_map(allowed)
         tags = []
         names = []
         for item in value:
-            if item in allowed:
-                tags.append(item)
+            norm = normalize_text(item)
+            canonical = alias_map.get(norm) or alias_map.get(item.strip().casefold())
+            if canonical and canonical in allowed:
+                if canonical not in tags:
+                    tags.append(canonical)
+            elif item in allowed:
+                if item not in tags:
+                    tags.append(item)
             else:
                 names.append(item)
         return tags, names
@@ -406,10 +476,10 @@ atau dengan filter yang benar-benar disebut pelanggan, lalu rekomendasikan hanya
 item pada field items dari hasil tool. Untuk pencarian dengan hasil, jangan
 menyebut nama item lain. Untuk hasil kosong, jelaskan hanya bahwa filter
 tersebut tidak menemukan kecocokan; jangan menyimpulkan seluruh katalog kosong.
-required_tags hanya berisi tag yang diminta pelanggan secara eksplisit (jenis
-makanan, rasa, minuman). Jangan menambahkan tag suasana atau situasi seperti
-quick_meal, filling, solo. Jika search_status adalah no_matches dan
-relaxed_dropped_tag bernilai null, panggil search_menu lagi dengan tag yang
+Kategori menu yang valid pada filter adalah "Makanan" dan "Minuman" (atau null jika tidak dibatasi).
+required_tags hanya berisi tag yang diminta pelanggan secara eksplisit (seperti sweet/manis, spicy/pedas, drink/minuman, rice/nasi, chicken/ayam, crispy/renyah). Jangan memasukkan kata hemat atau murah ke required_tags.
+Jangan menambahkan tag suasana atau situasi seperti quick_meal, filling, solo.
+Jika search_status adalah no_matches dan relaxed_dropped_tag bernilai null, panggil search_menu lagi dengan tag yang
 lebih sedikit. Jangan pernah bilang sebuah jenis menu tidak ada. Katakan hanya
 bahwa pencarian ini belum menemukan kecocokan, dan coba lagi dengan satu tag saja.
 

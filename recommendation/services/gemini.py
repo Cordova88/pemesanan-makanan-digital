@@ -1,3 +1,4 @@
+from collections.abc import Callable
 import os
 from time import perf_counter
 from typing import override
@@ -173,8 +174,8 @@ class GeminiClient(TextGenerator):
         message: str,
         system_instruction: str,
         tool_declarations: list,
-        tool_handler,
-        before_request,
+        tool_handler: Callable,
+        before_request: Callable,
         max_iterations: int = 4,
     ) -> tuple[str | None, list]:
         if self.client is None or not getattr(settings, 'GEMINI_ENABLED', False):
