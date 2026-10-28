@@ -5,6 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>{% block title %}RasaKita CMS{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{% static 'images/logo.png' %}" />
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -21,13 +22,13 @@
     <a class="skip-link" href="#cms-main">Lewati ke konten utama</a>
     <div class="d-lg-flex">
       <aside class="sidebar p-3 d-none d-lg-flex flex-column position-fixed" aria-label="Navigasi CMS">
-        <a class="brand fs-4 fw-bold mb-3" href="{% url 'staff:dashboard' %}"><span class="brand-mark" aria-hidden="true">R</span><span>RasaKita<small>Manajemen restoran</small></span></a>{% include 'users/nav.html' %}
+        <a class="brand fs-4 fw-bold mb-3" href="{% url 'staff:dashboard' %}"><img src="{% static 'images/logo.png' %}" alt="Logo RasaKita" class="brand-logo" width="38" height="38" style="object-fit: contain;"><span>RasaKita<small>Manajemen restoran</small></span></a>{% include 'users/nav.html' %}
       </aside>
       <main id="cms-main" class="cms-main flex-grow-1" tabindex="-1">
         <header class="cms-topbar d-none d-lg-flex justify-content-between align-items-center"><div><div class="cms-topbar-label">RasaKita CMS</div><strong>Panel operasional</strong></div><a class="btn btn-outline-secondary btn-sm" href="{% url 'storefront' %}">Lihat menu pelanggan <i class="bi bi-arrow-up-right ms-1" aria-hidden="true"></i></a></header>
         <nav class="navbar cms-mobile-nav px-3 d-lg-none">
-          <a class="navbar-brand fw-bold" href="{% url 'staff:dashboard' %}"
-            >RasaKita CMS</a
+          <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="{% url 'staff:dashboard' %}"
+            ><img src="{% static 'images/logo.png' %}" alt="Logo RasaKita" width="28" height="28" style="object-fit: contain;"><span>RasaKita CMS</span></a
           ><button
             class="btn btn-outline-success"
             data-bs-toggle="offcanvas"
@@ -38,7 +39,7 @@
         </nav>
         <div class="offcanvas offcanvas-start" id="nav" tabindex="-1" aria-labelledby="cms-nav-title">
           <div class="offcanvas-header">
-            <h5 id="cms-nav-title">RasaKita CMS</h5>
+            <h5 id="cms-nav-title" class="d-flex align-items-center gap-2 mb-0"><img src="{% static 'images/logo.png' %}" alt="Logo RasaKita" width="24" height="24" style="object-fit: contain;"><span>RasaKita CMS</span></h5>
             <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Tutup navigasi"></button>
           </div>
           <div class="offcanvas-body sidebar">
