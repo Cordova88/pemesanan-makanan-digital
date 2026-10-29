@@ -1,7 +1,7 @@
 """Authoritative chatbot-only state, with optimistic SQL compare-and-swap.
 
-Uses the existing django_session table, a separate HMAC-derived key and signing
-salt. Main auth/cart sessions contain a compatibility mirror, never authority.
+Uses the existing django_session table with a separate HMAC-derived key and
+signing salt. Auth/cart sessions keep a compatibility mirror, never authority.
 """
 
 from copy import deepcopy
@@ -29,13 +29,16 @@ class ConversationStoreUnavailable(Exception):
 
 
 class ConversationStore:
-    SALT: ClassVar[str] = 'rasakita.chat-state.v3'
-    PREFIX: ClassVar[str] = 'rkchatv3'
+    SALT: ClassVar[str] = 'rasakita.chat-state.v4'
+    PREFIX: ClassVar[str] = 'rkchatv4'
     MAX_BYTES: ClassVar[int] = 32768
     RETENTION_SECONDS: ClassVar[int] = 86400
 
     def __init__(
-        self, identity: str, legacy: SessionBase, expected_revision: int | None = None
+        self,
+        identity: str,
+        legacy: SessionBase,
+        expected_revision: int | None = None,
     ) -> None:
         self.key: str = self.PREFIX + UsageGuard.identity('chat-state:' + identity)[:32]
         self.session: SessionBase = SessionBase()
@@ -45,7 +48,7 @@ class ConversationStore:
         imported = SessionBase()
         imported.update(initial)
         # A compatibility mirror cannot resurrect an idle-expired conversation.
-        ConversationSession(imported).expire_dialog(touch=False)
+        ConversationSession(imported).expire_dialog()
         row, _ = Session.objects.get_or_create(
             session_key=self.key,
             defaults={
@@ -58,11 +61,14 @@ class ConversationStore:
             expired = self._decode(row.session_data)
             empty = SessionBase()
             empty[ConversationSession.GEMINI_CALLS_KEY] = max(
-                self._usage(expired), self._usage(initial)
+                self._usage(expired),
+                self._usage(initial),
             )
             empty[ConversationSession.REVISION_KEY] = self._revision(expired) + 1
             replacement = self._encode(dict(empty))
-            Session.objects.filter(session_key=self.key, session_data=row.session_data).update(
+            Session.objects.filter(
+                session_key=self.key, session_data=row.session_data
+            ).update(
                 session_data=replacement,
                 expire_date=now + timedelta(seconds=self.RETENTION_SECONDS),
             )
@@ -105,37 +111,13 @@ class ConversationStore:
         try:
             cls._revision(state)
 
-            if ConversationSession.SEARCH_KEY in state:
-                ConversationSession.validate_search(
-                    state[ConversationSession.SEARCH_KEY],
-                    allow_soft=state.get(ConversationSession.SCHEMA_KEY)
-                    in {5, ConversationSession.SCHEMA_VERSION},
-                )
-
-            if ConversationSession.PENDING_BUDGET_KEY in state:
-                if state.get(ConversationSession.SCHEMA_KEY) not in {
-                    5,
-                    ConversationSession.SCHEMA_VERSION,
-                }:
-                    raise ValueError('Unsupported pending budget version')
-
-                ConversationSession.validate_pending_budget(
-                    state[ConversationSession.PENDING_BUDGET_KEY]
-                )
-
-            if ConversationSession.CONTEXTS_KEY in state:
-                ConversationSession.validate_contexts(
-                    state[ConversationSession.CONTEXTS_KEY],
-                    schema_version=state.get(ConversationSession.SCHEMA_KEY),
-                )
-
             if (
                 len(json.dumps(state, ensure_ascii=False, allow_nan=False).encode('utf-8'))
                 > cls.MAX_BYTES
             ):
                 raise ConversationStoreUnavailable()
 
-            encoded = signing.dumps({'schema': 1, 'state': state}, salt=cls.SALT)
+            encoded = signing.dumps({'schema': 2, 'state': state}, salt=cls.SALT)
 
             if len(encoded) > cls.MAX_BYTES * 2:
                 raise ConversationStoreUnavailable()
@@ -156,48 +138,25 @@ class ConversationStore:
                 type(data) is not dict
                 or set(data) != {'schema', 'state'}
                 or type(data['schema']) is not int
-                or data['schema'] != 1
+                or data['schema'] != 2
                 or type(data['state']) is not dict
-                or any(
-                    not isinstance(key, str) or not ConversationSession._owned_key(key)
-                    for key in data['state']
-                )
             ):
                 raise ConversationStoreUnavailable()
 
-            cls._revision(data['state'])
-
-            if ConversationSession.SEARCH_KEY in data['state']:
-                ConversationSession.validate_search(
-                    data['state'][ConversationSession.SEARCH_KEY],
-                    allow_soft=data['state'].get(ConversationSession.SCHEMA_KEY)
-                    in {5, ConversationSession.SCHEMA_VERSION},
-                )
-
-            if ConversationSession.PENDING_BUDGET_KEY in data['state']:
-                if data['state'].get(ConversationSession.SCHEMA_KEY) not in {
-                    5,
-                    ConversationSession.SCHEMA_VERSION,
-                }:
-                    raise ValueError('Unsupported pending budget version')
-
-                ConversationSession.validate_pending_budget(
-                    data['state'][ConversationSession.PENDING_BUDGET_KEY]
-                )
-
-            if ConversationSession.CONTEXTS_KEY in data['state']:
-                ConversationSession.validate_contexts(
-                    data['state'][ConversationSession.CONTEXTS_KEY],
-                    schema_version=data['state'].get(ConversationSession.SCHEMA_KEY),
-                )
+            state = {
+                key: value
+                for key, value in data['state'].items()
+                if isinstance(key, str) and ConversationSession._owned_key(key)
+            }
+            cls._revision(state)
 
             if (
-                len(json.dumps(data['state'], ensure_ascii=False, allow_nan=False).encode('utf-8'))
+                len(json.dumps(state, ensure_ascii=False, allow_nan=False).encode('utf-8'))
                 > cls.MAX_BYTES
             ):
                 raise ConversationStoreUnavailable()
 
-            return data['state']
+            return state
         except (signing.BadSignature, ValueError, TypeError, UnicodeError, RecursionError):
             raise ConversationStoreUnavailable() from None
 
@@ -210,7 +169,9 @@ class ConversationStore:
         state[ConversationSession.REVISION_KEY] = self.base_revision + 1
         encoded = self._encode(state)
         changed = Session.objects.filter(
-            session_key=self.key, session_data=self._encoded, expire_date__gt=timezone.now()
+            session_key=self.key,
+            session_data=self._encoded,
+            expire_date__gt=timezone.now(),
         ).update(
             session_data=encoded,
             expire_date=timezone.now() + timedelta(seconds=self.RETENTION_SECONDS),
@@ -254,9 +215,9 @@ class ConversationStore:
             state[ConversationSession.REVISION_KEY] = self._revision(state) + 1
 
             if (
-                Session.objects.filter(session_key=self.key, session_data=row.session_data).update(
-                    session_data=self._encode(state),
-                )
+                Session.objects.filter(
+                    session_key=self.key, session_data=row.session_data
+                ).update(session_data=self._encode(state))
                 == 1
             ):
                 self._usage_recorded = True

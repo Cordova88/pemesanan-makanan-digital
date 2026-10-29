@@ -19,6 +19,3 @@ class ChatbotResponse(TypedDict):
     recommendations: list[RecommendationMatch]
     quick_replies: list[QuickReply]
     active_search: NotRequired[SearchConstraintsPayload]
-    explanations: NotRequired[dict[int, str]]
-    catalog_question: NotRequired[bool]
-    combination: NotRequired[dict[str, object]]

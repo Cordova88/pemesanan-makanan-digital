@@ -15,16 +15,49 @@ from django.db import close_old_connections, connections, OperationalError
 from django.test import Client, RequestFactory, TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
-from ..services.chatbot import ChatbotService
 from ..services.conversation_session import ConversationSession
 from ..services.conversation_store import (
     ConversationStore,
     ConversationConflict,
     ConversationStoreUnavailable,
 )
-from ..services.security import ChatInput, ChatInputError
-from ..services.telemetry import fallback_event
 from ..views import chat
+
+
+class FakeChatbotService:
+    """Stand-in for the AI service: records only the search state it is given."""
+
+    def __init__(self, session: SessionStore) -> None:
+        self.session = session
+
+    def reply(self, message: str, more: bool = False, action: str | None = None) -> dict:
+        del more
+        search = self.session.get(ConversationSession.SEARCH_KEY, {})
+
+        if not isinstance(search, dict):
+            search = {}
+
+        search = dict(search)
+
+        if action == 'reset' or message == 'mulai lagi':
+            self.session.pop(ConversationSession.SEARCH_KEY, None)
+            search = {}
+        elif 'jangan pedas' in message:
+            search['excluded_tags'] = ['spicy']
+        elif 'maksimal' in message:
+            search['max_price'] = 20000
+
+        if search:
+            self.session[ConversationSession.SEARCH_KEY] = search
+
+        return {
+            'message': 'Halo!',
+            'state': 'COLLECTING_PREFERENCES',
+            'preferences': {},
+            'recommendations': [],
+            'quick_replies': [],
+            'active_search': search,
+        }
 
 
 class ConversationStoreTests(TestCase):
@@ -161,7 +194,7 @@ class ConversationStoreTests(TestCase):
     def test_oversized_state_rejected_without_commit(self) -> None:
         for value in ('x' * 40000, '😀' * 8000):
             turn = self.turn()
-            turn.session['recommendation_oversized'] = value
+            turn.session['recommendation_last_message'] = value
 
             with self.assertRaises(ConversationStoreUnavailable):
                 turn.commit()
@@ -197,7 +230,9 @@ class RevisionApiTests(TestCase):
         )
 
     def test_response_revision_and_stale_request_409_without_provider(self) -> None:
-        first = self.send()
+        with patch('recommendation.views.ChatbotService', FakeChatbotService):
+            first = self.send()
+
         revision = first.json()['revision']
 
         with patch('recommendation.views.ChatbotService') as service:
@@ -216,18 +251,22 @@ class RevisionApiTests(TestCase):
                 self.assertEqual(self.send(revision=value).status_code, 400)
 
     def test_legacy_client_without_revision_still_uses_authoritative_state(self) -> None:
-        self.send('jangan pedas')
-        session = self.client.session
-        session[ConversationSession.SEARCH_KEY] = {'max_price': 1}
-        session.save()
-        result = self.send('maksimal 20 ribu').json()
+        with patch('recommendation.views.ChatbotService', FakeChatbotService):
+            self.send('jangan pedas')
+            session = self.client.session
+            session[ConversationSession.SEARCH_KEY] = {'max_price': 1}
+            session.save()
+            result = self.send('maksimal 20 ribu').json()
+
         self.assertIn('Pedas', ' '.join(result['active_search']['excluded_tags']))
         self.assertEqual(result['active_search']['max_price'], 20000)
 
     def test_reset_conflict_does_not_erase_newer_choice_or_quota(self) -> None:
-        first = self.send('jangan pedas').json()
-        updated = self.send('maksimal 20 ribu', revision=first['revision']).json()
-        response = self.send('mulai lagi', action='reset', revision=first['revision'])
+        with patch('recommendation.views.ChatbotService', FakeChatbotService):
+            first = self.send('jangan pedas').json()
+            updated = self.send('maksimal 20 ribu', revision=first['revision']).json()
+            response = self.send('mulai lagi', action='reset', revision=first['revision'])
+
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.json()['revision'], updated['revision'])
         main = self.client.session
@@ -272,10 +311,11 @@ class RevisionApiTests(TestCase):
             for _ in range(2)
         ]
 
-        for request in requests:
-            request.session = DbSession(session_key=main.session_key)
-            response = chat(request)
-            self.assertEqual(response.status_code, 200)
+        with patch('recommendation.views.ChatbotService', FakeChatbotService):
+            for request in requests:
+                request.session = DbSession(session_key=main.session_key)
+                response = chat(request)
+                self.assertEqual(response.status_code, 200)
 
         self.assertEqual(
             requests[0].session['chatbot_client_id'], requests[1].session['chatbot_client_id']
@@ -284,16 +324,9 @@ class RevisionApiTests(TestCase):
             Session.objects.filter(session_key__startswith=ConversationStore.PREFIX).count(), 1
         )
 
-    def test_fallback_log_has_metadata_only(self) -> None:
-        with self.assertLogs('recommendation.services.gemini', level='INFO') as logs:
-            fallback_event('ranking')
-
-        data = json.loads(logs.records[0].getMessage())
-        self.assertEqual(set(data), {'timestamp', 'request_id', 'event', 'stage', 'outcome'})
-        self.assertEqual(data['event'], 'dialog_fallback')
-
     def test_commit_race_returns_409_without_saving_losing_business_delta(self) -> None:
-        first = self.send('jangan pedas').json()
+        with patch('recommendation.views.ChatbotService', FakeChatbotService):
+            first = self.send('jangan pedas').json()
         commit = ConversationStore.commit
         raced = False
 
@@ -309,7 +342,9 @@ class RevisionApiTests(TestCase):
 
             return commit(turn)
 
-        with patch.object(ConversationStore, 'commit', race):
+        with patch('recommendation.views.ChatbotService', FakeChatbotService), patch.object(
+            ConversationStore, 'commit', race
+        ):
             response = self.send('maksimal 10 ribu', revision=first['revision'])
 
         self.assertEqual(response.status_code, 409)
@@ -318,16 +353,17 @@ class RevisionApiTests(TestCase):
             ConversationSession.SEARCH_KEY
         ]
         self.assertIn('shrimp', state['excluded_tags'])
-        self.assertIsNone(state['max_price'])
+        self.assertNotIn('max_price', state)
 
     def test_debug_compatibility_mirror_is_not_required_in_production(self) -> None:
-        with override_settings(DEBUG=True):
-            self.send('jangan pedas')
+        with patch('recommendation.views.ChatbotService', FakeChatbotService):
+            with override_settings(DEBUG=True):
+                self.send('jangan pedas')
 
-        self.assertIn(ConversationSession.SEARCH_KEY, self.client.session)
+            self.assertIn(ConversationSession.SEARCH_KEY, self.client.session)
 
-        with override_settings(DEBUG=False):
-            response = self.send('maksimal 20 ribu')
+            with override_settings(DEBUG=False):
+                response = self.send('maksimal 20 ribu')
 
         self.assertEqual(response.status_code, 200)
         self.assertNotIn(ConversationSession.SEARCH_KEY, self.client.session)
@@ -346,8 +382,6 @@ class ConcurrentSqlCasTests(TransactionTestCase):
         database = deepcopy(connections['default'].settings_dict)
         uri = 'file:rasakita_cas_' + uuid4().hex + '?mode=memory&cache=shared'
         database['NAME'] = uri
-        # Clone only the isolated test database into a known shared-memory URI.
-        # Some test bootstraps retain the original anonymous :memory: connection.
         shared = sqlite3.connect(uri, uri=True)
         connections['default'].connection.backup(shared)
         barrier = Barrier(2)
@@ -359,7 +393,7 @@ class ConcurrentSqlCasTests(TransactionTestCase):
 
             try:
                 turn = ConversationStore('threaded-synthetic', SessionStore())
-                turn.session['recommendation_writer'] = value
+                turn.session[ConversationSession.SEARCH_KEY] = {'max_price': value}
                 barrier.wait(timeout=10)
 
                 try:
@@ -385,6 +419,6 @@ class ConcurrentSqlCasTests(TransactionTestCase):
             ).fetchone()
             state = ConversationStore._decode(row[0])
             self.assertEqual(state[ConversationSession.REVISION_KEY], 1)
-            self.assertIn(state['recommendation_writer'], {1, 2})
+            self.assertIn(state[ConversationSession.SEARCH_KEY]['max_price'], {1, 2})
         finally:
             shared.close()

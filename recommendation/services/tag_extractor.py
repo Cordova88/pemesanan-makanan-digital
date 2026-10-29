@@ -1,13 +1,9 @@
 from collections.abc import Iterable
 import re
 from types import NotImplementedType
-from typing import TYPE_CHECKING, ClassVar, Self, TypedDict, cast
+from typing import ClassVar, Self, TypedDict, cast
 
 from .language import IndonesianPriceParser, normalize_text
-from .mood_resolver import MoodResolver
-
-if TYPE_CHECKING:
-    from .conversation_interpreter import ConversationInterpretation
 
 
 # Distinguish an omitted collection from an explicitly supplied value, as before.
@@ -76,79 +72,6 @@ class Preferences:
         fields = ", ".join(f"{name}={getattr(self, name)!r}" for name in self.__match_args__)
 
         return f"{type(self).__qualname__}({fields})"
-
-    def apply_interpretation(
-        self,
-        interpretation: "ConversationInterpretation",
-        mood_resolver: MoodResolver,
-    ) -> None:
-        """Apply a preference delta, preserving operation order and mood rules.
-
-        The orchestrator handles RESET and non-preference intents before calling
-        this method. Tag conflict cleanup runs after the complete operation list.
-        """
-        moods = set(interpretation.moods)
-
-        for operation in interpretation.operations:
-            op = operation.action
-            tags = set(operation.tags)
-
-            if op == "ADD":
-                self.tags.update(tags)
-                self.excluded_tags.difference_update(tags)
-                self.soft_excluded_tags.difference_update(tags)
-            elif op == "REMOVE":
-                self.tags.difference_update(tags)
-                self.excluded_tags.update(tags)
-                self.soft_excluded_tags.difference_update(tags)
-            elif op == "SOFT_REMOVE":
-                self.tags.difference_update(tags)
-                self.soft_excluded_tags.update(tags)
-                self.excluded_tags.difference_update(tags)
-            elif op == "REPLACE":
-                self.tags.difference_update(operation.remove_tags)
-                self.tags.update(tags)
-                self.excluded_tags.difference_update(tags)
-                self.soft_excluded_tags.difference_update(tags)
-                self.excluded_tags.difference_update(operation.remove_tags)
-                self.soft_excluded_tags.difference_update(operation.remove_tags)
-            elif op == "DROP":
-                self.tags.difference_update(tags)
-            elif op == "RELAX":
-                self.excluded_tags.difference_update(tags)
-                self.soft_excluded_tags.difference_update(tags)
-            elif op == "CLEAR_TAGS":
-                self.tags.clear()
-                self.excluded_tags.clear()
-                self.soft_excluded_tags.clear()
-            elif op == "CLEAR":
-                self.tags.clear()
-                self.excluded_tags.clear()
-                self.soft_excluded_tags.clear()
-                self.moods.clear()
-                self.max_price = None
-                self.category = None
-                self.prefer_affordable = False
-
-        if interpretation.clear_moods:
-            self.moods.clear()
-
-        if moods:
-            self.moods = moods
-
-        self.tags.difference_update(self.excluded_tags | self.soft_excluded_tags)
-        self.mood_tags = mood_resolver.resolve(self.moods)
-        self.max_price = interpretation.max_price
-        self.category = interpretation.category
-
-        if interpretation.prefer_affordable:
-            self.prefer_affordable = True
-
-        if interpretation.clear_max_price:
-            self.max_price = None
-
-        if interpretation.clear_prefer_affordable:
-            self.prefer_affordable = False
 
     @property
     def all_positive_tags(self) -> set[str]:

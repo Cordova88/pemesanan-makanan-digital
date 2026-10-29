@@ -1,8 +1,10 @@
+from collections.abc import Callable, Collection
 from django.conf import settings
 from django.db import DatabaseError
 import logging
 import json
 import re
+from typing import Any
 from google.genai import types
 
 from menu.models import Category, MenuItem
@@ -12,6 +14,9 @@ from recommendation.services.tag_extractor import Preferences
 from recommendation.services.language import normalize_text
 
 logger = logging.getLogger(__name__)
+
+Context = dict[str, Any]
+ToolResult = dict[str, Any]
 
 
 class GeminiAssistant:
@@ -100,17 +105,28 @@ class GeminiAssistant:
         "pas di dompet",
     })
 
-    def __init__(self, gemini_client, recommender, tag_extractor, session=None):
+    def __init__(
+        self,
+        gemini_client: Any,
+        recommender: Any,
+        tag_extractor: Any,
+        session: Any = None,
+    ) -> None:
         self.gemini_client = gemini_client
         self.recommender = recommender
         self.tag_extractor = tag_extractor
         self.session = session
 
     @property
-    def available(self):
-        return getattr(self.gemini_client, "available", False)
+    def available(self) -> bool:
+        return bool(getattr(self.gemini_client, "available", False))
 
-    def respond(self, message, context, request_budget):
+    def respond(
+        self,
+        message: str,
+        context: Context,
+        request_budget: Callable[[], bool],
+    ) -> tuple[str | None, list[ToolResult]]:
         tool_results = []
         response, raw_tool_results = self.gemini_client.converse(
             message=message,
@@ -130,7 +146,7 @@ class GeminiAssistant:
         return response, raw_tool_results
 
     @staticmethod
-    def _valid_response(response):
+    def _valid_response(response: object) -> bool:
         return (
             isinstance(response, str)
             and bool(response.strip())
@@ -139,7 +155,13 @@ class GeminiAssistant:
             and not re.search(r"https?://|www\.", response, re.IGNORECASE)
         )
 
-    def _dispatch(self, name, arguments, context, tool_results):
+    def _dispatch(
+        self,
+        name: str,
+        arguments: object,
+        context: Context,
+        tool_results: list[ToolResult],
+    ) -> ToolResult:
         try:
             if name == "search_menu":
                 result = self._search_menu(arguments, context)
@@ -156,7 +178,7 @@ class GeminiAssistant:
         tool_results.append(result)
         return result
 
-    def _search_menu(self, arguments, context):
+    def _search_menu(self, arguments: object, context: Context) -> ToolResult:
         if not isinstance(arguments, dict):
             return {"ok": False, "error": "Tool arguments must be an object."}
         allowed_tags = set(self.tag_extractor._aliases)
@@ -315,7 +337,7 @@ class GeminiAssistant:
             "constraints": constraints.to_dict(),
         }
 
-    def _get_tag_alias_map(self, allowed):
+    def _get_tag_alias_map(self, allowed: Collection[str]) -> dict[str, str]:
         alias_map = {}
         for canonical in allowed:
             alias_map[canonical.casefold()] = canonical
@@ -327,7 +349,11 @@ class GeminiAssistant:
                     alias_map[alias.casefold()] = canonical
         return alias_map
 
-    def _validated_tags(self, value, allowed):
+    def _validated_tags(
+        self,
+        value: object,
+        allowed: Collection[str],
+    ) -> tuple[list[str], bool] | None:
         if not isinstance(value, list) or len(value) > 8:
             return None
         alias_map = self._get_tag_alias_map(allowed)
@@ -351,7 +377,11 @@ class GeminiAssistant:
                 return None
         return resolved, prefer_affordable
 
-    def _validated_exclusions(self, value, allowed):
+    def _validated_exclusions(
+        self,
+        value: object,
+        allowed: Collection[str],
+    ) -> tuple[list[str] | None, list[str]]:
         if (
             not isinstance(value, list)
             or len(value) > 8
@@ -376,7 +406,7 @@ class GeminiAssistant:
         return tags, names
 
     @staticmethod
-    def _validated_item_ids(value):
+    def _validated_item_ids(value: object) -> list[int] | None:
         if (
             not isinstance(value, list)
             or len(value) > 8
@@ -387,7 +417,7 @@ class GeminiAssistant:
         return value
 
     @staticmethod
-    def _validated_item_names(value):
+    def _validated_item_names(value: object) -> list[str] | None:
         if (
             not isinstance(value, list)
             or len(value) > 8
@@ -403,7 +433,7 @@ class GeminiAssistant:
         return value
 
     @staticmethod
-    def _resolve_excluded_item_names(names):
+    def _resolve_excluded_item_names(names: Collection[str]) -> set[int] | None:
         normalized = {normalize_text(name) for name in names}
         if not normalized:
             return set()
@@ -425,14 +455,18 @@ class GeminiAssistant:
             return None
         return resolved
 
-    def _persist_excluded_item_ids(self, context, item_ids):
+    def _persist_excluded_item_ids(
+        self,
+        context: Context,
+        item_ids: Collection[int],
+    ) -> None:
         if self.session is not None:
             self.session["recommendation_excluded_item_ids"] = sorted(item_ids)
             if hasattr(self.session, "modified"):
                 self.session.modified = True
 
     @staticmethod
-    def _item_data(item):
+    def _item_data(item: MenuItem) -> dict[str, Any]:
         return {
             "id": item.pk,
             "name": item.name,
@@ -443,7 +477,7 @@ class GeminiAssistant:
             "tags": sorted(tag.name for tag in item.tags.all()),
         }
 
-    def _get_menu_details(self, arguments):
+    def _get_menu_details(self, arguments: object) -> ToolResult:
         item_ids = arguments.get("item_ids") if isinstance(arguments, dict) else None
         if (
             not isinstance(item_ids, list)
@@ -460,7 +494,7 @@ class GeminiAssistant:
         }
 
     @staticmethod
-    def _system_instruction(context):
+    def _system_instruction(context: Context) -> str:
         return f"""Kamu adalah asisten percakapan pemesanan makanan berbahasa Indonesia.
 Kamu harus memproses setiap pesan dan menjawab dengan hangat, alami, dan relevan.
 Kamu boleh mengobrol santai, memahami slang/jokes, menyapa, dan membantu memilih

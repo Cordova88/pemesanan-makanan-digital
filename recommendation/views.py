@@ -14,7 +14,7 @@ from cart.services import CartService
 from menu.models import MenuItem
 from menu.selection import MenuSelection
 
-from .services.chatbot import ChatbotService
+from .services.chatbot import ChatbotService, ChatbotUnavailable
 from .services.conversation_store import ConversationStore, ConversationConflict
 from .services.language import tag_label
 from .services.recommendation import RecommendationMatch, SearchConstraintsPayload
@@ -34,10 +34,10 @@ def _body(request: HttpRequest) -> dict[str, object]:
     return cast(dict[str, object], body)
 
 
-def _item(match: RecommendationMatch, explanation: str | None = None) -> dict[str, object]:
+def _item(match: RecommendationMatch) -> dict[str, object]:
     item = match.item
     minimum = MenuSelection.minimum_payable(item)
-    result: dict[str, object] = {
+    return {
         "id": item.id,
         "name": item.name,
         "image_url": item.image.url if item.image else "",
@@ -70,11 +70,6 @@ def _item(match: RecommendationMatch, explanation: str | None = None) -> dict[st
             for addon in item.allowed_addons.filter(is_active=True, is_available=True)
         ],
     }
-
-    if explanation:
-        result["explanation"] = explanation
-
-    return result
 
 
 def _public_preferences(preferences: PreferencesPayload) -> PreferencesPayload:
@@ -150,11 +145,9 @@ def chat(request: HttpRequest) -> JsonResponse:
             body.action == 'more',
             body.action,
         )
-        explanations = service_result.pop("explanations", {})
         result: dict[str, object] = dict(service_result)
         result["recommendations"] = [
-            _item(item, explanations.get(item.item.id))
-            for item in service_result["recommendations"]
+            _item(item) for item in service_result["recommendations"]
         ]
         result["preferences"] = _public_preferences(service_result["preferences"])
 
@@ -195,6 +188,22 @@ def chat(request: HttpRequest) -> JsonResponse:
         response['X-Request-ID'] = request_id
 
         request_event(request_id, 'input_rejected', error.status)
+
+        return response
+
+    except ChatbotUnavailable as error:
+        if turn is not None:
+            try:
+                turn.preserve_usage()
+            except Exception:
+                pass  # Shared provider quotas remain authoritative on storage failure.
+
+        request.session.modified = False
+
+        response = JsonResponse({'error': str(error)}, status=503)
+        response['X-Request-ID'] = request_id
+
+        request_event(request_id, 'ai_unavailable', 503)
 
         return response
 
@@ -248,8 +257,4 @@ def add_to_cart(request: HttpRequest) -> JsonResponse:
 
 @require_GET
 def chatbot_page(request: HttpRequest) -> HttpResponse:
-    return render(
-        request,
-        "recommendation/chatbot.html",
-        {'gemini_enabled': bool(getattr(settings, 'GEMINI_ENABLED', False))},
-    )
+    return render(request, "recommendation/chatbot.html")
