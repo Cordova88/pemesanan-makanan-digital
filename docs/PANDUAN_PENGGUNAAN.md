@@ -128,10 +128,10 @@ sapaan AI baru; keduanya bisa memakai kuota meskipun belum ada pesan yang diketi
 Kalimat `es kelapa tambah susu` belum otomatis memasang tambahan; pilih tambahan yang tersedia
 pada halaman menu/keranjang.
 
-Mode lokal dapat menjawab tanpa Gemini. Jika Gemini aktif dan tersedia, jalur AI-first mencoba
-memproses pesan biasa lebih dahulu; instruksi, konteks, dan hasil fungsi katalog dapat diproses
-layanan AI. Jalur lokal/hybrid tetap menjadi cadangan dan tidak semua tindakan melalui jalur
-yang sama. Untuk alergi, konfirmasi bahan serta kontak silang kepada staf; kartu rekomendasi
+Chatbot hanya menjawab melalui Gemini. Jika Gemini aktif dan tersedia, instruksi, konteks, dan
+hasil fungsi katalog diproses layanan AI. Bila Gemini tidak tersedia atau jawabannya ditolak,
+halaman menampilkan pesan bahwa chatbot belum tersedia; tidak ada jawaban lokal sebagai
+cadangan. Untuk alergi, konfirmasi bahan serta kontak silang kepada staf; kartu rekomendasi
 bukan jaminan aman.
 
 ## 4. Makan di tempat dan QR meja
@@ -253,7 +253,7 @@ varian/tambahan, uang kurang, pembatalan, serta makan di tempat dengan QR.
 | Total berubah | Varian, tambahan, jumlah; server menghitung pilihan aktual. |
 | Order tidak bisa diubah/dibayar | Masih pending atau sudah kedaluwarsa? |
 | Foto/menu berbeda antar-laptop | Data katalog dan upload tidak disinkronkan Git. |
-| Chatbot layanan belum tersedia | Periksa terminal, migrasi, profil, dan penyimpanan sesi; belum tentu karena Gemini. |
+| Chatbot layanan belum tersedia | `GEMINI_ENABLED=true`, kunci API valid, kuota sesi, dan log terminal. Tanpa Gemini, chatbot memang tidak menjawab. |
 | Modal/pemindai gagal dimuat | Periksa koneksi CDN dan error browser selain server Django. |
 
 ## 9. Catatan penggunaan setelah pembaruan

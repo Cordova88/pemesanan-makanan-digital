@@ -39,5 +39,5 @@ dokumen juga menampilkan diagram Mermaid. Jika diagram tidak terlihat pada edito
 tautan gambar SVG yang tersedia.
 
 Gambar hanya menunjukkan bagian penting agar mudah diikuti. Untuk mengetahui seluruh langkah,
-buka berkas kode yang ditautkan. Diagram bagian hybrid chatbot juga tidak berarti semua pesan
-selalu melewati jalur yang sama.
+buka berkas kode yang ditautkan. Diagram chatbot menggambarkan satu jalur: setiap pesan diproses
+Gemini dengan bantuan fungsi katalog Django.

@@ -28,7 +28,7 @@ Beberapa istilah yang diperlukan:
 ## Daftar isi
 
 1. [Apa pekerjaan chatbot?](#1-apa-pekerjaan-chatbot)
-2. [Mengapa ada bagian lokal dan AI?](#2-mengapa-ada-bagian-lokal-dan-ai)
+2. [Mengapa chatbot memakai AI?](#2-mengapa-chatbot-memakai-ai)
 3. [Perjalanan satu pesan](#3-perjalanan-satu-pesan)
 4. [Siapa mengerjakan bagian mana?](#4-siapa-mengerjakan-bagian-mana)
 5. [Bagaimana nama menu dan tag dikenali?](#5-bagaimana-nama-menu-dan-tag-dikenali)
@@ -61,27 +61,25 @@ Chatbot membantu **memilih**, bukan menggantikan seluruh proses restoran:
 - Varian/tambahan dipilih melalui pilihan menu dan keranjang.
 - Pembayaran tetap mengikuti alur pesanan dan kasir.
 
-## 2. Mengapa ada bagian lokal dan AI?
+## 2. Mengapa chatbot memakai AI?
 
-**Lokal** berarti aturan dijalankan oleh kode aplikasi sendiri. Contohnya, nominal `10k` perlu
-dibaca sebagai Rp10.000 dan menu tidak tersedia harus dikeluarkan dari hasil. Itu tidak
-membutuhkan percakapan bebas dengan AI.
+Aturan aplikasi tetap dijalankan oleh kode sendiri. Contohnya, menu tidak tersedia harus
+dikeluarkan dari hasil, dan harga akhir dihitung server. Itu tidak diserahkan kepada AI.
 
-**AI** dapat membantu ketika bahasa lebih samar, misalnya pilihan yang cocok untuk “nemenin
-nugas”. Hasil bantuannya tetap perlu dibatasi dan diperiksa. AI tidak mengambil alih database,
-aturan harga, atau izin transaksi.
+**AI** dipakai untuk memahami bahasa yang samar, misalnya pilihan yang cocok untuk “nemenin
+nugas”, dan untuk menyusun kalimat balasan. Hasil bantuannya tetap dibatasi dan diperiksa. AI
+tidak mengambil alih database, aturan harga, atau izin transaksi.
 
-Cara utama sekarang disebut **AI-first**: Gemini dicoba lebih dahulu ketika aktif dan tersedia.
-Ketika Gemini aktif dan tersedia, pesan biasa diproses oleh `GeminiAssistant` lebih dahulu. AI
-dapat bertanya atau meminta pencarian melalui fungsi Django. Jika Gemini dimatikan atau gagal,
-aturan lokal menjadi jalur cadangan. Hasil mode lokal tidak mewakili semua kemampuan percakapan
-AI-first.
+Cara kerja chatbot sekarang hanya satu jalur: **Gemini**. `GeminiAssistant` memproses setiap
+pesan. AI dapat bertanya atau meminta pencarian melalui fungsi Django. Jika Gemini dimatikan,
+kuotanya habis, atau balasannya gagal diperiksa, chatbot mengembalikan pesan bahwa layanan
+belum tersedia (HTTP 503); tidak ada balasan lokal sebagai cadangan.
 
 | Pertanyaan | Jawaban |
 |---|---|
-| Apakah paket Python untuk Gemini terpasang berarti Gemini aktif? | Tidak. Pengaturan, model, kunci API, dan jalur yang dipilih juga menentukan. |
-| Apakah chatbot bisa berjalan tanpa kunci API? | Bisa, memakai profil lokal bawaan. |
-| Siapa menyusun kalimat saat AI-first aktif? | Gemini; fakta menu diambil melalui fungsi katalog Django. |
+| Apakah paket Python untuk Gemini terpasang berarti Gemini aktif? | Tidak. Pengaturan, model, dan kunci API juga menentukan. |
+| Apakah chatbot bisa berjalan tanpa kunci API? | Tidak. Tanpa Gemini aktif, endpoint mengembalikan pesan "Chatbot belum tersedia". |
+| Siapa menyusun kalimat? | Gemini; fakta menu diambil melalui fungsi katalog Django. |
 | Apakah JSON dari AI otomatis dipakai? | Tidak. Bentuk dan isinya diperiksa dahulu. |
 
 ## 3. Perjalanan satu pesan
@@ -89,11 +87,10 @@ AI-first.
 ### Saat halaman pertama kali dibuka
 
 Template chatbot memanggil `sendMessage("", "")` saat inisialisasi. Browser mengirim `POST
-/api/recommendation/chat/` meskipun pengguna belum mengetik. Pada jalur AI-first, pesan kosong
-diterjemahkan menjadi permintaan memulai percakapan. Petunjuk untuk AI, daftar fungsi bantuan
-yang boleh diminta, dan catatan percakapan ikut dikirim sehingga input token tidak nol. Sapaan
-lokal tanpa API belum diterapkan; itu baru pilihan optimasi yang dibahas, bukan perilaku
-sekarang.
+/api/recommendation/chat/` meskipun pengguna belum mengetik. Pesan kosong diterjemahkan menjadi
+permintaan memulai percakapan. Petunjuk untuk AI, daftar fungsi bantuan yang boleh diminta, dan
+catatan percakapan ikut dikirim sehingga input token tidak nol. Sapaan tanpa API tidak
+disediakan; setiap sapaan memakai Gemini.
 
 Jadi, bedakan `GET /chatbot/` yang memuat halaman, POST inisialisasi, dan POST pesan
 berikutnya. Membuka atau me-refresh halaman dapat memakai kuota layanan AI.
@@ -105,12 +102,13 @@ Ikuti pesan **`minuman maksimal 10 ribu`**:
 1. Browser mengirim pesan ke `POST /api/recommendation/chat/` dengan informasi
    sesi/revisi yang dibutuhkan alur percakapan serta CSRF.
 2. View memeriksa permintaan dan memuat keadaan percakapan yang benar.
-3. `ChatbotService` mencoba `GeminiAssistant` jika tersedia. Gemini membaca pesan dan konteks.
+3. `ChatbotService` memanggil `GeminiAssistant`. Gemini membaca pesan dan konteks.
 4. Jika membutuhkan fakta menu, Gemini meminta `search_menu` atau `get_menu_details`.
-   Django menjalankan fungsi tersebut. Jika AI tidak tersedia, penafsir lokal menangani pesan.
+   Django menjalankan fungsi tersebut. Jika AI tidak tersedia atau balasannya tidak lolos
+   pemeriksaan, permintaan berhenti dengan HTTP 503.
 5. Pencarian memeriksa katalog serta syarat yang berlaku. Menu tidak tersedia
    atau yang melanggar batas tidak menjadi kandidat yang sah.
-6. Hasil dirangkai menjadi rencana respons, kalimat, tombol, dan kartu menu.
+6. Balasan AI dipakai bersama kartu menu hasil pencarian; tombol mengikuti hasil tersebut.
 7. Perubahan percakapan disimpan dengan pemeriksaan revisi, lalu browser menampilkan hasil.
 
 Ini ringkasan untuk belajar; beberapa permintaan berhenti lebih awal untuk bertanya ulang atau
@@ -142,20 +140,16 @@ Jangan membaca seluruh file besar sekaligus. Mulailah dari pekerjaan tiap bagian
 | Halaman chatbot | Tempat pelanggan berbicara dan melihat pilihan | [template chatbot](../recommendation/templates/recommendation/chatbot.html) |
 | View | Penerima pesan yang memeriksa bentuk permintaan | [views.py](../recommendation/views.py) |
 | `ChatbotService` | Pengatur alur percakapan | [chatbot.py](../recommendation/services/chatbot.py) |
-| `GeminiAssistant` | Percakapan AI-first dan permintaan fungsi katalog | [assistant.py](../recommendation/services/ai/assistant.py) |
-| `ConversationInterpreter` | Membaca jenis maksud dan perubahan pilihan | [conversation_interpreter.py](../recommendation/services/conversation_interpreter.py) |
-| `EntityResolver` | Mencocokkan sebutan dengan identitas menu | [entity_resolver.py](../recommendation/services/entity_resolver.py) |
-| `TagExtractor`, bagian mood | Membaca ciri atau suasana yang disebut | [tag_extractor.py](../recommendation/services/tag_extractor.py), [mood_extractor.py](../recommendation/services/mood_extractor.py), [mood_resolver.py](../recommendation/services/mood_resolver.py) |
-| Budget dan rencana | Memisahkan harga, jumlah, dan maksud budget | [budget.py](../recommendation/services/budget.py), [plan_interpreter.py](../recommendation/services/plan_interpreter.py) |
-| `DecisionRouter` | Menentukan jalur lokal, bantuan AI, atau klarifikasi | [decision_router.py](../recommendation/services/decision_router.py) |
+| `GeminiAssistant` | Percakapan AI dan permintaan fungsi katalog | [assistant.py](../recommendation/services/ai/assistant.py) |
+| `TagExtractor` | Kosakata tag, alias, dan kategori katalog yang boleh dipakai AI | [tag_extractor.py](../recommendation/services/tag_extractor.py) |
 | `RecommendationService` | Memeriksa daftar menu dan mengurutkan hasil | [recommendation.py](../recommendation/services/recommendation.py) |
 | `ConversationSession` | Catatan pilihan dan konteks percakapan | [conversation_session.py](../recommendation/services/conversation_session.py) |
 | `ConversationStore` | Penjaga penyimpanan/revisi catatan | [conversation_store.py](../recommendation/services/conversation_store.py) |
-| `ResponsePlan`, `LocalResponseComposer` | Rencana jawaban dan kalimat lokal | [response_plan.py](../recommendation/services/response_plan.py), [response_composer.py](../recommendation/services/response_composer.py) |
-| Adapter dan pembatas AI | Penghubung layanan luar yang dibatasi | [gemini.py](../recommendation/services/gemini.py), [turn_generator.py](../recommendation/services/ai/turn_generator.py), [security.py](../recommendation/services/security.py) |
+| Adapter dan pembatas AI | Penghubung layanan luar yang dibatasi | [gemini.py](../recommendation/services/gemini.py), [security.py](../recommendation/services/security.py) |
 
-`DecisionRouter` membuat keputusan; ia bukan bagian yang membuka koneksi Google sendiri.
-Pemisahan ini membantu menguji keputusan tanpa memanggil layanan AI.
+`GeminiAssistant` memutuskan kapan meminta fakta katalog; ia tidak membuka koneksi Google
+sendiri. `GeminiClient` yang menangani koneksi, sehingga keputusan dan pemeriksaan bisa diuji
+tanpa memanggil layanan AI.
 
 ## 5. Bagaimana nama menu dan tag dikenali?
 
@@ -163,9 +157,9 @@ Nama menu adalah **identitas**. Contohnya, pelanggan menyebut menu tertentu. Tag
 **ciri**, misalnya manis atau dingin. Memilih tag dingin tidak sama dengan memilih satu menu
 bernama tertentu.
 
-1. Teks dibantu normalisasi melalui [language.py](../recommendation/services/language.py).
-2. Penafsir mencari ciri, kategori, nominal, serta maksud kalimat.
-3. Pencocokan menu memakai katalog dan alias yang tersedia.
+1. Teks dinormalisasi melalui [language.py](../recommendation/services/language.py).
+2. Gemini membaca maksud kalimat dan memilih tag/kategori/anggaran yang disebut pelanggan.
+3. Backend memvalidasi tag terhadap kosakata katalog dan mencari menu yang cocok.
 4. Jika lebih dari satu menu sama-sama mungkin, bot dapat meminta penjelasan.
 
 Alias menu berasal dari `MenuItemAlias`; alias tag berbeda, melalui `MenuTagAlias` dan kosakata
@@ -214,10 +208,9 @@ Pengguna tidak harus menjawab dengan satu kata persis. Koreksi nominal mengikuti
 yang sudah dikonfirmasi. Jika belum jelas, bot bertanya lagi. Permintaan dengan jumlah porsi
 yang sudah lengkap tidak perlu ditanyai ulang.
 
-`BudgetConstraint` mewakili batas harga yang sudah jelas. `BudgetRequest` dan bagian penafsiran
-rencana membantu memahami maksud kalimatnya. Method `intersect` adalah operasi menggabungkan
-batas yang memang perlu digabung; keberadaannya tidak berarti setiap dua pesan pelanggan harus
-digabung menjadi rentang.
+`BudgetConstraint` mewakili batas harga yang sudah jelas dan dipakai saat menyaring kandidat.
+Pemahaman kalimat seperti “budget 20 ribu” diserahkan kepada Gemini; jawabannya tetap harus
+berupa angka yang masuk akal dan melewati pemeriksaan server sebelum dipakai.
 
 ### Nominal baru dan kelanjutan konteks
 
@@ -309,19 +302,18 @@ Angka/nama ini ilustrasi, bukan isi katalog tetap.
 
 Penyaringan juga memeriksa status menu/kategori, pilihan wajib, batas yang berlaku, serta
 pengecualian yang dapat dibuktikan dari data. Setelah itu urutan dapat mempertimbangkan
-preferensi, suasana, dan kebijakan ranking.
+preferensi dan suasana.
 
 Tag/suasana bukan diagnosis kesehatan. “Cocok untuk nugas” adalah pertimbangan subjektif, bukan
 jaminan menu meningkatkan konsentrasi.
 
-[`CombinationPlanner`](../recommendation/services/combination_planner.py) membantu usulan
-kombinasi dalam cakupan/batas yang didukung. Ini bukan bukti sistem sudah dapat menyelesaikan
-semua kemungkinan pembagian budget dan porsi. Permintaan yang tidak jelas tetap dapat
-ditanyakan kembali.
+Pemecahan satu anggaran menjadi beberapa menu tidak lagi punya perencana khusus. Bila
+permintaan tidak jelas, Gemini dapat menanyakan kembali, dan setiap usulan tetap harus lolos
+pemeriksaan katalog.
 
 ## 9. Apa tepatnya peran Gemini?
 
-Jalur utama berada di [`GeminiAssistant`](../recommendation/services/ai/assistant.py). Ia
+Seluruh jawaban berada di [`GeminiAssistant`](../recommendation/services/ai/assistant.py). Ia
 mengirim pesan dan konteks singkat kepada Gemini. AI dapat memanggil:
 
 - `search_menu`: mencari menu melalui filter dan katalog aplikasi.
@@ -332,79 +324,47 @@ hasil fungsi, lalu menyusun jawaban. `GEMINI_MAX_TOOL_ITERATIONS` membatasi puta
 Setiap permintaan tetap dicatat dan dibatasi kuotanya. AI tidak diberi fungsi untuk mengubah
 keranjang, checkout, atau pembayaran.
 
-Pengaturan ranking/wording/proposal di bawah adalah komponen hybrid yang tetap tersedia pada
-jalur cadangan; pengaturan tersebut tidak mematikan `GeminiAssistant` yang aktif.
+| Yang dilakukan AI | Tetap menjadi tugas aplikasi |
+|---|---|
+| Memahami kalimat dan memilih filter pencarian. | Memvalidasi tag, kategori, nominal, dan identitas menu. |
+| Menyusun kalimat balasan. | Menjaga harga, ketersediaan, dan pantangan tetap sesuai katalog. |
+| Menjelaskan hasil pencarian. | Menolak balasan yang memuat HTML, tautan, atau menu di luar hasil fungsi katalog. |
 
-Ada beberapa kemampuan terpisah. Pengaturan konfigurasi menentukan mana yang aktif:
-
-| Kemampuan | Bantuannya | Tetap menjadi tugas aplikasi |
-|---|---|---|
-| Interpretasi/proposal | Mengusulkan pembacaan bahasa yang belum jelas. | Memeriksa maksud, nominal, cakupan, identitas, dan perubahan yang boleh diterapkan. |
-| Semantic ranking | Mengusulkan urutan kandidat yang sudah lolos filter. | Menjaga harga, ketersediaan, pantangan, dan ID kandidat tetap sah. |
-| Wording | Membantu kalimat berdasarkan fakta yang disediakan. | Menolak klaim/menu/harga yang tidak didukung dan menyediakan kalimat lokal. |
-
-`GeminiInterpreter` berhubungan dengan pembacaan maksud. `SemanticReranker` berhubungan dengan
-pengurutan. `RecommendationExplanationService` berhubungan dengan penjelasan/wording. Jangan
-menyebut ketiganya sebagai satu tahap wajib yang selalu berjalan pada setiap pesan.
-
-### Contoh jalur ranking
-
-```mermaid
-flowchart TD
-    A[Kandidat yang sah dari katalog] --> B{Ranking AI boleh dipakai?}
-    B -->|Tidak| C[Urutan lokal]
-    B -->|Ya| D[Minta usulan urutan]
-    D --> E{Usulan lolos pemeriksaan?}
-    E -->|Tidak| C
-    E -->|Ya| F[Gunakan urutan yang sah]
-    C --> G[Susun respons]
-    F --> G
-```
-
-[Buka diagram SVG](diagrams/chatbot-ranking.svg).
+Balasan AI diperiksa sebelum dipakai: harus teks biasa, tidak memuat HTML/Markdown/tautan, dan
+tidak melebihi panjang yang wajar. Balasan yang gagal diperiksa dianggap kegagalan layanan,
+bukan alasan untuk menyusun jawaban lokal.
 
 AI tidak bebas mengembalikan menu di luar daftar. Format data yang salah, ID tidak
 sah/berulang, atau isi yang melanggar aturan dapat ditolak. Keluaran JSON yang bisa dibaca
 belum otomatis lolos seluruh pemeriksaan.
 
-### Mode bawaan dan mode opsional
+### Konfigurasi Gemini
 
-- `v1_settings.py` membaca `GEMINI_ENABLED` dari pengaturan lingkungan atau `.env`; bawaan `false`.
-- Jika aktif dan tersedia, AI-first didahulukan untuk pesan biasa. Tombol cari lain
-  mempertahankan jalur yang sudah tersedia pada implementasi `main`.
-- `CHATBOT_AI_RESPONSE_MODE` membedakan tugas respons seperti ranking/wording.
-- `CHATBOT_AI_WORDING_ENABLED` bukan otomatis aktif ketika ranking diaktifkan.
-- `CHATBOT_RANKING_STRUCTURED_OUTPUT_ENABLED` mengatur format JSON terstruktur
-  khusus ranking. Bawaan dimatikan; pemeriksaan bagian program pada server tetap berlaku bila diaktifkan.
-- `CHATBOT_PROPOSAL_V3_ENABLED` adalah jalur proposal opsional, bukan arti bahwa
-  semua pesan sudah diinterpretasi penuh oleh AI.
+- `v1_settings.py` membaca `GEMINI_ENABLED` dari pengaturan lingkungan atau `.env`.
+- `GEMINI_ENABLED=true` dan `GEMINI_API_KEY` yang valid adalah syarat chatbot dapat menjawab.
+- `GEMINI_MAX_TOOL_ITERATIONS` membatasi putaran pemanggilan fungsi katalog, dan
+  `GEMINI_MAX_CALLS_PER_SESSION` membatasi panggilan per sesi.
+- Tidak ada pilihan mode lain: bila Gemini nonaktif, kuota habis, atau balasannya gagal
+  diperiksa, endpoint mengembalikan HTTP 503 dengan pesan "Chatbot belum tersedia".
 
-Konfigurasi Gemini disiapkan per laptop dan tidak ikut Git karena memuat rahasia. Mode lokal
-tidak memerlukannya. Pengaktifan layanan berbayar perlu ditentukan dengan pemilik akun; jangan
-menyalin kunci API anggota lain.
+Konfigurasi Gemini disiapkan per laptop dan tidak ikut Git karena memuat rahasia.
+Pengaktifan layanan berbayar perlu ditentukan dengan pemilik akun; jangan menyalin kunci API
+anggota lain.
 
 ## 10. Dari hasil pencarian menjadi kalimat
 
-Pada jalur AI-first, teks jawaban berasal dari `GeminiAssistant`, sedangkan kartu menu berasal
-dari hasil fungsi katalog Django. Penjelasan `ResponsePlan` dan template di bawah berlaku untuk
-jalur lokal dan komponen hybrid cadangan.
+Teks jawaban berasal dari `GeminiAssistant`, sedangkan kartu menu berasal dari hasil fungsi
+katalog Django. AI hanya boleh menyebut menu yang muncul pada hasil pencarian; backend tetap
+memeriksa bentuk balasan sebelum dikirim ke browser.
 
 Hasil pencarian belum merupakan balasan siap baca. Bot perlu tahu tujuannya: memberi
 rekomendasi, menjawab harga, meminta penjelasan, menjelaskan hasil kosong, atau mengakui
-perubahan pilihan.
+perubahan pilihan. Instruksi sistem menjelaskan hal ini kepada Gemini, dan kartu menu tetap
+menjadi sumber kebenaran nama, harga, dan ketersediaan.
 
-`ResponsePlan` mengumpulkan informasi yang relevan untuk jawaban. `LocalResponseComposer`
-menyusun kalimat dari bagian lokal yang tersedia. Jika wording AI diizinkan dan lolos
-pemeriksaan, kalimat bantuan dapat dipakai; jika tidak, sistem menggunakan hasil lokal yang
-sesuai.
-
-Karena itu, kalimat yang terdengar seperti template tidak membuktikan layanan AI mati. Mungkin
-ranking AI sudah dipakai, sedangkan wording memang belum aktif. Sebaliknya, kalimat yang terasa
-alami juga tidak membuktikan ada panggilan API.
-
-Saat memperbaiki respons, periksa dahulu maksud dan fakta di `ResponsePlan`. Mengganti template
-saja tidak memperbaiki salah konteks atau salah budget. Jangan menambahkan klaim “aman”, “sudah
-dipesan”, atau “tersedia” tanpa dasar yang sesuai dari alur aplikasi.
+Saat memperbaiki respons, periksa dahulu hasil pencarian dan konteks yang dikirim ke AI.
+Mengganti kalimat saja tidak memperbaiki salah konteks atau salah budget. Jangan menambahkan
+klaim “aman”, “sudah dipesan”, atau “tersedia” tanpa dasar yang sesuai dari alur aplikasi.
 
 ## 11. Dari kartu menu menjadi pesanan
 
@@ -423,32 +383,26 @@ Rincian langkah pengguna/operator ada di [panduan penggunaan](PANDUAN_PENGGUNAAN
 
 ## 12. Mengapa ada batas penggunaan dan pemeriksaan keamanan?
 
-### Bedakan batas komponen hybrid dan putaran AI-first
+### Batas putaran dan kuota
 
-`TurnGenerator` dipakai oleh bagian penafsir pesan, pengurut menu, dan pembuat penjelasan
-pada jalur gabungan aturan lokal dan AI. Bagian-bagian ini berbagi satu jatah percobaan
-untuk satu balasan. Jika jatahnya sudah dipakai, bagian lain tidak menambah percobaan.
-Kegagalan atau jawaban yang ditolak tidak otomatis mengembalikan jatah.
-
-AI-first memakai `GeminiAssistant` dan `GeminiClient.converse` langsung, sehingga satu pesan
-dapat menghasilkan beberapa panggilan AI: permintaan tool, hasil tool, dan respons lanjutan.
-Jumlah putarannya dibatasi `GEMINI_MAX_TOOL_ITERATIONS` (bawaan lokal 4). Sebelum setiap panggilan AI,
-program memeriksa jatah sesi melalui fungsi yang diberikan pemanggil, lalu menjalankan
-`_allow_provider` untuk penghitung global/klien/sesi bersama. Jangan menerangkan pembatas pada
-bagian hybrid sebagai batas satu panggilan untuk semua AI-first.
+`GeminiAssistant` memakai `GeminiClient.converse` langsung, sehingga satu pesan dapat
+menghasilkan beberapa panggilan AI: permintaan tool, hasil tool, dan respons lanjutan. Jumlah
+putarannya dibatasi `GEMINI_MAX_TOOL_ITERATIONS` (bawaan 4). Sebelum setiap panggilan AI, program
+memeriksa jatah sesi melalui fungsi yang diberikan pemanggil, lalu menjalankan
+`_allow_provider` untuk penghitung global/klien/sesi bersama.
 
 `UsageGuard` menghitung pemakaian per hari menurut waktu UTC, lalu menyimpannya sementara
 di cache. Jika tidak diubah lewat pengaturan, kode memakai batas harian 100 untuk seluruh
-aplikasi dan 20 per klien; batas sesi lokal bawaannya 50. Pengelola server dapat memakai
+aplikasi dan 20 per klien; batas sesi bawaannya 50. Pengelola server dapat memakai
 nilai lain. Angka ini menghitung percobaan panggilan, bukan token atau kuota akun Google.
 
 Pada pengaturan lokal, penghitung berada pada masing-masing proses server dan dapat hilang
 ketika proses berhenti. Jika server memakai beberapa proses, mereka memerlukan tempat
 penyimpanan penghitung yang sama supaya batas pemakaiannya tidak terpisah-pisah.
 
-Jika kuota dibatasi, layanan AI gagal, atau keluaran ditolak, bot dapat memakai jalur lokal
-atau meminta penjelasan. Jangan mengulang panggilan terus-menerus tanpa batas. Hitungan aplikasi berbeda
-dengan batas pemakaian atau tagihan pada dashboard penyedia.
+Jika kuota habis, layanan AI gagal, atau keluarannya ditolak, chatbot mengembalikan pesan bahwa
+layanan belum tersedia. Jangan mengulang panggilan terus-menerus tanpa batas. Hitungan aplikasi
+berbeda dengan batas pemakaian atau tagihan pada dashboard penyedia.
 
 ### Data dari pelanggan/katalog bukan instruksi sistem
 
@@ -472,12 +426,11 @@ penggunaan sebenarnya.
 
 | Yang terlihat | Artinya | Bukan bukti bahwa… |
 |---|---|---|
-| `chat_request`, status 200 | Permintaan chat berhasil dijawab. | Gemini pasti dipanggil. |
+| `chat_request`, status 200 | Permintaan chat berhasil dijawab. | Gemini pasti dipanggil pada permintaan itu. |
 | `provider_attempt`, `success` | Respons layanan AI diterima pada upaya itu. | Isinya pasti dipakai atau sesuai aturan. |
-| `ranking_validation`, `accepted` | Usulan ranking lolos pemeriksaan. | Kalimat balasan ditulis AI. |
+| `chat_request`, status 503 | AI tidak tersedia atau balasannya ditolak; pelanggan menerima pesan belum tersedia. | Kunci API pasti salah. |
 | `invalid_json` atau penolakan pemeriksaan | Format/isi keluaran tidak memenuhi aturan. | Seluruh aplikasi gagal berjalan. |
 | `session_limit_reached` | Batas panggilan sesi tercapai. | Kunci API pasti salah. |
-| `dialog_fallback` | Bantuan AI tidak tersedia/diterima untuk tahap itu. | Pelanggan pasti tidak mendapat hasil lokal. |
 | `provider_failure` | Ada kategori kegagalan layanan AI untuk diagnosis. | Pesan error mentah aman dibagikan. |
 
 `input_tokens` dan `output_tokens` adalah ukuran penggunaan yang dilaporkan layanan AI. `null`
@@ -534,25 +487,21 @@ pernah mencapai layanan AI.
 
 ## 15. Keterbatasan dan urutan membaca kode
 
-- Masih ada aturan/frasa lokal. Tidak semua kalimat ditafsirkan AI dan tidak
-  semua variasi bahasa mempunyai cakupan yang sama.
-- Kualitas hasil bergantung pada katalog, alias, tag, status, dan data pilihan.
-- Rencana kombinasi mempunyai batas; bukan pemecah semua masalah alokasi budget.
+- Kualitas jawaban bergantung pada instruksi AI, katalog, alias, tag, dan status data menu.
+- Tidak ada jalur balasan lokal; gangguan Gemini berarti chatbot belum tersedia.
 - Tidak ada jaminan alergi, nutrisi, atau kesehatan dari informasi pendukung menu.
 - Chat tidak menerapkan opsi, membayar, atau membuat perubahan transaksi bebas.
-- `ChatbotService` masih besar. Pisahkan penjelasan alur dari klaim bahwa semua
-  bagian sudah kecil atau sepenuhnya memenuhi SOLID.
+- `ChatbotService` sekarang hanya pengatur lalu lintas antara sesi, penyimpanan, dan
+  `GeminiAssistant`; aturan katalog berada di `RecommendationService`.
 
 Urutan membaca yang disarankan:
 
 1. Template: lihat apa yang dikirim/dilihat pelanggan.
 2. View: temukan penerimaan permintaan dan penyimpanan respons.
-3. `ChatbotService.reply`: pilih satu cabang, jangan seluruh file sekaligus.
-4. Penafsir, budget, dan resolver: cari asal maksud/angka/menu.
+3. `ChatbotService.reply`: lihat alur reset, kuota, dan pemanggilan AI.
+4. `GeminiAssistant`: lihat instruksi sistem, deklarasi fungsi katalog, dan pemeriksaan balasan.
 5. Pencarian: temukan syarat yang menggugurkan menu.
-6. Rencana respons dan composer: lihat asal kalimat.
-7. Generator, router, dan pemeriksaan: pahami kapan bantuan AI diterima/ditolak.
-8. Tes terkait: baca contoh perilaku dan batas yang sengaja dijaga.
+6. Tes terkait: baca contoh perilaku dan batas yang sengaja dijaga.
 
 Untuk presentasi, pilih satu cerita: “pelanggan menyebut budget, lalu mengganti kategori”.
 Tunjukkan perubahan catatan, penyaringan menu, dan kalimat respons. Hubungkan ke
@@ -560,16 +509,16 @@ Tunjukkan perubahan catatan, penyaringan menu, dan kalimat respons. Hubungkan ke
 [polymorphism](oop/6.%20Polimorfisme%20dan%20Abstraksi.md) hanya pada bagian yang benar-benar
 memperlihatkan konsep tersebut.
 
-Pertanyaan diskusi: mengapa harga harus tetap diperiksa server setelah bantuan AI? Mengapa
-ranking dan wording perlu dibedakan? Bagaimana mengetahui masalah berasal dari penafsiran, data
-katalog, atau penyusunan kalimat?
+Pertanyaan diskusi: mengapa harga harus tetap diperiksa server setelah bantuan AI? Mengapa kartu
+menu tetap berasal dari katalog, bukan dari kalimat AI? Bagaimana mengetahui masalah berasal dari
+instruksi AI, data katalog, atau penyimpanan sesi?
 
 ## 16. Mendiagnosis log yang tidak terlihat
 
 Baris `[tanggal] "GET/POST ..."` adalah log akses Django. JSON `chat_request` adalah informasi
 pendukung permintaan chatbot, sedangkan `provider_attempt` adalah informasi pendukung upaya
-layanan AI. HTTP 200 chat tidak selalu berarti Gemini dipanggil karena jalur lokal dapat
-memberi respons.
+layanan AI. Status 200 berarti AI memberi balasan yang lolos pemeriksaan; status 503 berarti
+chatbot belum tersedia untuk permintaan itu.
 
 Gunakan alamat dan port yang sama dengan terminal. Karena `--noreload`, restart setelah
 perubahan Python atau konfigurasi. Hindari beberapa runserver bersamaan pada alamat yang sama;

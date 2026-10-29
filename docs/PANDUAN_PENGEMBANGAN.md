@@ -36,7 +36,7 @@ sedangkan pekerjaannya dapat kita sebut “layanan keranjang”.
 5. [Model dan relasi](#5-model-dan-relasi)
 6. [Keranjang, harga, dan checkout](#6-keranjang-harga-dan-checkout)
 7. [Alamat layanan dan akses](#7-alamat-layanan-dan-akses)
-8. [Chatbot lokal dan hybrid](#8-chatbot-lokal-dan-hybrid)
+8. [Chatbot berbasis Gemini](#8-chatbot-berbasis-gemini)
 9. [Kelas dan OOP](#9-kelas-dan-oop)
 10. [Migrasi, foto, dan data awal](#10-migrasi-foto-dan-data-awal)
 11. [Alur kerja tim](#11-alur-kerja-tim)
@@ -133,11 +133,11 @@ start.ps1                       menjalankan server lokal
 | Form CMS | `users/forms.py`, template di `users/templates/users/` |
 | Peran staf/kasir | `users/access.py`, `orders/permissions.py` |
 | Halaman kasir | `users/cashier_views.py`, `users/templates/users/kasir/` |
-| Percakapan/budget | `recommendation/services/chatbot.py`, `conversation_interpreter.py`, `budget.py` |
-| Identitas menu/alias | `recommendation/services/entity_resolver.py`, model `MenuItemAlias` |
-| Filter/ranking | `recommendation/services/recommendation.py`, `services/ai/semantic_reranker.py` |
-| Layanan AI dan batas penggunaan | `recommendation/services/gemini.py`, `security.py`, `telemetry.py` |
-| Respons | `response_plan.py`, `response_composer.py`, `services/ai/explanations.py` |
+| Percakapan dan batas harga | `recommendation/services/chatbot.py`, `budget.py` |
+| Identitas menu/alias | model `MenuItemAlias`, `menu/models.py` |
+| Filter dan urutan kandidat | `recommendation/services/recommendation.py` |
+| Layanan AI dan batas penggunaan | `recommendation/services/gemini.py`, `services/ai/assistant.py`, `security.py`, `telemetry.py` |
+| Kosakata tag dan kategori | `recommendation/services/tag_extractor.py`, `language.py` |
 | Konteks dan penyimpanan chat | `conversation_session.py`, `conversation_store.py` |
 
 Path layanan chatbot yang disingkat berada di `recommendation/services/`. Folder `tests/` pada
@@ -263,41 +263,35 @@ Halaman: `/`, `/chatbot/`, `/orders/<public_id>/`, `/staff/`, `/kasir/`, dan `/a
 semua kemampuan API mempunyai tombol pada halaman kasir. Cart pelanggan tetap sama ketika
 berpindah dari chatbot ke katalog.
 
-## 8. Chatbot lokal dan hybrid
+## 8. Chatbot berbasis Gemini
 
-Chatbot bersifat **AI-first**, mengikuti sistem pada `main`. Jika Gemini aktif dan tersedia,
-`GeminiAssistant` menangani pesan biasa lebih dahulu. AI mengambil fakta menu melalui fungsi
-Django. Jalur lokal tetap tersedia sebagai jalur cadangan.
+Chatbot hanya menjawab melalui Gemini. `GeminiAssistant` mengirim pesan pelanggan beserta
+konteks percakapan, lalu mengambil fakta menu melalui fungsi katalog Django. Tidak ada jalur
+balasan lokal: bila Gemini nonaktif, kuota panggilan habis, atau balasannya gagal divalidasi,
+endpoint mengembalikan HTTP 503 dengan pesan "Chatbot belum tersedia" sehingga pelanggan
+tidak menerima jawaban karangan.
 
 ```mermaid
 flowchart TD
     A[Pesan pelanggan] --> B{Gemini aktif dan tersedia?}
-    B -->|Tidak| C[Jalur lokal]
+    B -->|Tidak| C[HTTP 503: Chatbot belum tersedia]
     B -->|Ya| D[Gemini memahami percakapan]
     D --> E{Perlu fakta menu?}
     E -->|Ya| F[Fungsi katalog Django]
     F --> D
     E -->|Tidak| G[Jawaban AI]
-    D -->|Gagal atau kuota habis| C
-    C --> H[Balasan dan kartu menu]
-    G --> H
+    G --> H[Balasan dan kartu menu]
 ```
 
-[Diagram SVG komponen hybrid cadangan](diagrams/chatbot-hybrid.svg).
-
-Diagram menunjukkan batas kepercayaan. Pada tugas ranking, kandidat sudah disaring sebelum
-dikirim ke AI; aturan server tetap berlaku setelahnya. Gemini tidak boleh membuat harga, stok,
-ID menu, atau mengubah keranjang secara bebas.
+Diagram menunjukkan batas kepercayaan. Kandidat menu selalu disaring oleh aturan server;
+Gemini tidak boleh membuat harga, stok, ID menu, atau mengubah keranjang secara bebas.
 
 | Bagian | Tugas |
 |---|---|
-| `ConversationInterpreter`, `EntityResolver` | Memahami pesan dan mengenali menu/alias. |
-| `budget.py`, `plan_interpreter.py` | Nominal, jumlah, cakupan rencana/budget. |
-| `DecisionRouter` | Keputusan dialog dan pemeriksaan proposal AI. |
+| `GeminiAssistant` | Percakapan, pemanggilan tool katalog, validasi balasan. |
 | `RecommendationService` | Katalog, syarat keras, dan urutan kandidat. |
-| `ConversationSession` | Konteks, fokus, budget, preferensi melalui method yang dibatasi. |
+| `ConversationSession` | Preferensi, pencarian aktif, dan kuota melalui method yang dibatasi. |
 | `conversation_store.py` | Penyimpanan chat bertanda revisi agar permintaan tidak saling menimpa. |
-| `ResponsePlan`, `ResponseComposer` | Hasil dan kalimat lokal dari fakta yang sudah diperiksa. |
 | `GeminiClient`, `UsageGuard`, catatan penggunaan | Adapter layanan AI, batas panggilan, informasi pendukung penggunaan. |
 
 ### Contoh budget dan konteks
@@ -318,15 +312,13 @@ staf tetap diperlukan.
 
 ### Mode AI
 
-- **Lokal:** `GEMINI_ENABLED=False`; respons dan keputusan lokal tanpa API.
-- **AI-first:** jalur utama saat Gemini tersedia. Memakai `GeminiAssistant`
-  dan fungsi katalog, dengan batas putaran `GEMINI_MAX_TOOL_ITERATIONS`.
-- **Ranking pada jalur cadangan:** Gemini dapat membantu urutan kandidat yang lolos filter.
-  `ranking_validation=accepted` menunjukkan keluaran dipakai; sukses HTTP layanan AI belum cukup.
-- **Wording:** fitur kalimat AI opsional, bawaan dimatikan pada profil lokal. Kalimat
-  tetap dapat berupa template lokal walaupun ranking Gemini aktif.
-- **Proposal v3:** jalur interpretasi opsional dengan pemeriksaan; pemasangan paket Python untuk Gemini
-  atau keberadaan kunci API saja tidak mengaktifkan jalur ini.
+- **Aktif:** `GEMINI_ENABLED=true` dengan `GEMINI_API_KEY` yang valid. `GeminiAssistant`
+  menangani seluruh balasan dan meminta fakta menu melalui fungsi katalog, dengan batas
+  putaran `GEMINI_MAX_TOOL_ITERATIONS`.
+- **Nonaktif:** tidak ada balasan lokal. Endpoint mengembalikan HTTP 503 dan halaman chatbot
+  menampilkan pesan bahwa layanan belum tersedia.
+- **Kuota:** `GEMINI_MAX_CALLS_PER_SESSION` membatasi panggilan per sesi; percobaan yang gagal
+  tetap dihitung.
 
 Profil lokal bawaan memuat `.env` jika pemuat tersedia; nilai pengaturan yang diberikan pada proses yang sudah ada
 didahulukan. Kunci API, model, dan pengaturan berada pada konfigurasi bagian program pada server, bukan bagian tampilan pada browser.
@@ -334,8 +326,8 @@ Membuka halaman chatbot mengirim pesan kosong untuk sapaan, dan reset dapat memi
 baru. Ketika Gemini tersedia, keduanya dapat memakai API walaupun pengguna belum mengetik pesan
 baru.
 
-Setiap putaran `converse` kini memeriksa kuota bersama dan mencatat informasi pendukung token
-seperti jalur generate. `TurnGenerator` membatasi komponen hybrid, bukan seluruh AI-first.
+Setiap putaran `converse` memeriksa kuota bersama dan mencatat informasi pendukung token.
+Pemeriksaan privasi dan validasi balasan tetap berada di server.
 Lihat bagian 12–13 pada [Chatbot.md](Chatbot.md).
 
 Kunci API, model, dan pengaturan dapat memakai profil lokal tambahan yang disiapkan pemilik

@@ -180,11 +180,6 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
-        "recommendation.services.ai.GeminiInterpreter": {
-            "handlers": ["console"],
-            "level": "INFO",
-            "propagate": False,
-        },
     },
 }
 
@@ -192,19 +187,6 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 # Runtime opt-in; this does not load or modify a credential file.
 GEMINI_ENABLED = os.environ.get('GEMINI_ENABLED', 'false').lower() == 'true'
-CHATBOT_SEMANTIC_RERANKING_ENABLED = (
-    os.environ.get('CHATBOT_SEMANTIC_RERANKING_ENABLED', 'true').lower() == 'true'
-)
-CHATBOT_AI_WORDING_ENABLED = os.environ.get('CHATBOT_AI_WORDING_ENABLED', 'false').lower() == 'true'
-# Opt-in expression task replaces ranking for subjective requests, never follows it.
-CHATBOT_AI_RESPONSE_MODE = os.environ.get('CHATBOT_AI_RESPONSE_MODE', 'ranking').lower()
-# Staged H3 wire contract; enable only after readiness review, not for live rollout.
-CHATBOT_PROPOSAL_V3_ENABLED = (
-    os.environ.get('CHATBOT_PROPOSAL_V3_ENABLED', 'false').lower() == 'true'
-)
-CHATBOT_CONTEXT_SWITCHING_ENABLED = (
-    os.environ.get('CHATBOT_CONTEXT_SWITCHING_ENABLED', 'true').lower() == 'true'
-)
 CHATBOT_CACHE_ALIAS = 'chatbot'
 CHATBOT_REQUIRE_SHARED_CACHE = not DEBUG
 _chatbot_redis_url = os.environ.get('CHATBOT_REDIS_URL', '')
