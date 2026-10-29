@@ -12,8 +12,6 @@ from django.db.migrations.loader import MigrationLoader
 from django.db.migrations.state import ProjectState
 from django.test import SimpleTestCase
 
-from recommendation.services.conversation_interpreter import ConversationInterpretation
-
 
 class BackendVerificationTests(SimpleTestCase):
     def test_model_refactor_requires_no_schema_migrations(self) -> None:
@@ -61,10 +59,7 @@ class BackendVerificationTests(SimpleTestCase):
                 module = importlib.import_module(
                     ".".join(source.relative_to(root).with_suffix("").parts)
                 )
-                namespace = {
-                    **vars(module),
-                    "ConversationInterpretation": ConversationInterpretation,
-                }
+                namespace = dict(vars(module))
                 candidates = []
 
                 for value in vars(module).values():

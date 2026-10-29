@@ -73,17 +73,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "/staff/login/"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_ENABLED = os.environ.get("GEMINI_ENABLED", "false").lower() == "true"
-CHATBOT_SEMANTIC_RERANKING_ENABLED = (
-    os.environ.get("CHATBOT_SEMANTIC_RERANKING_ENABLED", "true").lower() == "true"
-)
-CHATBOT_AI_WORDING_ENABLED = (
-    os.environ.get("CHATBOT_AI_WORDING_ENABLED", "false").lower() == "true"
-)
-CHATBOT_AI_RESPONSE_MODE = os.environ.get("CHATBOT_AI_RESPONSE_MODE", "ranking").lower()
-CHATBOT_CONTEXT_SWITCHING_ENABLED = (
-    os.environ.get('CHATBOT_CONTEXT_SWITCHING_ENABLED', 'true').lower() == 'true'
-)
-
 GEMINI_MAX_CALLS_PER_SESSION = int(os.environ.get("GEMINI_MAX_CALLS_PER_SESSION", "50"))
 GEMINI_MAX_TOOL_ITERATIONS = int(os.environ.get("GEMINI_MAX_TOOL_ITERATIONS", "4"))
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")

@@ -115,27 +115,6 @@ class BudgetConstraint:
     def __hash__(self) -> int:
         return hash((self.minimum, self.maximum, self.minimum_inclusive, self.maximum_inclusive))
 
-    def intersect(self, other: "BudgetConstraint") -> "BudgetConstraint":
-        minimum = self.minimum
-        min_inclusive = self.minimum_inclusive
-
-        if other.minimum is not None and (minimum is None or other.minimum > minimum):
-            minimum, min_inclusive = other.minimum, other.minimum_inclusive
-        elif other.minimum is not None and other.minimum == minimum:
-            min_inclusive = min_inclusive and other.minimum_inclusive
-
-        maximum = self.maximum
-        max_inclusive = self.maximum_inclusive
-
-        if other.maximum is not None and (maximum is None or other.maximum < maximum):
-            maximum, max_inclusive = other.maximum, other.maximum_inclusive
-        elif other.maximum is not None and other.maximum == maximum:
-            max_inclusive = max_inclusive and other.maximum_inclusive
-
-        return BudgetConstraint(
-            minimum, maximum, minimum_inclusive=min_inclusive, maximum_inclusive=max_inclusive
-        )
-
     @staticmethod
     def rupiah(value: Decimal) -> str:
         return "Rp" + f"{value:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
@@ -156,65 +135,3 @@ class BudgetConstraint:
             )
 
         return " dan ".join(parts)
-
-
-class NumericMention:
-    """Ephemeral role of a number in normalized input; never persisted as history."""
-
-    __slots__ = ('value', 'role', 'start', 'end')
-
-    def __init__(self, value: Decimal, role: str, start: int, end: int) -> None:
-        if role not in {
-            'MONEY',
-            'PERSON_COUNT',
-            'QUANTITY',
-            'TIME',
-            'TABLE_NUMBER',
-            'REFERENCE',
-            'MEASUREMENT',
-            'RATING',
-            'PERSONAL_FINANCE',
-            'OTHER',
-        }:
-            raise ValueError('Invalid numeric role')
-
-        self.value: Decimal = value
-        self.role: str = role
-        self.start: int = start
-        self.end: int = end
-
-
-class BudgetRequest:
-    def __init__(
-        self,
-        kind: str = "none",
-        constraint: BudgetConstraint | None = None,
-        *,
-        correction: bool = False,
-        clarification: str | None = None,
-        scope: str = 'CURRENT_SEARCH',
-        amount: Decimal | None = None,
-        person_count: int | None = None,
-        requested_categories: tuple[str, ...] = (),
-        soft_target: Decimal | None = None,
-        scope_ambiguous: bool = False,
-    ) -> None:
-        self.kind: str = kind
-        self.constraint: BudgetConstraint | None = constraint
-        self.correction: bool = correction
-        self.clarification: str | None = clarification
-
-        if scope not in {'CURRENT_SEARCH', 'PLAN_TOTAL', 'GROUP_TOTAL', 'PER_PERSON'}:
-            raise ValueError('Invalid budget scope')
-
-        self.scope: str = scope
-        self.amount: Decimal | None = amount
-        self.person_count: int | None = person_count
-        self.requested_categories: tuple[str, ...] = requested_categories
-
-        if soft_target is not None:
-            BudgetConstraint(maximum=soft_target)
-
-        self.soft_target: Decimal | None = soft_target
-        self.scope_ambiguous: bool = scope_ambiguous
-        self.numeric_roles: tuple[NumericMention, ...] = ()

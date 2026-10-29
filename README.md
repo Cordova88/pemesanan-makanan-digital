@@ -165,18 +165,19 @@ mengisi data katalog. Keduanya berbeda.
 | `db.sqlite3` | Katalog, akun, pesanan, dan sesi lokal. Tidak masuk Git. |
 | `media/`, `private/menu-originals/` | Foto upload dan arsip foto asli. Tidak masuk Git. |
 | `.local-secret-key` | Rahasia development lokal yang dibuat otomatis. Jangan dibagikan. |
-| `.env`, `local_gemini_settings.py` | Konfigurasi Gemini opsional per laptop. Tidak diperlukan untuk mode lokal dan tidak masuk Git. |
+| `.env`, `local_gemini_settings.py` | Konfigurasi Gemini per laptop. Diperlukan agar chatbot dapat menjawab; tidak masuk Git. |
 
-Mode lokal memakai `GEMINI_ENABLED=False`. Pemasangan paket Python untuk Gemini `google-genai` tidak
-otomatis mengirim pesan ke Gemini. Jika konfigurasi Gemini aktif dan tersedia,
-chatbot memakai alur **AI-first** dari `main`: Gemini menangani percakapan dan
-meminta fakta menu melalui fungsi Django. Mode lokal menjadi jalur cadangan.
-Alurnya dijelaskan di
-[panduan pengembangan](docs/PANDUAN_PENGEMBANGAN.md#8-chatbot-lokal-dan-hybrid).
+Chatbot hanya menjawab melalui Gemini. `GEMINI_ENABLED=true` beserta `GEMINI_API_KEY` yang
+valid merupakan syarat agar chatbot berfungsi; tanpa itu, endpoint mengembalikan
+pesan "Chatbot belum tersedia" (HTTP 503) dan tidak ada balasan lokal. Pemasangan paket
+Python `google-genai` saja tidak otomatis mengirim pesan ke Gemini. Gemini menangani
+percakapan dan meminta fakta menu melalui fungsi Django, sehingga nama, harga, dan
+ketersediaan tetap berasal dari katalog. Alurnya dijelaskan di
+[panduan pengembangan](docs/PANDUAN_PENGEMBANGAN.md#8-chatbot-berbasis-gemini).
 
 Contoh nama variabel tanpa rahasia tersedia di [.env.example](.env.example).
 File tersebut bukan konfigurasi siap pakai: kunci rahasia, URL cache, model, dan kunci API
-masih kosong. Mode lokal bawaan tidak perlu menyalinnya. Profil
+masih kosong. Profil
 settings dapat memuat `.env` melalui `python-dotenv`, dengan pengaturan pada proses
 yang sudah ada tetap didahulukan;
 ikuti [panduan hosting](docs/PANDUAN_VERIFIKASI_HOSTING.md) bila menyiapkan server.

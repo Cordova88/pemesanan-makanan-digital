@@ -10,7 +10,7 @@ from typing import ClassVar, cast
 from django.conf import settings
 from django.contrib.sessions.backends.base import SessionBase
 
-from menu.models import Category, MenuTag
+from menu.models import MenuTag
 
 from .ai.assistant import GeminiAssistant
 from .conversation_session import ConversationSession
@@ -69,9 +69,6 @@ class ChatbotService:
             .distinct()
         )
         self.tag_extractor.configure_catalog_tags(catalog_tags, catalog_aliases)
-        self.tag_extractor.configure_categories(
-            Category.objects.filter(is_active=True).values_list('name', flat=True)
-        )
         self.recommender: RecommendationService = RecommendationService()
         self.gemini_client: TextGenerator = (
             GeminiClient() if gemini_client is None else gemini_client
