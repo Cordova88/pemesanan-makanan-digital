@@ -73,8 +73,7 @@ katalog yang wajib ada di setiap laptop.
 | [budget.py](../../recommendation/services/budget.py) | Menyimpan dan memeriksa batas harga. |
 | [text_generator.py](../../recommendation/services/text_generator.py) | Menentukan kemampuan dasar pembuat teks. |
 | [gemini.py](../../recommendation/services/gemini.py) | Menghubungi Gemini dan mencatat pemakaiannya. |
-| [turn_generator.py](../../recommendation/services/ai/turn_generator.py) | Membatasi percobaan AI pada bagian hybrid yang memakainya. |
-| [explanations.py](../../recommendation/services/ai/explanations.py) | Meminta dan memeriksa penjelasan rekomendasi. |
+| [users/forms.py](../../users/forms.py) | Form manajemen CMS dan penataan styling Bootstrap otomatis. |
 | [assistant.py](../../recommendation/services/ai/assistant.py) | Mengatur percakapan Gemini dan fungsi pencarian menu. |
 | [chatbot.py](../../recommendation/services/chatbot.py) | Menghubungkan bagian-bagian percakapan. |
 | [conversation_session.py](../../recommendation/services/conversation_session.py) | Mengelola data percakapan yang perlu diingat sementara. |
@@ -105,20 +104,20 @@ katalog yang wajib ada di setiap laptop.
 2. [`MenuSelection`](../../menu/selection.py#L97) — `menu/selection.py`.
 3. [`CartService.add_item`](../../cart/services.py#L36) — `cart/services.py`.
 4. [`StaffAccess`](../../users/access.py#L10) — `users/access.py`.
-5. [`ConversationSession.reset`](../../recommendation/services/conversation_session.py#L977) — `recommendation/services/conversation_session.py`.
+5. [`ConversationSession.reset`](../../recommendation/services/conversation_session.py#L123) — `recommendation/services/conversation_session.py`.
 
 ### Modul 4: Relasi Kelas dan UML
 
 1. [`MenuItem`](../../menu/models.py#L68) — `menu/models.py`.
 2. [`OrderItem`](../../orders/models.py#L135) — `orders/models.py`.
 3. [`MenuSelection.__init__`](../../menu/selection.py#L34) — `menu/selection.py`.
-4. [`ChatbotService.__init__`](../../recommendation/services/chatbot.py#L114) — `recommendation/services/chatbot.py`.
+4. [`ChatbotService.__init__`](../../recommendation/services/chatbot.py#L45) — `recommendation/services/chatbot.py`.
 5. [`TextGenerator`](../../recommendation/services/text_generator.py#L6) — `recommendation/services/text_generator.py`.
 
 ### Modul 5: Inheritance
 
 1. [`GeminiClient.generate`](../../recommendation/services/gemini.py#L61) — `recommendation/services/gemini.py`.
-2. [`TurnGenerator`](../../recommendation/services/ai/turn_generator.py#L69) — `recommendation/services/ai/turn_generator.py`.
+2. [`BootstrapModelForm.__init__`](../../users/forms.py#L11) — `users/forms.py`.
 3. [`MenuItem.save`](../../menu/models.py#L71) — `menu/models.py`.
 4. [`MenuPhotoForm.__init__`](../../menu/forms.py#L34) — `menu/forms.py`.
 5. [`MenuPhotoWidget.get_context`](../../menu/widgets.py#L12) — `menu/widgets.py`.
@@ -126,7 +125,7 @@ katalog yang wajib ada di setiap laptop.
 ### Modul 6: Polimorfisme dan Abstraksi
 
 1. [`TextGenerator`](../../recommendation/services/text_generator.py#L6) — `recommendation/services/text_generator.py`.
-2. [`TurnGenerator._generate`](../../recommendation/services/ai/turn_generator.py#L69) — `recommendation/services/ai/turn_generator.py`.
+2. [`FakeProvider.generate`](../../recommendation/tests/test_ai_only.py#L31) — `recommendation/tests/test_ai_only.py`.
 3. [`VariantGroup.__str__`](../../menu/models.py#L142) — `menu/models.py`.
 4. [`BudgetConstraint.__eq__`](../../recommendation/services/budget.py#L107) — `recommendation/services/budget.py`.
 5. [`MenuPhotoWidget.get_context`](../../menu/widgets.py#L12) — `menu/widgets.py`.
@@ -134,10 +133,10 @@ katalog yang wajib ada di setiap laptop.
 ### Modul 7: Prinsip SOLID
 
 1. [`MenuSelection.from_ids`](../../menu/selection.py#L44) — `menu/selection.py`.
-2. [`TextGenerator`](../../recommendation/services/text_generator.py#L17) — `recommendation/services/text_generator.py`.
-3. [`GeminiClient._generate`](../../recommendation/services/gemini.py#L61) — `recommendation/services/gemini.py`.
+2. [`TextGenerator`](../../recommendation/services/text_generator.py#L6) — `recommendation/services/text_generator.py`.
+3. [`GeminiClient._generate`](../../recommendation/services/gemini.py#L65) — `recommendation/services/gemini.py`.
 4. [`StaffAccess`](../../users/access.py#L18) — `users/access.py`.
-5. [`RecommendationExplanationService.__init__`](../../recommendation/services/ai/explanations.py#L74) — `recommendation/services/ai/explanations.py`.
+5. [`ChatbotService.__init__`](../../recommendation/services/chatbot.py#L45) — `recommendation/services/chatbot.py`.
 
 
 ## Menghubungkan konsep dengan tindakan pengguna
