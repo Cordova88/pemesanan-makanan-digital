@@ -1,4 +1,4 @@
-import { createMenuCard, createFoodVisual, createDetailPhoto } from './menu-card.mjs?v=customer-p4-r5';
+import { createMenuCard, createFoodVisual, createDetailPhoto } from './menu-card.mjs?v=photo-shape-r1';
 import { money } from "./api.mjs?v=customer-p4-r5";
 import { state } from "./state.mjs?v=customer-p4-r5";
 
@@ -231,7 +231,8 @@ export function renderCatalog() {
   if (featured) hero.append(createFoodVisual(featured, { eager: true }));
   const favorites = document.querySelector("#homeFavorites");
   favorites.replaceChildren();
-  state.menu.slice(0, 2).forEach((item) => {
+  // Up to six favourites; responsive.css shows 2 on phones and more on wider screens.
+  state.menu.slice(0, 6).forEach((item) => {
     const card = document.createElement("a");
     card.href = "#menu";
     card.addEventListener("click", () => openItem(item.id));

@@ -1,5 +1,5 @@
 {% load static %}
-<div class="menu-photo-editor" data-photo-editor data-photo-module="{% static 'menu/js/menu-card.mjs' %}?v=images-p8" data-photo-original="{{ widget.photo_url }}" data-menu-id="{{ widget.attrs.data_menu_id|default:'' }}" data-photo-kind="{{ widget.attrs.data_photo_kind|default:'card' }}">
+<div class="menu-photo-editor" data-photo-editor data-photo-module="{% static 'menu/js/menu-card.mjs' %}?v=photo-shape-r1" data-photo-original="{{ widget.photo_url }}" data-menu-id="{{ widget.attrs.data_menu_id|default:'' }}" data-photo-kind="{{ widget.attrs.data_photo_kind|default:'card' }}">
   <div data-photo-card class="menu-photo-editor__card" aria-label="{% if widget.attrs.data_photo_kind == 'detail' %}Pratinjau foto arsip{% else %}Pratinjau kartu menu{% endif %}" hidden></div>
   {% if widget.attrs.data_photo_kind != 'detail' %}<div data-photo-selection class="menu-photo-editor__selection" aria-label="Pratinjau foto pilihan menu" hidden></div>{% endif %}
   {% if widget.photo_url %}<img data-photo-static src="{{ widget.photo_url }}" class="menu-photo-editor__static" alt="Foto menu tersimpan" width="176" height="132">{% endif %}

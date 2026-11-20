@@ -32,3 +32,6 @@ staticfiles/
 
 # Machine-specific Gemini profile
 local_gemini_settings.py
+
+/CLAUDE.md
+/PLAN.md

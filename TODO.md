@@ -1,0 +1,4 @@
+- [x] Make the the user interface responsive to desktop
+- Fix UI bugs from overly large image ruining the menu cards
+- Use a docker container for local operations
+- Refactor codes to follow closely OOP Standards (docs/oop)

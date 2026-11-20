@@ -53,4 +53,12 @@
 
 .chat-recommendation>.food-card__art{width:110px;height:96px;float:right;margin:0 0 8px 12px;aspect-ratio:auto}
 .chat-recommendation .food-card__blob{inset:0}
+/* Opaque photos (no transparent cut-out): clip a cover image inside its box instead of
+   letting it float over the card edges. The class is set by PhotoShapeProbe in menu-card.mjs. */
+.food-card__art--photo{overflow:hidden;border-radius:14px}
+.food-card__art--photo .food-card__blob{display:none}
+.food-card__art--photo .food-card__image{inset:0;width:100%;height:100%;max-width:100%;margin:0;object-fit:cover;border-radius:inherit}
+#menuGrid .food-card{container-type:inline-size}
+#menuGrid .food-card>.food-card__art--photo{margin-top:0;aspect-ratio:auto;height:calc(100cqw / 1.45 - 24px);border-radius:17px 17px 0 0}
+#menuGrid .food-card__art--photo .food-card__image{width:100%;height:100%}
 @media(max-width:380px){#modalImage{height:200px}.home-hero{height:210px}.favorite-card>.food-card__art{height:120px}}

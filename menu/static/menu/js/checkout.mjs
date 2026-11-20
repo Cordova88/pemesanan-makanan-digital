@@ -1,8 +1,8 @@
 import { api, money, toast } from "./api.mjs?v=customer-p4-r5";
 import { state } from "./state.mjs?v=customer-p4-r5";
-import { createFoodVisual } from './menu-card.mjs?v=customer-p4-r5';
+import { createFoodVisual } from './menu-card.mjs?v=photo-shape-r1';
 import { renderOrderType } from "./table-scanner.mjs?v=customer-p4-r5";
-import { flushCartNotes } from "./cart.mjs?v=customer-p4-r5";
+import { flushCartNotes } from "./cart.mjs?v=photo-shape-r1";
 
 let reviewing = false;
 let submitting = false;

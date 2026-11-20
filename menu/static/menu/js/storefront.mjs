@@ -1,7 +1,7 @@
 import { api } from "./api.mjs?v=customer-p4-r5";
-import { bindCart, refreshCart } from "./cart.mjs?v=customer-p4-r5";
-import { bindCheckout } from "./checkout.mjs?v=customer-p4-r5";
-import { bindMenu, renderCatalog } from "./menu.mjs?v=customer-p4-r5";
+import { bindCart, refreshCart } from "./cart.mjs?v=photo-shape-r1";
+import { bindCheckout } from "./checkout.mjs?v=photo-shape-r1";
+import { bindMenu, renderCatalog } from "./menu.mjs?v=photo-shape-r1";
 import { bindTableScanner, establishTableContext } from "./table-scanner.mjs?v=customer-p4-r5";
 import { state } from "./state.mjs?v=customer-p4-r5";
 import { bindCustomerNavigation } from "./navigation.mjs?v=service-layer-r8";
@@ -56,7 +56,7 @@ async function initializeStorefront() {
     state.menu = response.items;
     renderCatalog();
     const selectedId = Number(new URLSearchParams(window.location.search).get("menu"));
-    if (selectedId) { const {openItem}=await import("./menu.mjs?v=customer-p4-r5"); openItem(selectedId); }
+    if (selectedId) { const {openItem}=await import("./menu.mjs?v=photo-shape-r1"); openItem(selectedId); }
     await refreshCart();
   } catch (error) {
     console.error("Initialization error:", error);
