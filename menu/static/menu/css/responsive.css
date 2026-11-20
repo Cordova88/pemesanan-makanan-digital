@@ -1,15 +1,27 @@
-/* Keep the 412px Figma frame on desktop; fit smaller screens without scaling the page. */
+/* Fluid customer layout. The storefront fills the screen at every width; receipt and
+   chat stay readable centred columns on the same background (no visible frame).
+   Breakpoints: 560px (large phone / small tablet), 768px (tablet), 1024px+ (desktop). */
 :root {
-  --customer-width: 412px;
+  --customer-width: 100%;
   --customer-gutter: clamp(16px, calc(8.7vw - 11.8px), 24px);
   --app-height: 100dvh;
 }
+
+.page-storefront, .page-receipt, .page-chat { background: var(--paper); }
+.page-receipt, .page-chat { --customer-width: 560px; }
 
 .customer-shell, .chat-shell {
   width: 100%;
   max-width: var(--customer-width);
   margin-inline: auto;
+  box-shadow: none;
+  border-inline: 0 !important;
 }
+
+/* page4/retro size these from the old 412/480px frame. */
+.floating-cart-wrapper, .status-bottom { width: min(100%, var(--customer-width)); }
+#cartDrawer { width: 100%; }
+.receipt { max-width: none; }
 
 .catalog-header, .catalog-main, .home-view {
   padding-inline: var(--customer-gutter);
@@ -181,27 +193,21 @@
 /* Phones keep the original two favourites; wider screens reveal more below. */
 .home-favorites > .favorite-card:nth-child(n+3) { display: none; }
 
-/* ---------- Tablet & desktop: phones (<768px) keep the 412px frame above. ---------- */
-@media (min-width: 768px) {
-  body { --customer-gutter: 32px; }
-  .page-storefront { --customer-width: 720px; }
-  .page-receipt, .page-chat { --customer-width: 640px; }
+/* ---------- Large phones / small tablets: wider than the 412px design frame. ---------- */
+@media (min-width: 560px) {
+  body { --customer-gutter: 28px; }
 
   /* Menu view */
-  .catalog-header { padding-top: 32px; }
-  .catalog-header h1 { font-size: 30px; line-height: 36px; }
   .category-chip { flex: 0 0 auto; min-width: 96px; padding: 10px 20px; }
-  #menuGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 24px; }
-  .floating-cart-wrapper { width: min(100%, var(--customer-width)); }
+  #menuGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 18px; }
   .floating-cart-wrapper > * { max-width: 420px; margin-inline: auto; }
   .floating-cart-wrapper > .btn { display: flex; }
 
   /* Home view */
-  .home-view { padding-top: 40px; }
-  .home-hero { height: 320px; margin: 24px 0; border-radius: 20px; }
-  .home-favorites { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+  .home-hero { height: 300px; margin: 24px 0; border-radius: 20px; }
+  .home-view > .btn { max-width: 420px; }
+  .home-favorites { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
   .home-favorites > .favorite-card:nth-child(-n+3) { display: block; }
-  .favorite-card > .food-card__art { height: 160px; }
 
   /* Cart: right-side panel instead of a full-screen sheet. */
   #cartDrawer.offcanvas {
@@ -224,6 +230,8 @@
     margin: 32px auto;
   }
   #checkoutModal .modal-dialog { max-width: 600px; }
+  /* Keep a visible margin when the screen is barely wider than the dialog. */
+  #itemModal .modal-dialog, #checkoutModal .modal-dialog { width: calc(100% - 32px); }
   #itemModal .modal-content, #checkoutModal .modal-content {
     height: min(calc(var(--app-height) - 64px), 860px);
     border-radius: 20px;
@@ -232,14 +240,34 @@
   #modalImage { height: 260px; }
 
   /* Receipt */
-  .receipt { max-width: none; }
-  .status-bottom { width: min(100%, var(--customer-width)); }
   .status-bottom > * { max-width: 420px; margin-inline: auto; }
+
+  /* Chat */
+  .bubble { max-width: 80%; }
+  .bubble.me { max-width: 70%; }
+}
+
+/* ---------- Tablet ---------- */
+@media (min-width: 768px) {
+  body { --customer-gutter: 32px; }
+  .page-receipt, .page-chat { --customer-width: 640px; }
+
+  /* Menu view */
+  .catalog-header { padding-top: 32px; }
+  .catalog-header h1 { font-size: 30px; line-height: 36px; }
+  #menuGrid { gap: 20px 24px; }
+
+  /* Home view */
+  .home-view { padding-top: 40px; }
+  .home-hero { height: 320px; }
+  .home-favorites { gap: 20px; }
+  .favorite-card > .food-card__art { height: 160px; }
+
+  /* Receipt */
   .qr-box { width: 200px; min-height: 200px; }
   .qr-box img, .qr-box canvas { max-width: 180px; }
 
   /* Chat */
-  .chat-shell { border-inline: 1px solid #e1ded4; }
   .bubble { max-width: 75%; }
   .bubble.me { max-width: 65%; }
   .chat-recommendation { max-width: 75%; }
@@ -247,13 +275,9 @@
 }
 
 @media (min-width: 1024px) {
-  /* Storefront uses the whole screen: no phone frame, no empty side bands. */
+  /* Wider gutter; the storefront is already full width at every size. */
   body { --customer-gutter: clamp(40px, 5vw, 96px); }
-  .page-storefront { --customer-width: 100%; background: var(--paper); }
-  .page-storefront .customer-shell { box-shadow: none; border-inline: 0; }
-  .page-receipt, .page-chat { --customer-width: 680px; background: var(--paper); }
-  .page-chat .chat-shell { border-inline: 0; }
-  .page-receipt, .page-chat { --customer-gutter: 32px; }
+  .page-receipt, .page-chat { --customer-width: 680px; --customer-gutter: 32px; }
 
   /* Menu view: title left, service + search right. */
   .catalog-header {

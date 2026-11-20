@@ -123,7 +123,7 @@ start.ps1                       menjalankan server lokal
 |---|---|
 | Katalog dan modal pilihan | `menu/templates/menu/storefront.html`, `menu/templates/menu/partials/` |
 | Tampilan katalog/kartu | `menu/static/menu/css/page4.css`, `retro.css`, `storefront.css`, `menu-card.css` |
-| Tata letak responsif (tablet ≥768px, desktop ≥1024px) | `menu/static/menu/css/responsive.css` (dimuat paling akhir; aturan ponsel tetap 412px) |
+| Tata letak responsif (lebar penuh; titik henti 560px, 768px, 1024px, 1440px) | `menu/static/menu/css/responsive.css` (dimuat paling akhir) |
 | Pencarian dan pemilihan menu | `menu/static/menu/js/menu.mjs`, `storefront.mjs` |
 | Keranjang dan catatan item | `menu/static/menu/js/cart.mjs`, `cart/services.py` |
 | Checkout dua tahap | `menu/static/menu/js/checkout.mjs`, `orders/views.py`, `orders/services.py` |
